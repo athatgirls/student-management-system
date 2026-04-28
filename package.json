@@ -1,0 +1,11 @@
+{
+  "scripts": {
+    "docker:dev": "docker compose -f docker-compose.dev.yml up --build",
+    "docker:dev:down": "docker compose -f docker-compose.dev.yml down",
+    "docker:preview": "docker compose up -d --build",
+    "docker:preview:down": "docker compose down"
+  },
+  "dependencies": {
+    "@popperjs/core": "^2.11.8"
+  }
+}

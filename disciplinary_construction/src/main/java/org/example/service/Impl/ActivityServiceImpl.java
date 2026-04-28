@@ -1,0 +1,289 @@
+package org.example.service.Impl;
+
+import org.example.model.ActivityModel;
+import org.example.model.DailyTaskModel;
+import org.example.model.DailyTaskSubmissionModel;
+import org.example.model.StudentModel;
+import org.example.model.PartyApplicationModel;
+import org.example.repository.ActivityRepository;
+import org.example.repository.DailyTaskRepository;
+import org.example.repository.DailyTaskSubmissionRepository;
+import org.example.repository.StudentRepository;
+import org.example.service.ActivityService;
+import org.example.service.PartyApplicationService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
+import com.mongodb.client.result.UpdateResult;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.*;
+
+@Service
+public class ActivityServiceImpl implements ActivityService {
+
+    @Autowired
+    private ActivityRepository activityRepository;
+
+    @Autowired
+    private StudentRepository studentRepository;
+
+    @Autowired
+    private DailyTaskRepository taskRepository;
+
+    @Autowired
+    private DailyTaskSubmissionRepository submissionRepository;
+
+    @Autowired
+    private PartyApplicationService partyApplicationService;
+
+    @Autowired
+    private MongoTemplate mongoTemplate;
+
+    @Override
+    public ActivityModel createActivity(ActivityModel activity) {
+        activity.setCreateTime(LocalDateTime.now());
+        activity.setUpdateTime(LocalDateTime.now());
+        activity.setMatched(false);
+        if (activity.getParticipantStudentIds() == null) {
+            activity.setParticipantStudentIds(new ArrayList<>());
+        }
+        return activityRepository.save(activity);
+    }
+
+    @Override
+    public List<ActivityModel> getAllActivities() {
+        return activityRepository.findAllByOrderByActivityTimeDesc();
+    }
+
+    @Override
+    public ActivityModel getActivityById(String id) {
+        return activityRepository.findById(id).orElse(null);
+    }
+
+    @Override
+    public void deleteActivity(String id) {
+        activityRepository.deleteById(id);
+    }
+
+    @Override
+    public Map<String, Object> importStudentsAndMatchTasks(String activityId, List<Map<String, String>> students) {
+        Map<String, Object> result = new HashMap<>();
+        List<Map<String, Object>> matchedResults = new ArrayList<>();
+        List<Map<String, Object>> unmatchedResults = new ArrayList<>();
+        
+        ActivityModel activity = activityRepository.findById(activityId).orElse(null);
+        if (activity == null) {
+            result.put("success", false);
+            result.put("message", "活动不存在");
+            return result;
+        }
+
+        // 检查活动是否关联了任务
+        if (activity.getTaskId() == null || activity.getTaskId().trim().isEmpty()) {
+            result.put("success", false);
+            result.put("message", "活动未关联任务，请先为活动关联一个任务");
+            return result;
+        }
+
+        // 获取关联的特定任务
+        DailyTaskModel associatedTask = taskRepository.findById(activity.getTaskId()).orElse(null);
+        if (associatedTask == null) {
+            result.put("success", false);
+            result.put("message", "关联的任务不存在");
+            return result;
+        }
+
+        if (!associatedTask.isActive()) {
+            result.put("success", false);
+            result.put("message", "关联的任务未激活");
+            return result;
+        }
+
+        // 如果是报名型任务，需要检查报名人数限制
+        if ("registration".equals(associatedTask.getTaskCategory())) {
+            int maxParticipants = associatedTask.getMaxParticipants() != null ? associatedTask.getMaxParticipants() : 0;
+            int currentParticipants = associatedTask.getCurrentParticipants() != null ? associatedTask.getCurrentParticipants() : 0;
+            int remainingSlots = maxParticipants - currentParticipants;
+            
+            if (remainingSlots <= 0) {
+                result.put("success", false);
+                result.put("message", "报名型任务已满员，无法继续导入学生");
+                return result;
+            }
+        }
+
+        List<String> participantIds = new ArrayList<>();
+
+        for (Map<String, String> studentInfo : students) {
+            String name = studentInfo.get("name");
+            String studentId = studentInfo.get("studentId");
+            
+            // 先尝试通过学号查找
+            StudentModel foundStudent = null;
+            if (studentId != null && !studentId.trim().isEmpty()) {
+                foundStudent = studentRepository.findByStudentId(studentId.trim());
+            }
+            
+            // 如果通过学号找不到，尝试通过姓名查找
+            if (foundStudent == null && name != null && !name.trim().isEmpty()) {
+                List<StudentModel> studentsByName = studentRepository.findByName(name.trim());
+                if (studentsByName != null && !studentsByName.isEmpty()) {
+                    // 如果找到多个同名学生，优先选择学号匹配的
+                    if (studentId != null && !studentId.trim().isEmpty()) {
+                        foundStudent = studentsByName.stream()
+                                .filter(s -> studentId.trim().equals(s.getStudentId()))
+                                .findFirst()
+                                .orElse(studentsByName.get(0));
+                    } else {
+                        foundStudent = studentsByName.get(0);
+                    }
+                }
+            }
+
+            if (foundStudent == null) {
+                Map<String, Object> unmatched = new HashMap<>();
+                unmatched.put("name", name);
+                unmatched.put("studentId", studentId);
+                unmatched.put("reason", "未找到匹配的学生");
+                unmatchedResults.add(unmatched);
+                continue;
+            }
+
+            final StudentModel student = foundStudent;
+            participantIds.add(student.getId());
+
+            // 获取学生的入党申请信息（用于判断任务限制条件）
+            String studentPartyStage = null;
+            if (student.getStudentId() != null) {
+                PartyApplicationModel partyApplication = partyApplicationService.getByStudentId(student.getStudentId());
+                if (partyApplication != null) {
+                    studentPartyStage = partyApplication.getCurrentStage();
+                }
+            }
+            final String finalPartyStage = studentPartyStage;
+
+            // 检查该学生是否符合这个特定任务的限制条件
+            boolean canCompleteTask = true;
+            String restrictionReason = null;
+
+            // 检查年级限制
+            if (associatedTask.getAllowedGrades() != null && !associatedTask.getAllowedGrades().isEmpty()) {
+                if (student.getGrade() == null || !associatedTask.getAllowedGrades().contains(student.getGrade())) {
+                    canCompleteTask = false;
+                    restrictionReason = "不符合年级限制";
+                }
+            }
+
+            // 检查政治面貌限制
+            if (canCompleteTask && associatedTask.getAllowedPoliticalStatuses() != null && !associatedTask.getAllowedPoliticalStatuses().isEmpty()) {
+                if (student.getPoliticalStatus() == null || !associatedTask.getAllowedPoliticalStatuses().contains(student.getPoliticalStatus())) {
+                    canCompleteTask = false;
+                    restrictionReason = "不符合政治面貌限制";
+                }
+            }
+
+            // 检查入党阶段限制
+            if (canCompleteTask && associatedTask.getAllowedPartyStages() != null && !associatedTask.getAllowedPartyStages().isEmpty()) {
+                if (finalPartyStage == null || !associatedTask.getAllowedPartyStages().contains(finalPartyStage)) {
+                    canCompleteTask = false;
+                    restrictionReason = "不符合入党阶段限制";
+                }
+            }
+
+            int matchedCount = 0;
+            if (canCompleteTask) {
+                // 检查是否已经提交过
+                Optional<DailyTaskSubmissionModel> existing = submissionRepository.findByTaskIdAndStudentId(
+                        associatedTask.getId(), student.getId());
+
+                if (!existing.isPresent()) {
+                    // 如果是报名型任务，需要检查报名人数限制
+                    if ("registration".equals(associatedTask.getTaskCategory())) {
+                        int maxParticipants = associatedTask.getMaxParticipants() != null ? associatedTask.getMaxParticipants() : 0;
+                        int currentParticipants = associatedTask.getCurrentParticipants() != null ? associatedTask.getCurrentParticipants() : 0;
+                        
+                        if (currentParticipants >= maxParticipants) {
+                            // 已满员
+                            Map<String, Object> unmatched = new HashMap<>();
+                            unmatched.put("name", student.getName());
+                            unmatched.put("studentId", student.getStudentId());
+                            unmatched.put("reason", "报名型任务已满员");
+                            unmatchedResults.add(unmatched);
+                            continue;
+                        }
+                        
+                        // 使用原子操作更新报名人数
+                        Query query = new Query(
+                            Criteria.where("_id").is(associatedTask.getId())
+                                .and("currentParticipants").lt(maxParticipants)
+                        );
+                        Update update = new Update().inc("currentParticipants", 1);
+                        
+                        UpdateResult updateResult = mongoTemplate.updateFirst(query, update, DailyTaskModel.class);
+                        
+                        if (updateResult.getModifiedCount() == 0) {
+                            // 更新失败，说明已满员
+                            Map<String, Object> unmatched = new HashMap<>();
+                            unmatched.put("name", student.getName());
+                            unmatched.put("studentId", student.getStudentId());
+                            unmatched.put("reason", "报名型任务已满员");
+                            unmatchedResults.add(unmatched);
+                            continue;
+                        }
+                    }
+                    
+                    // 创建新的提交记录
+                    DailyTaskSubmissionModel submission = new DailyTaskSubmissionModel();
+                    submission.setTaskId(associatedTask.getId());
+                    submission.setStudentId(student.getId());
+                    submission.setStudentName(student.getName());
+                    submission.setSubmissionTime(LocalDateTime.now());
+                    submission.setUpdateTime(LocalDateTime.now());
+                    submission.setStatus("completed");
+                    // 提交内容可以包含活动信息
+                    submission.setContent(String.format("{\"activityId\":\"%s\",\"activityTitle\":\"%s\"}", 
+                            activityId, activity.getTitle()));
+                    
+                    submissionRepository.save(submission);
+                    matchedCount = 1;
+                } else {
+                    // 已经提交过，也算匹配成功
+                    matchedCount = 1;
+                }
+            } else {
+                // 不符合任务限制条件
+                Map<String, Object> unmatched = new HashMap<>();
+                unmatched.put("name", student.getName());
+                unmatched.put("studentId", student.getStudentId());
+                unmatched.put("reason", restrictionReason);
+                unmatchedResults.add(unmatched);
+                continue;
+            }
+
+            Map<String, Object> matched = new HashMap<>();
+            matched.put("name", student.getName());
+            matched.put("studentId", student.getStudentId());
+            matched.put("matchedTaskCount", matchedCount);
+            matchedResults.add(matched);
+        }
+
+        // 更新活动的参与学生列表
+        activity.setParticipantStudentIds(participantIds);
+        activity.setMatched(true);
+        activity.setUpdateTime(LocalDateTime.now());
+        activityRepository.save(activity);
+
+        result.put("success", true);
+        result.put("matchedCount", matchedResults.size());
+        result.put("unmatchedCount", unmatchedResults.size());
+        result.put("matchedResults", matchedResults);
+        result.put("unmatchedResults", unmatchedResults);
+
+        return result;
+    }
+}
+

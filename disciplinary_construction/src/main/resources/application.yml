@@ -1,0 +1,73 @@
+server:
+  port: ${SERVER_PORT:1010}
+  servlet:
+    context-path: ${SERVER_CONTEXT_PATH:/SCSE@hbut}
+
+spring:
+  application:
+    name: disciplinary-construction
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/disciplinary_construction}
+
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    database: ${REDIS_DATABASE:0}
+    timeout: ${REDIS_TIMEOUT:10000ms}
+    lettuce:
+      pool:
+        max-active: ${REDIS_POOL_MAX_ACTIVE:8}
+        max-wait: ${REDIS_POOL_MAX_WAIT:-1ms}
+        max-idle: ${REDIS_POOL_MAX_IDLE:8}
+        min-idle: ${REDIS_POOL_MIN_IDLE:0}
+
+  servlet:
+    multipart:
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:10MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:50MB}
+
+  jackson:
+    date-format: yyyy-MM-dd
+    time-zone: GMT+8
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
+
+app:
+  upload-dir: ${APP_UPLOAD_DIR:uploads}
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
+
+logging:
+  level:
+    root: ${LOG_LEVEL_ROOT:INFO}
+    org.example: ${LOG_LEVEL_APP:INFO}
+    org.springframework.security: ${LOG_LEVEL_SECURITY:INFO}
+    org.springframework.data.mongodb: ${LOG_LEVEL_MONGODB:INFO}
+    com.mongodb.client: ${LOG_LEVEL_MONGO_CLIENT:WARN}
+
+jwt:
+  secret: ${JWT_SECRET:your-secret-key-must-be-at-least-256-bits-long-for-production-use}
+  expiration: ${JWT_EXPIRATION:86400000}
+  refresh-threshold: ${JWT_REFRESH_THRESHOLD:1800000}
+
+knife4j:
+  enable: ${KNIFE4J_ENABLE:true}
+  setting:
+    language: zh-CN
+    enable-swagger-models: true
+    enable-document-manage: true
+    swagger-model-name: Entity List
+  basic:
+    enable: false

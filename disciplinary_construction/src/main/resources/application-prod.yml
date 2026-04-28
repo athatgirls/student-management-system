@@ -1,0 +1,15 @@
+spring:
+  devtools:
+    restart:
+      enabled: false
+
+logging:
+  level:
+    root: INFO
+    org.example: INFO
+    org.springframework.security: WARN
+    org.springframework.data.mongodb: WARN
+    com.mongodb.client: WARN
+
+knife4j:
+  enable: false

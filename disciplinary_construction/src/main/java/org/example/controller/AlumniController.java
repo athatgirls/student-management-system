@@ -1,0 +1,126 @@
+package org.example.controller;
+
+import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.date.LocalDateTimeUtil;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
+import org.example.annotation.CurrentUser;
+import org.example.exception.BusinessException;
+import org.example.model.AlumniModel;
+import org.example.response.ResponseCode;
+import org.example.response.ResponseResult;
+import org.example.service.AlumniService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.*;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+@Slf4j
+@RestController
+@RequestMapping("/msi/alumni")
+@Tag(name = "校友管理接口")
+public class AlumniController {
+    @Autowired
+    private AlumniService alumniService;
+
+    public AlumniController() {
+        log.info("AlumniController已创建");
+    }
+
+    @Operation(summary = "添加校友信息")
+    @PostMapping("/insertAlumni")
+    public ResponseResult<String> insertAlumni(@RequestBody AlumniModel alumniModel, @CurrentUser Map<String, Object> currentUser) {
+        String userId = (String) currentUser.get("userId");
+        System.out.println(currentUser);
+        alumniModel.setStudentId(userId);
+        alumniService.insertAlumni(alumniModel);
+        return ResponseResult.success();
+    }
+
+    @Operation(summary = "添加校友信息（管理员使用）")
+    @PostMapping("/insertAlumniByAdmin")
+    public ResponseResult<String> insertAlumniByAdmin(@RequestBody AlumniModel alumniModel, @CurrentUser Map<String, Object> currentUser) {
+        String userType = (String) currentUser.get("userType");
+        if (!userType.equals("admin")) {
+            return ResponseResult.error();
+        }
+        alumniService.insertAlumniByAdmin(alumniModel);
+        return ResponseResult.success();
+    }
+
+    @Operation(summary = "更新校友信息")
+    @PostMapping("/updateAlumni")
+    public ResponseResult<String> updateAlumni(@RequestBody AlumniModel alumniModel, @CurrentUser Map<String, Object> currentUser) {
+        String userId = (String) currentUser.get("userId");
+        alumniModel.setStudentId(userId);
+        alumniService.updateAlumni(alumniModel);
+        return ResponseResult.success();
+    }
+
+    @Operation(summary = "更新校友信息（管理员使用）")
+    @PostMapping("/updateAlumniByAdmin")
+    public ResponseResult<String> updateAlumniByAdmin(@RequestBody AlumniModel alumniModel, @CurrentUser Map<String, Object> currentUser) {
+        String userType = (String) currentUser.get("userType");
+        if (!userType.equals("admin")) {
+            return ResponseResult.error();
+        }
+        alumniService.updateAlumniByAdmin(alumniModel);
+        return ResponseResult.success();
+    }
+
+    @Operation(summary = "获取当前用户的校友信息")
+    @PostMapping("/getMyAlumniInfo")
+    public ResponseResult<AlumniModel> getMyAlumniInfo(@CurrentUser Map<String, Object> currentUser) {
+        String userId = (String) currentUser.get("userId");
+        AlumniModel alumni = alumniService.findAlumniByStudentId(userId);
+        return ResponseResult.success(alumni);
+    }
+
+    @Operation(summary = "分页模糊查询校友信息（学生端：只显示公开的）")
+    @PostMapping("/searchAlumniList")
+    public ResponseResult<List<AlumniModel>> searchAlumniList(
+            String searchValue,
+            @RequestParam(defaultValue = "") String searchYear,
+            @RequestParam(defaultValue = "1") Integer currentPage,
+            @RequestParam(defaultValue = "10") Integer pageSize,
+            @CurrentUser Map<String, Object> currentUser
+    ) {
+        Date year = null;
+        if (!searchYear.isEmpty()) {
+            year = Date.from(
+                    LocalDate.of(Integer.parseInt(searchYear), 1, 1)
+                            .atStartOfDay(ZoneId.of("Asia/Shanghai"))
+                            .toInstant()
+            );
+        }
+        // 判断是否为管理员
+        String userType = (String) currentUser.get("userType");
+        boolean isAdmin = "admin".equals(userType);
+        return ResponseResult.success(alumniService.searchAlumniList(searchValue, year, currentPage, pageSize, isAdmin));
+    }
+
+    @Operation(summary = "分页模糊查询校友信息个数")
+    @PostMapping("/getTotalCount")
+    public ResponseResult<Integer> getTotalCount(
+            String searchValue,
+            @RequestParam(defaultValue = "") String searchYear,
+            @CurrentUser Map<String, Object> currentUser
+    ) {
+        Date year = null;
+        if (!searchYear.isEmpty()) {
+            year = Date.from(
+                    LocalDate.of(Integer.parseInt(searchYear), 1, 1)
+                            .atStartOfDay(ZoneId.of("Asia/Shanghai"))
+                            .toInstant()
+            );
+        }
+        // 判断是否为管理员
+        String userType = (String) currentUser.get("userType");
+        boolean isAdmin = "admin".equals(userType);
+        return ResponseResult.success(alumniService.getTotalCount(searchValue, year, isAdmin));
+    }
+}
