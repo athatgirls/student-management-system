@@ -25,12 +25,21 @@ public class StudentController {
     @Autowired
     private org.example.service.OnlineUserService onlineUserService;
 
+    @Autowired
+    private CurrentUserAccessService currentUserAccessService;
+
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> loginForm) {
         String account = loginForm.get("account");
         String password = loginForm.get("password");
         
         Map<String, Object> result = new HashMap<>();
+        if (account == null || account.trim().isEmpty() || password == null || password.isEmpty()) {
+            result.put("code", 400);
+            result.put("data", null);
+            result.put("msg", "账号和密码不能为空");
+            return ResponseEntity.badRequest().body(result);
+        }
         StudentModel student = studentService.login(account, password);
         
         if (student != null) {
@@ -102,7 +111,9 @@ public class StudentController {
 
     // 根据ID获取学生信息
     @GetMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> getStudentById(@PathVariable String id) {
+    public ResponseEntity<Map<String, Object>> getStudentById(@PathVariable String id,
+                                                              @CurrentUser Map<String, Object> currentUser) {
+        currentUserAccessService.requireStudentAccess(currentUser, id);
         Map<String, Object> result = new HashMap<>();
         try {
             StudentModel student = studentService.findById(id);
@@ -282,7 +293,9 @@ public class StudentController {
 
     // 获取学生个人统计数据
     @GetMapping("/personal-stats/{studentId}")
-    public ResponseEntity<Map<String, Object>> getPersonalStats(@PathVariable String studentId) {
+    public ResponseEntity<Map<String, Object>> getPersonalStats(@PathVariable String studentId,
+                                                                @CurrentUser Map<String, Object> currentUser) {
+        currentUserAccessService.requireStudentAccess(currentUser, studentId);
         Map<String, Object> result = new HashMap<>();
         try {
             // 从数据库获取真实的个人统计数据
@@ -299,7 +312,6 @@ public class StudentController {
             result.put("data", personalStats);
             result.put("msg", "获取个人统计数据成功");
         } catch (Exception e) {
-            e.printStackTrace(); // 打印异常堆栈，便于调试
             result.put("code", 500);
             result.put("data", null);
             result.put("msg", "获取个人统计数据失败: " + e.getMessage());
@@ -632,6 +644,7 @@ public class StudentController {
         Map<String, Object> result = new HashMap<>();
         try {
             String studentId = requestBody.get("studentId");
+            String initialPassword = requestBody.get("initialPassword");
             String newPassword = requestBody.get("newPassword");
             
             if (studentId == null || studentId.isEmpty()) {
@@ -645,6 +658,12 @@ public class StudentController {
                 result.put("msg", "新密码不能为空");
                 return ResponseEntity.ok(result);
             }
+
+            if (initialPassword == null || initialPassword.isEmpty()) {
+                result.put("code", 400);
+                result.put("msg", "请输入当前初始密码");
+                return ResponseEntity.ok(result);
+            }
             
             // 验证学号是否存在
             StudentModel student = studentService.findByStudentId(studentId);
@@ -655,16 +674,16 @@ public class StudentController {
             }
             
             // 验证当前密码是否为初始密码（通过检查数据库中的密码是否为初始密码的加密值）
-            boolean isDefaultPassword = studentService.isDefaultPassword(studentId, "");
+            boolean isDefaultPassword = studentService.isDefaultPassword(studentId, initialPassword);
             if (!isDefaultPassword) {
                 result.put("code", 400);
-                result.put("msg", "当前密码不是初始密码，无法使用此接口修改");
+                result.put("msg", "初始密码不正确，无法修改密码");
                 return ResponseEntity.ok(result);
             }
             
             // 修改密码（传入空字符串作为旧密码，因为初始密码修改不需要验证旧密码）
             try {
-                boolean success = studentService.changePassword(studentId, "", newPassword);
+                boolean success = studentService.changePassword(studentId, initialPassword, newPassword);
                 if (success) {
                     result.put("code", 200);
                     result.put("msg", "密码修改成功，请重新登录");

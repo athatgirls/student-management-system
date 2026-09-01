@@ -4,6 +4,7 @@ import org.example.annotation.CurrentUser;
 import org.example.model.AcademicEventModel;
 import org.example.model.StudentModel;
 import org.example.service.AcademicEventService;
+import org.example.service.CurrentUserAccessService;
 import org.example.service.StudentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +25,9 @@ public class AcademicEventController {
     @Autowired
     private StudentService studentService;
 
+    @Autowired
+    private CurrentUserAccessService currentUserAccessService;
+
     @PostMapping("/create")
     public ResponseEntity<Map<String, Object>> create(@RequestBody AcademicEventModel model, @CurrentUser Map<String, Object> currentUser) {
         String userId = (String) currentUser.get("userId");
@@ -37,7 +41,11 @@ public class AcademicEventController {
     }
 
     @GetMapping("/list")
-    public ResponseEntity<Map<String, Object>> list(@RequestParam(required = false) String studentId) {
+    public ResponseEntity<Map<String, Object>> list(@RequestParam(required = false) String studentId,
+                                                     @CurrentUser Map<String, Object> currentUser) {
+        if (!currentUserAccessService.isAdmin(currentUser)) {
+            studentId = currentUserAccessService.requireUserId(currentUser);
+        }
         Map<String, Object> result = new HashMap<>();
         result.put("code", 200);
         List<AcademicEventModel> events;
@@ -82,4 +90,3 @@ public class AcademicEventController {
         return ResponseEntity.ok(result);
     }
 }
-

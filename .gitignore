@@ -32,10 +32,13 @@
 # Uploaded files directory
 /uploads/
 **/uploads/
+/backups/
 
 # Local tool/dependency caches
 /.tools/
 /.m2/
+/_download/
+/source.zip
 
 # Java compiled files
 *.class

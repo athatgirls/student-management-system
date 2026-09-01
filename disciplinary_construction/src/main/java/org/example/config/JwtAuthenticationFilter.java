@@ -14,7 +14,8 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Collections;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 @Slf4j
 @Component
@@ -50,8 +51,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     String username = jwtUtil.getUsernameFromToken(token);
                     
                     // 创建认证对象
+                    String role = "ROLE_" + userType.toUpperCase();
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        userId, null, new ArrayList<>());
+                        userId, null, Collections.singletonList(new SimpleGrantedAuthority(role)));
                     
                     // 设置认证信息到Security上下文
                     SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -90,4 +92,4 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         
         filterChain.doFilter(request, response);
     }
-} 
+}

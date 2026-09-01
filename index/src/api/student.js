@@ -159,10 +159,10 @@ export function changePassword(oldPassword, newPassword) {
 }
 
 // 修改初始密码（不需要登录）
-export function changeInitialPassword(studentId, newPassword) {
+export function changeInitialPassword(studentId, initialPassword, newPassword) {
   return request({
     url: '/student/change-initial-password',
     method: 'put',
-    data: { studentId, newPassword }
+    data: { studentId, initialPassword, newPassword }
   })
-} 
+}

@@ -374,6 +374,101 @@
         </el-descriptions-item>
       </el-descriptions>
     </el-dialog>
+
+    <el-dialog
+      v-model="showBatchImportApplicationDialog"
+      title="批量导入入党申请"
+      width="760px"
+      destroy-on-close
+    >
+      <el-form label-width="100px">
+        <el-form-item label="申请阶段" required>
+          <el-select v-model="batchImportForm.currentStage" style="width: 100%">
+            <el-option label="提交申请" value="提交申请" />
+            <el-option label="入党积极分子" value="入党积极分子" />
+            <el-option label="发展对象" value="发展对象" />
+            <el-option label="预备党员" value="预备党员" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+
+      <el-tabs v-model="applicationImportTab">
+        <el-tab-pane label="Excel 导入" name="excel">
+          <el-upload
+            ref="applicationUploadRef"
+            v-model:file-list="applicationFileList"
+            drag
+            :auto-upload="false"
+            :limit="1"
+            accept=".xlsx"
+            :on-change="handleApplicationFileChange"
+          >
+            <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+            <div class="el-upload__text">拖入 Excel 文件，或<em>点击选择</em></div>
+            <template #tip>
+              <div class="el-upload__tip">表格至少包含“姓名”或“学号”列</div>
+            </template>
+          </el-upload>
+        </el-tab-pane>
+        <el-tab-pane label="手动录入" name="manual">
+          <div style="margin-bottom: 12px">
+            <el-button type="primary" plain @click="addApplicationStudentRow">添加一行</el-button>
+            <el-button plain @click="clearApplicationStudentRows">清空</el-button>
+          </div>
+          <el-table :data="applicationManualStudents" max-height="320" border>
+            <el-table-column label="姓名">
+              <template #default="scope">
+                <el-input v-model="scope.row.name" placeholder="学生姓名" />
+              </template>
+            </el-table-column>
+            <el-table-column label="学号">
+              <template #default="scope">
+                <el-input v-model="scope.row.studentId" placeholder="学生学号" />
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="90" align="center">
+              <template #default="scope">
+                <el-button type="danger" link @click="removeApplicationStudentRow(scope.$index)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+      </el-tabs>
+
+      <template #footer>
+        <el-button @click="showBatchImportApplicationDialog = false">取消</el-button>
+        <el-button type="primary" :loading="applicationImportLoading" @click="handleBatchImportApplication">
+          开始导入
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="applicationResultDialogVisible" title="导入结果" width="720px">
+      <el-alert
+        :title="`成功 ${applicationImportResult.matchedCount} 条，失败 ${applicationImportResult.unmatchedCount} 条`"
+        :type="applicationImportResult.unmatchedCount ? 'warning' : 'success'"
+        :closable="false"
+        show-icon
+      />
+      <el-tabs v-model="applicationResultTab" style="margin-top: 16px">
+        <el-tab-pane :label="`成功 (${applicationImportResult.matchedCount})`" name="matched">
+          <el-table :data="applicationImportResult.matchedResults" max-height="320">
+            <el-table-column prop="name" label="姓名" />
+            <el-table-column prop="studentId" label="学号" />
+          </el-table>
+        </el-tab-pane>
+        <el-tab-pane :label="`失败 (${applicationImportResult.unmatchedCount})`" name="unmatched">
+          <el-table :data="applicationImportResult.unmatchedResults" max-height="320">
+            <el-table-column prop="name" label="姓名" />
+            <el-table-column prop="studentId" label="学号" />
+            <el-table-column prop="reason" label="原因" />
+          </el-table>
+        </el-tab-pane>
+      </el-tabs>
+      <template #footer>
+        <el-button type="primary" @click="applicationResultDialogVisible = false">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -387,16 +482,7 @@ import {
   partyCourseApi,
   volunteerServiceApi
 } from '@/api/party'
-
-// 动态导入xlsx库（如果已安装）
-let XLSX = null
-let xlsxAvailable = false
-try {
-  XLSX = require('xlsx')
-  xlsxAvailable = true
-} catch (e) {
-  console.warn('xlsx库未安装，Excel导入功能不可用。如需使用Excel导入，请运行: npm install xlsx')
-}
+import { readExcelObjects } from '@/utils/excel'
 
 // 标签页
 const activeTab = ref('application')
@@ -847,20 +933,9 @@ const getFieldLabel = (key) => {
 }
 
 // 批量导入入党申请相关函数
-const handleApplicationFileChange = (file) => {
-  if (!xlsxAvailable) {
-    ElMessage.warning('xlsx库未安装，无法使用Excel导入功能')
-    return
-  }
-  
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    try {
-      const data = new Uint8Array(e.target.result)
-      const workbook = XLSX.read(data, { type: 'array' })
-      const firstSheetName = workbook.SheetNames[0]
-      const worksheet = workbook.Sheets[firstSheetName]
-      const jsonData = XLSX.utils.sheet_to_json(worksheet)
+const handleApplicationFileChange = async (file) => {
+  try {
+      const jsonData = await readExcelObjects(file.raw)
       
       // 清空手动输入列表
       applicationManualStudents.value = []
@@ -883,12 +958,10 @@ const handleApplicationFileChange = (file) => {
       } else {
         ElMessage.warning('Excel文件中没有找到有效数据')
       }
-    } catch (error) {
-      console.error('解析Excel文件失败:', error)
-      ElMessage.error('解析Excel文件失败，请检查文件格式')
-    }
+  } catch (error) {
+    console.error('解析Excel文件失败:', error)
+    ElMessage.error(error.message || '解析Excel文件失败，请检查文件格式')
   }
-  reader.readAsArrayBuffer(file.raw)
 }
 
 const addApplicationStudentRow = () => {
@@ -1033,4 +1106,3 @@ onMounted(() => {
   }
 }
 </style>
-

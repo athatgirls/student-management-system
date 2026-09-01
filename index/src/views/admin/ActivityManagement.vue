@@ -205,12 +205,12 @@
               show-icon
             >
               <template #default>
-                <div>需要安装xlsx库才能使用Excel导入功能</div>
+                <div>Excel 组件加载失败，请刷新页面后重试</div>
                   <div style="margin-top: 10px;">
                     <el-button type="primary" size="small" @click="importTab = 'manual'">切换到手动输入</el-button>
                   </div>
                 <div style="margin-top: 10px; font-size: 12px; color: #909399;">
-                  安装命令: npm install xlsx
+                  当前仅支持 .xlsx 文件
                 </div>
               </template>
             </el-alert>
@@ -221,7 +221,7 @@
             :auto-upload="false"
             :on-change="handleFileChange"
             :file-list="fileList"
-            accept=".xlsx,.xls"
+            accept=".xlsx"
             drag
           >
             <el-icon class="el-icon--upload"><upload-filled /></el-icon>
@@ -230,7 +230,7 @@
             </div>
             <template #tip>
               <div class="el-upload__tip">
-                只能上传 xlsx/xls 文件，Excel格式：第一行为表头（姓名、学号），从第二行开始为数据
+                只能上传 .xlsx 文件，第一行为表头（姓名、学号），从第二行开始为数据
               </div>
             </template>
           </el-upload>
@@ -317,16 +317,9 @@ import {
   createDailyTask
 } from '@/api/daily'
 import { getAllGrades } from '@/api/student'
+import { readExcelObjects } from '@/utils/excel'
 
-// 动态导入xlsx库（如果已安装）
-let XLSX = null
-let xlsxAvailable = false
-try {
-  XLSX = require('xlsx')
-  xlsxAvailable = true
-} catch (e) {
-  console.warn('xlsx库未安装，Excel导入功能不可用。如需使用Excel导入，请运行: npm install xlsx')
-}
+const xlsxAvailable = true
 
 const activities = ref([])
 const createDialogVisible = ref(false)
@@ -517,19 +510,9 @@ const handleImportStudents = (activity) => {
 }
 
 // 文件变化处理
-const handleFileChange = (file) => {
-  if (!XLSX || !xlsxAvailable) {
-    ElMessage.warning('Excel导入功能需要安装xlsx库')
-    return
-  }
-  
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    try {
-      const data = new Uint8Array(e.target.result)
-      const workbook = XLSX.read(data, { type: 'array' })
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-      const jsonData = XLSX.utils.sheet_to_json(firstSheet)
+const handleFileChange = async (file) => {
+  try {
+      const jsonData = await readExcelObjects(file.raw)
       
       if (jsonData.length === 0) {
         ElMessage.warning('Excel文件中没有数据')
@@ -548,12 +531,10 @@ const handleFileChange = (file) => {
       
       ElMessage.success(`成功读取 ${manualStudents.value.length} 条数据`)
       importTab.value = 'manual'
-    } catch (error) {
-      console.error('Excel读取错误:', error)
-      ElMessage.error('文件读取失败，请检查文件格式')
-    }
+  } catch (error) {
+    console.error('Excel读取错误:', error)
+    ElMessage.error(error.message || '文件读取失败，请检查文件格式')
   }
-  reader.readAsArrayBuffer(file.raw)
 }
 
 // 添加学生行
@@ -714,4 +695,3 @@ onMounted(() => {
   color: #303133;
 }
 </style>
-

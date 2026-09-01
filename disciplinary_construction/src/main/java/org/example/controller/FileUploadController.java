@@ -10,18 +10,28 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/msi/upload")
 public class FileUploadController {
+
+    private static final long MAX_FILE_SIZE = 10L * 1024L * 1024L;
+    private static final int MAX_FILES_PER_REQUEST = 5;
+    private static final Set<String> ALLOWED_EXTENSIONS = new HashSet<>(Arrays.asList(
+            ".jpg", ".jpeg", ".png", ".pdf", ".doc", ".docx"
+    ));
 
     @Value("${app.upload-dir:uploads}")
     private String uploadDir;
@@ -33,6 +43,10 @@ public class FileUploadController {
     public ResponseResult<List<String>> uploadFiles(@RequestParam("file") MultipartFile[] files, HttpServletRequest request) {
         List<String> fileUrls = new ArrayList<>();
 
+        if (files == null || files.length == 0 || files.length > MAX_FILES_PER_REQUEST) {
+            return new ResponseResult<>(400, "每次请上传 1 至 5 个文件", null);
+        }
+
         try {
             Path uploadPath = getUploadPath();
             Files.createDirectories(uploadPath);
@@ -40,19 +54,25 @@ public class FileUploadController {
 
             for (MultipartFile file : files) {
                 if (!file.isEmpty()) {
+                    String validationError = validateFile(file);
+                    if (validationError != null) {
+                        return new ResponseResult<>(400, validationError, null);
+                    }
                     String filename = buildSafeFilename(file.getOriginalFilename());
                     Path filePath = uploadPath.resolve(filename).normalize();
                     if (!filePath.startsWith(uploadPath)) {
                         return new ResponseResult<>(400, "Invalid file path", null);
                     }
-                    Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+                    try (InputStream inputStream = file.getInputStream()) {
+                        Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
+                    }
                     fileUrls.add(baseUrl + "/uploads/" + filename);
                 }
             }
 
             return ResponseResult.success(fileUrls);
         } catch (IOException e) {
-            return new ResponseResult<>(500, "File upload failed: " + e.getMessage(), null);
+            return new ResponseResult<>(500, "文件上传失败", null);
         }
     }
 
@@ -63,6 +83,11 @@ public class FileUploadController {
                 return new ResponseResult<>(400, "File cannot be empty", null);
             }
 
+            String validationError = validateFile(file);
+            if (validationError != null) {
+                return new ResponseResult<>(400, validationError, null);
+            }
+
             Path uploadPath = getUploadPath();
             Files.createDirectories(uploadPath);
 
@@ -71,12 +96,25 @@ public class FileUploadController {
             if (!filePath.startsWith(uploadPath)) {
                 return new ResponseResult<>(400, "Invalid file path", null);
             }
-            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+            try (InputStream inputStream = file.getInputStream()) {
+                Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
+            }
 
             return ResponseResult.success(getBaseUrl(request) + "/uploads/" + filename);
         } catch (IOException e) {
-            return new ResponseResult<>(500, "File upload failed: " + e.getMessage(), null);
+            return new ResponseResult<>(500, "文件上传失败", null);
         }
+    }
+
+    private String validateFile(MultipartFile file) {
+        if (file.getSize() > MAX_FILE_SIZE) {
+            return "单个文件不能超过 10MB";
+        }
+        String extension = getSafeExtension(file.getOriginalFilename());
+        if (!ALLOWED_EXTENSIONS.contains(extension)) {
+            return "仅支持 JPG、PNG、PDF、DOC、DOCX 文件";
+        }
+        return null;
     }
 
     private String getBaseUrl(HttpServletRequest request) {

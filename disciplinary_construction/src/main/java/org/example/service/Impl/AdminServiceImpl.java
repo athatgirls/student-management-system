@@ -4,6 +4,8 @@ import org.example.model.AdminModel;
 import org.example.repository.AdminRepository;
 import org.example.service.AdminService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
@@ -17,11 +19,35 @@ public class AdminServiceImpl implements AdminService {
     @Autowired
     private AdminRepository adminRepository;
 
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+
+    @Value("${app.bootstrap.admin.username:admin}")
+    private String bootstrapAdminUsername;
+
+    @Value("${app.bootstrap.admin.password:admin123}")
+    private String bootstrapAdminPassword;
+
     @Override
     public AdminModel login(String username, String password) {
-        Optional<AdminModel> adminOpt = adminRepository.findByUsernameAndPassword(username, password);
+        if (username == null || password == null) {
+            return null;
+        }
+        Optional<AdminModel> adminOpt = adminRepository.findByUsername(username);
         if (adminOpt.isPresent()) {
             AdminModel admin = adminOpt.get();
+            String storedPassword = admin.getPassword();
+            boolean passwordMatches = storedPassword != null &&
+                    (storedPassword.startsWith("$2")
+                            ? passwordEncoder.matches(password, storedPassword)
+                            : storedPassword.equals(password));
+            if (!passwordMatches) {
+                return null;
+            }
+
+            // Seamlessly migrate legacy plaintext administrator passwords.
+            if (!storedPassword.startsWith("$2")) {
+                admin.setPassword(passwordEncoder.encode(password));
+            }
             // 检查管理员是否激活
             if (admin.getIsActive() != null && admin.getIsActive()) {
                 // 更新最后登录时间
@@ -35,6 +61,10 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public AdminModel createAdmin(AdminModel admin) {
+        if (admin.getPassword() == null || admin.getPassword().length() < 8) {
+            throw new IllegalArgumentException("管理员密码不能少于8位");
+        }
+        admin.setPassword(passwordEncoder.encode(admin.getPassword()));
         admin.setCreateTime(new Date());
         admin.setUpdateTime(new Date());
         admin.setIsActive(true);
@@ -43,8 +73,27 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public AdminModel updateAdmin(AdminModel admin) {
-        admin.setUpdateTime(new Date());
-        return adminRepository.save(admin);
+        AdminModel existing = adminRepository.findByAdminId(admin.getAdminId())
+                .orElseThrow(() -> new IllegalArgumentException("管理员不存在"));
+
+        existing.setUsername(admin.getUsername());
+        existing.setRealName(admin.getRealName());
+        existing.setEmail(admin.getEmail());
+        existing.setPhone(admin.getPhone());
+        existing.setRole(admin.getRole());
+        existing.setDepartment(admin.getDepartment());
+        existing.setPosition(admin.getPosition());
+        existing.setPermissions(admin.getPermissions());
+        existing.setRemark(admin.getRemark());
+        existing.setUpdateBy(admin.getUpdateBy());
+        if (admin.getPassword() != null && !admin.getPassword().isBlank()) {
+            if (admin.getPassword().length() < 8) {
+                throw new IllegalArgumentException("管理员密码不能少于8位");
+            }
+            existing.setPassword(passwordEncoder.encode(admin.getPassword()));
+        }
+        existing.setUpdateTime(new Date());
+        return adminRepository.save(existing);
     }
 
     @Override
@@ -123,12 +172,12 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public void createDefaultAdmin() {
         // 检查是否已存在默认管理员
-        Optional<AdminModel> existingAdmin = adminRepository.findByUsername("admin");
+        Optional<AdminModel> existingAdmin = adminRepository.findByUsername(bootstrapAdminUsername);
         if (!existingAdmin.isPresent()) {
             AdminModel defaultAdmin = new AdminModel();
             defaultAdmin.setAdminId("ADMIN001");
-            defaultAdmin.setUsername("admin");
-            defaultAdmin.setPassword("admin123"); // 实际项目中应该加密
+            defaultAdmin.setUsername(bootstrapAdminUsername);
+            defaultAdmin.setPassword(passwordEncoder.encode(bootstrapAdminPassword));
             defaultAdmin.setRealName("系统管理员");
             defaultAdmin.setEmail("admin@hbut.edu.cn");
             defaultAdmin.setPhone("13800000000");
@@ -155,4 +204,4 @@ public class AdminServiceImpl implements AdminService {
             adminRepository.save(defaultAdmin);
         }
     }
-} 
+}

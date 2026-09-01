@@ -1,8 +1,10 @@
 package org.example.controller;
 
 
+import org.example.annotation.CurrentUser;
 import org.example.model.CompetitionModel;
 import org.example.service.CompetitionService;
+import org.example.service.CurrentUserAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +19,9 @@ public class CompetitionController {
     @Autowired
     private CompetitionService competitionService;
 
+    @Autowired
+    private CurrentUserAccessService currentUserAccessService;
+
 
     // ==================== 学生端接口 ====================
 
@@ -24,7 +29,9 @@ public class CompetitionController {
      * 获取学生的竞赛数据
      */
     @GetMapping("/student/{studentId}")
-    public ResponseEntity<?> getStudentCompetitions(@PathVariable String studentId) {
+    public ResponseEntity<?> getStudentCompetitions(@PathVariable String studentId,
+                                                     @CurrentUser Map<String, Object> currentUser) {
+        currentUserAccessService.requireStudentAccess(currentUser, studentId);
         try {
             List<CompetitionModel> competitions = competitionService.getStudentCompetitions(studentId);
             return ResponseEntity.ok(competitions);
@@ -37,11 +44,12 @@ public class CompetitionController {
      * 添加竞赛
      */
     @PostMapping
-    public ResponseEntity<?> addCompetition(@RequestBody CompetitionModel competition) {
+    public ResponseEntity<?> addCompetition(@RequestBody CompetitionModel competition,
+                                            @CurrentUser Map<String, Object> currentUser) {
+        competition.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
+        competition.setStudentName((String) currentUser.get("username"));
         try {
-            if (competition.getAuditStatus() == null) {
-                competition.setAuditStatus("待审核");
-            }
+            resetCompetitionAudit(competition);
             CompetitionModel saved = competitionService.addCompetition(competition);
             return ResponseEntity.ok(saved);
         } catch (Exception e) {
@@ -53,10 +61,18 @@ public class CompetitionController {
      * 更新竞赛
      */
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateCompetition(@PathVariable String id, @RequestBody CompetitionModel competition) {
+    public ResponseEntity<?> updateCompetition(@PathVariable String id, @RequestBody CompetitionModel competition,
+                                               @CurrentUser Map<String, Object> currentUser) {
+        CompetitionModel existing = competitionService.getCompetitionById(id);
+        if (existing == null) {
+            return ResponseEntity.notFound().build();
+        }
+        currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
         try {
-            // 注意：这里改为 String 类型的 id
             competition.setId(id);
+            competition.setStudentId(existing.getStudentId());
+            competition.setStudentName(existing.getStudentName());
+            resetCompetitionAudit(competition);
             CompetitionModel updated = competitionService.updateCompetition(competition);
             return ResponseEntity.ok(updated);
         } catch (Exception e) {
@@ -68,7 +84,13 @@ public class CompetitionController {
      * 删除竞赛
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteCompetition(@PathVariable String id) {
+    public ResponseEntity<?> deleteCompetition(@PathVariable String id,
+                                               @CurrentUser Map<String, Object> currentUser) {
+        CompetitionModel existing = competitionService.getCompetitionById(id);
+        if (existing == null) {
+            return ResponseEntity.notFound().build();
+        }
+        currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
         try {
             competitionService.deleteCompetition(id);
             return ResponseEntity.ok("删除成功");
@@ -80,13 +102,17 @@ public class CompetitionController {
 
     // 获取单条竞赛记录
     @GetMapping("/{id}")
-    public ResponseEntity<?> getCompetition(@PathVariable String id) {
+    public ResponseEntity<?> getCompetition(@PathVariable String id,
+                                            @CurrentUser Map<String, Object> currentUser) {
         try {
             CompetitionModel competition = competitionService.getCompetitionById(id);
             if (competition == null) {
                 return ResponseEntity.badRequest().body("竞赛不存在");
             }
+            currentUserAccessService.requireStudentAccess(currentUser, competition.getStudentId());
             return ResponseEntity.ok(competition);
+        } catch (org.springframework.security.access.AccessDeniedException e) {
+            throw e;
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("获取竞赛失败: " + e.getMessage());
         }
@@ -133,12 +159,13 @@ public class CompetitionController {
      * 审核竞赛
      */
     @PutMapping("/admin/{id}/audit")
-    public ResponseEntity<?> auditCompetition(@PathVariable String id, @RequestBody Map<String, String> auditData) {
+    public ResponseEntity<?> auditCompetition(@PathVariable String id, @RequestBody Map<String, String> auditData,
+                                              @CurrentUser Map<String, Object> currentUser) {
         try {
             String auditStatus = auditData.get("auditStatus");
             String auditComment = auditData.get("auditComment");
-            String auditorId = auditData.get("auditorId");
-            String auditorName = auditData.get("auditorName");
+            String auditorId = currentUserAccessService.requireUserId(currentUser);
+            String auditorName = (String) currentUser.get("username");
             
             CompetitionModel competition = competitionService.getCompetitionById(id);
             if (competition == null) {
@@ -156,5 +183,12 @@ public class CompetitionController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("审核失败: " + e.getMessage());
         }
+    }
+
+    private void resetCompetitionAudit(CompetitionModel competition) {
+        competition.setAuditStatus("待审核");
+        competition.setAuditComment(null);
+        competition.setAuditorId(null);
+        competition.setAuditorName(null);
     }
 }

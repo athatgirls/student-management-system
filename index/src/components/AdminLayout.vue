@@ -184,7 +184,7 @@
           <div class="header-left">
             <el-button 
               v-if="isMobile" 
-              type="text" 
+              link
               class="menu-toggle"
               @click="sidebarVisible = !sidebarVisible"
             >

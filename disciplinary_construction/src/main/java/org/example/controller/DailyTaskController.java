@@ -129,9 +129,6 @@ public class DailyTaskController {
                     List<DailyTaskSubmissionModel> submissions = dailyTaskService.getSubmissionsByTaskId(task.getId());
                     int currentCount = submissions != null ? submissions.size() : 0;
                     taskMap.put("currentParticipants", currentCount);
-                    // 更新任务中的当前报名人数
-                    task.setCurrentParticipants(currentCount);
-                    dailyTaskService.createTask(task); // 更新任务
                 } else {
                     taskMap.put("currentParticipants", null);
                 }
@@ -260,4 +257,3 @@ public class DailyTaskController {
         return ResponseEntity.ok(result);
     }
 }
-

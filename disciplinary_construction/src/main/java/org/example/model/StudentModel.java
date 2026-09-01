@@ -1,6 +1,7 @@
 package org.example.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -16,7 +17,8 @@ public class StudentModel {
     private String name; // 姓名
     private String gender; // 性别
     private Integer age; // 年龄
-    private String password; // 密码（加密存储）
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    private String password; // 密码（BCrypt 加密存储，禁止通过 JSON 返回）
     private String maritalStatus; // 婚姻状况
     private String nation; // 民族
     private Date birthDate; // 出生日期

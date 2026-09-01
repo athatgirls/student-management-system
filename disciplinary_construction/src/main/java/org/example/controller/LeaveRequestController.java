@@ -1,6 +1,8 @@
 package org.example.controller;
 
 import org.example.model.LeaveRequestModel;
+import org.example.annotation.CurrentUser;
+import org.example.service.CurrentUserAccessService;
 import org.example.service.LeaveRequestService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -16,10 +18,15 @@ public class LeaveRequestController {
     
     @Autowired
     private LeaveRequestService leaveRequestService;
+
+    @Autowired
+    private CurrentUserAccessService currentUserAccessService;
     
     // 学生提交请假申请
     @PostMapping("/create")
-    public ResponseEntity<Map<String, Object>> createLeaveRequest(@RequestBody LeaveRequestModel leaveRequest) {
+    public ResponseEntity<Map<String, Object>> createLeaveRequest(@RequestBody LeaveRequestModel leaveRequest,
+                                                                   @CurrentUser Map<String, Object> currentUser) {
+        leaveRequest.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
         Map<String, Object> result = new HashMap<>();
         try {
             LeaveRequestModel created = leaveRequestService.createLeaveRequest(leaveRequest);
@@ -36,15 +43,17 @@ public class LeaveRequestController {
     
     // 学生获取自己的请假记录
     @GetMapping("/my-leaves")
-    public ResponseEntity<Map<String, Object>> getMyLeaveRequests(@RequestParam(required = false) String studentId) {
+    public ResponseEntity<Map<String, Object>> getMyLeaveRequests(@RequestParam(required = false) String studentId,
+                                                                  @CurrentUser Map<String, Object> currentUser) {
         Map<String, Object> result = new HashMap<>();
         try {
-            // 如果studentId为空，尝试从请求头或其他地方获取
-            if (studentId == null || studentId.isEmpty()) {
+            if (!currentUserAccessService.isAdmin(currentUser)) {
+                studentId = currentUserAccessService.requireStudentNumber(currentUser);
+            } else if (studentId == null || studentId.isEmpty()) {
                 result.put("code", 400);
                 result.put("data", null);
                 result.put("msg", "学号不能为空");
-                return ResponseEntity.ok(result);
+                return ResponseEntity.badRequest().body(result);
             }
             List<LeaveRequestModel> leaves = leaveRequestService.findByStudentId(studentId);
             result.put("code", 200);
@@ -124,7 +133,12 @@ public class LeaveRequestController {
     @PutMapping("/check-in/{id}")
     public ResponseEntity<Map<String, Object>> checkIn(
             @PathVariable String id,
-            @RequestBody Map<String, Object> requestBody) {
+            @RequestBody Map<String, Object> requestBody,
+            @CurrentUser Map<String, Object> currentUser) {
+        LeaveRequestModel existing = leaveRequestService.findById(id);
+        if (existing != null) {
+            currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+        }
         Map<String, Object> result = new HashMap<>();
         try {
             String checkInComment = (String) requestBody.get("checkInComment");
@@ -199,4 +213,3 @@ public class LeaveRequestController {
         return ResponseEntity.ok(result);
     }
 }
-

@@ -8,14 +8,15 @@
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
-    "axios": "^1.6.0",
+    "axios": "^1.20.0",
     "core-js": "^3.8.3",
-    "echarts": "^6.0.0",
+    "echarts": "^6.1.0",
     "element-plus": "^2.4.0",
+    "read-excel-file": "^9.3.10",
     "vue": "^3.2.13",
     "vue-router": "^4.0.3",
     "vuex": "^4.0.0",
-    "xlsx": "^0.18.5"
+    "write-excel-file": "^4.1.1"
   },
   "devDependencies": {
     "@babel/core": "^7.12.16",

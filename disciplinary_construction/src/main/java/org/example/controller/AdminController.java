@@ -30,6 +30,12 @@ public class AdminController {
         String password = loginForm.get("password");
         
         Map<String, Object> result = new HashMap<>();
+        if (username == null || username.trim().isEmpty() || password == null || password.isEmpty()) {
+            result.put("code", 400);
+            result.put("data", null);
+            result.put("msg", "用户名和密码不能为空");
+            return ResponseEntity.badRequest().body(result);
+        }
         AdminModel admin = adminService.login(username, password);
         
         if (admin != null) {
@@ -393,4 +399,4 @@ public class AdminController {
         result.put("msg", hasPermission ? "有权限" : "无权限");
         return ResponseEntity.ok(result);
     }
-} 
+}

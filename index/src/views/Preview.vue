@@ -15,7 +15,7 @@
         <el-button size="large" @click="startPreview('admin', '/admin/dashboard')">
           进入管理员端
         </el-button>
-        <el-button text size="large" @click="stopPreview">
+        <el-button link size="large" @click="stopPreview">
           关闭预览模式
         </el-button>
       </div>

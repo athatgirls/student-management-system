@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.annotation.CurrentUser;
 import org.example.model.PartyMemberModel;
 import org.example.response.ResponseResult;
+import org.example.service.CurrentUserAccessService;
 import org.example.service.PartyMemberService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -21,11 +22,17 @@ public class PartyMemberController {
     @Autowired
     private PartyMemberService partyMemberService;
 
+    @Autowired
+    private CurrentUserAccessService currentUserAccessService;
+
     @Operation(summary = "添加党员信息")
     @PostMapping("/add")
     public ResponseResult<PartyMemberModel> addPartyMember(@RequestBody PartyMemberModel partyMember, @CurrentUser Map<String, Object> currentUser) {
-        String userId = (String) currentUser.get("userId");
-        partyMember.setStudentId(userId);
+        if (!currentUserAccessService.isAdmin(currentUser)) {
+            partyMember.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
+            partyMember.setName((String) currentUser.get("username"));
+            resetAudit(partyMember);
+        }
         PartyMemberModel result = partyMemberService.addPartyMember(partyMember);
         return ResponseResult.success(result);
     }
@@ -33,30 +40,48 @@ public class PartyMemberController {
     @Operation(summary = "更新党员信息")
     @PutMapping("/update")
     public ResponseResult<PartyMemberModel> updatePartyMember(@RequestBody PartyMemberModel partyMember, @CurrentUser Map<String, Object> currentUser) {
-        String userId = (String) currentUser.get("userId");
-        partyMember.setStudentId(userId);
+        PartyMemberModel existing = partyMemberService.getPartyMemberById(partyMember.getId());
+        if (existing != null) {
+            currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+        }
+        if (!currentUserAccessService.isAdmin(currentUser)) {
+            partyMember.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
+            partyMember.setName((String) currentUser.get("username"));
+            resetAudit(partyMember);
+        }
         PartyMemberModel result = partyMemberService.updatePartyMember(partyMember);
         return ResponseResult.success(result);
     }
 
     @Operation(summary = "删除党员信息")
     @DeleteMapping("/delete/{id}")
-    public ResponseResult<String> deletePartyMember(@PathVariable String id) {
+    public ResponseResult<String> deletePartyMember(@PathVariable String id,
+                                                    @CurrentUser Map<String, Object> currentUser) {
+        PartyMemberModel existing = partyMemberService.getPartyMemberById(id);
+        if (existing != null) {
+            currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+        }
         partyMemberService.deletePartyMember(id);
         return ResponseResult.success("删除成功");
     }
 
     @Operation(summary = "获取学生党员信息")
     @GetMapping("/student/{studentId}")
-    public ResponseResult<List<PartyMemberModel>> getStudentPartyMembers(@PathVariable String studentId) {
+    public ResponseResult<List<PartyMemberModel>> getStudentPartyMembers(@PathVariable String studentId,
+                                                                         @CurrentUser Map<String, Object> currentUser) {
+        currentUserAccessService.requireStudentAccess(currentUser, studentId);
         List<PartyMemberModel> result = partyMemberService.getStudentPartyMembers(studentId);
         return ResponseResult.success(result);
     }
 
     @Operation(summary = "根据ID获取党员信息")
     @GetMapping("/{id}")
-    public ResponseResult<PartyMemberModel> getPartyMemberById(@PathVariable String id) {
+    public ResponseResult<PartyMemberModel> getPartyMemberById(@PathVariable String id,
+                                                               @CurrentUser Map<String, Object> currentUser) {
         PartyMemberModel result = partyMemberService.getPartyMemberById(id);
+        if (result != null) {
+            currentUserAccessService.requireStudentAccess(currentUser, result.getStudentId());
+        }
         return ResponseResult.success(result);
     }
 
@@ -116,5 +141,12 @@ public class PartyMemberController {
         List<Map<String, String>> students = (List<Map<String, String>>) request.get("students");
         Map<String, Object> result = partyMemberService.batchImportPartyMembers(students);
         return ResponseResult.success(result);
+    }
+
+    private void resetAudit(PartyMemberModel partyMember) {
+        partyMember.setAuditStatus("待审核");
+        partyMember.setAuditComment(null);
+        partyMember.setAuditorId(null);
+        partyMember.setAuditTime(null);
     }
 } 

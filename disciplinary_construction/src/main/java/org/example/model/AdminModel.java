@@ -1,5 +1,6 @@
 package org.example.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -13,7 +14,8 @@ public class AdminModel {
     private String id;
     private String adminId; // 管理员ID
     private String username; // 用户名
-    private String password; // 密码（加密存储）
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    private String password; // 密码（BCrypt 加密存储，禁止通过 JSON 返回）
     private String realName; // 真实姓名
     private String email; // 邮箱
     private String phone; // 手机号
@@ -29,4 +31,4 @@ public class AdminModel {
     private String createBy; // 创建人
     private String updateBy; // 更新人
     private String remark; // 备注
-} 
+}

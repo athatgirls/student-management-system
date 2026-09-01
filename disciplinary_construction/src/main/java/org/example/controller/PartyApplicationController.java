@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.annotation.CurrentUser;
 import org.example.model.PartyApplicationModel;
 import org.example.response.ResponseResult;
+import org.example.service.CurrentUserAccessService;
 import org.example.service.PartyApplicationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -21,41 +22,69 @@ public class PartyApplicationController {
     @Autowired
     private PartyApplicationService partyApplicationService;
 
+    @Autowired
+    private CurrentUserAccessService currentUserAccessService;
+
     @Operation(summary = "添加申请入党信息")
     @PostMapping("/add")
     public ResponseResult<PartyApplicationModel> addPartyApplication(
             @RequestBody PartyApplicationModel application,
             @CurrentUser Map<String, Object> currentUser) {
-        // 可以从用户信息中获取学号，这里假设前端已经传入
+        if (!currentUserAccessService.isAdmin(currentUser)) {
+            application.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
+            application.setName((String) currentUser.get("username"));
+            resetAudit(application);
+        }
         PartyApplicationModel result = partyApplicationService.addPartyApplication(application);
         return ResponseResult.success(result);
     }
 
     @Operation(summary = "更新申请入党信息")
     @PutMapping("/update")
-    public ResponseResult<PartyApplicationModel> updatePartyApplication(@RequestBody PartyApplicationModel application) {
+    public ResponseResult<PartyApplicationModel> updatePartyApplication(@RequestBody PartyApplicationModel application,
+                                                                        @CurrentUser Map<String, Object> currentUser) {
+        PartyApplicationModel existing = partyApplicationService.getById(application.getId());
+        if (existing != null) {
+            currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+        }
+        if (!currentUserAccessService.isAdmin(currentUser)) {
+            application.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
+            application.setName((String) currentUser.get("username"));
+            resetAudit(application);
+        }
         PartyApplicationModel result = partyApplicationService.updatePartyApplication(application);
         return ResponseResult.success(result);
     }
 
     @Operation(summary = "删除申请入党信息")
     @DeleteMapping("/delete/{id}")
-    public ResponseResult<String> deletePartyApplication(@PathVariable String id) {
+    public ResponseResult<String> deletePartyApplication(@PathVariable String id,
+                                                         @CurrentUser Map<String, Object> currentUser) {
+        PartyApplicationModel existing = partyApplicationService.getById(id);
+        if (existing != null) {
+            currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+        }
         partyApplicationService.deletePartyApplication(id);
         return ResponseResult.success("删除成功");
     }
 
     @Operation(summary = "根据学号获取申请入党信息")
     @GetMapping("/student/{studentId}")
-    public ResponseResult<PartyApplicationModel> getByStudentId(@PathVariable String studentId) {
+    public ResponseResult<PartyApplicationModel> getByStudentId(@PathVariable String studentId,
+                                                                @CurrentUser Map<String, Object> currentUser) {
+        currentUserAccessService.requireStudentAccess(currentUser, studentId);
         PartyApplicationModel result = partyApplicationService.getByStudentId(studentId);
         return ResponseResult.success(result);
     }
 
     @Operation(summary = "根据ID获取申请入党信息")
     @GetMapping("/{id}")
-    public ResponseResult<PartyApplicationModel> getById(@PathVariable String id) {
+    public ResponseResult<PartyApplicationModel> getById(@PathVariable String id,
+                                                         @CurrentUser Map<String, Object> currentUser) {
         PartyApplicationModel result = partyApplicationService.getById(id);
+        if (result != null) {
+            currentUserAccessService.requireStudentAccess(currentUser, result.getStudentId());
+        }
         return ResponseResult.success(result);
     }
 
@@ -105,5 +134,12 @@ public class PartyApplicationController {
         }
         Map<String, Object> result = partyApplicationService.batchImportPartyApplications(students, currentStage);
         return ResponseResult.success(result);
+    }
+
+    private void resetAudit(PartyApplicationModel application) {
+        application.setAuditStatus("待审核");
+        application.setAuditComment(null);
+        application.setAuditorId(null);
+        application.setAuditTime(null);
     }
 }

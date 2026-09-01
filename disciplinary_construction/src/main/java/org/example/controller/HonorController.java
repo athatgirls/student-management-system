@@ -4,6 +4,7 @@ import org.example.annotation.CurrentUser;
 import org.example.model.HonorModel;
 import org.example.model.StudentModel;
 import org.example.service.HonorService;
+import org.example.service.CurrentUserAccessService;
 import org.example.service.StudentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +25,9 @@ public class HonorController {
     @Autowired
     private StudentService studentService;
 
+    @Autowired
+    private CurrentUserAccessService currentUserAccessService;
+
     @PostMapping("/create")
     public ResponseEntity<Map<String, Object>> create(@RequestBody HonorModel model, @CurrentUser Map<String, Object> currentUser) {
         String userId = (String) currentUser.get("userId");
@@ -35,7 +39,11 @@ public class HonorController {
     }
 
     @GetMapping("/list")
-    public ResponseEntity<Map<String, Object>> list(@RequestParam(required = false) String userId) {
+    public ResponseEntity<Map<String, Object>> list(@RequestParam(required = false) String userId,
+                                                     @CurrentUser Map<String, Object> currentUser) {
+        if (!currentUserAccessService.isAdmin(currentUser)) {
+            userId = currentUserAccessService.requireUserId(currentUser);
+        }
         Map<String, Object> result = new HashMap<>();
         result.put("code", 200);
         List<HonorModel> honors;
@@ -77,4 +85,3 @@ public class HonorController {
         return ResponseEntity.ok(result);
     }
 }
-

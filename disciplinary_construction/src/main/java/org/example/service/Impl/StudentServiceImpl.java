@@ -9,6 +9,7 @@ import org.example.repository.DailyTaskRepository;
 import org.example.repository.DailyTaskSubmissionRepository;
 import org.example.service.StudentService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -26,6 +27,9 @@ public class StudentServiceImpl implements StudentService {
     @Autowired
     private StudentRepository studentRepository;
     private BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+
+    @Value("${app.demo-data.student-password:Student123!}")
+    private String demoStudentPassword;
 
     @Autowired
     private DailyTaskRepository dailyTaskRepository;
@@ -406,7 +410,7 @@ public class StudentServiceImpl implements StudentService {
             student1.setName("默认学生");
             student1.setGender("男");
             student1.setAge(24);
-            student1.setPassword(passwordEncoder.encode("123456"));
+            student1.setPassword(passwordEncoder.encode(demoStudentPassword));
             student1.setEmail("default@student.edu.cn");
             student1.setPhone("13800000000");
             student1.setMajor("计算机科学与技术");
@@ -436,7 +440,7 @@ public class StudentServiceImpl implements StudentService {
             student2.setName("学生111");
             student2.setGender("女");
             student2.setAge(23);
-            student2.setPassword(passwordEncoder.encode("123456"));
+            student2.setPassword(passwordEncoder.encode(demoStudentPassword));
             student2.setEmail("student111@edu.cn");
             student2.setPhone("13900000001");
             student2.setMajor("软件工程");
@@ -575,14 +579,16 @@ public class StudentServiceImpl implements StudentService {
     public boolean isDefaultPassword(String studentId, String password) {
         try {
             StudentModel student = studentRepository.findByStudentId(studentId);
-            if (student == null || student.getPassword() == null || student.getPassword().isEmpty()) {
+            if (student == null || student.getPassword() == null || student.getPassword().isEmpty()
+                    || password == null || password.isEmpty()) {
                 return false;
             }
             // 计算初始密码
             String lastSix = studentId.length() > 6 ? studentId.substring(studentId.length() - 6) : studentId;
             String defaultPassword = "Hbut_" + lastSix;
             // 验证数据库中存储的密码是否为初始密码（通过匹配初始密码的加密值）
-            return passwordEncoder.matches(defaultPassword, student.getPassword());
+            return defaultPassword.equals(password)
+                    && passwordEncoder.matches(password, student.getPassword());
         } catch (Exception e) {
             e.printStackTrace();
             return false;

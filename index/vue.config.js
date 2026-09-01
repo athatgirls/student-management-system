@@ -18,8 +18,14 @@ module.exports = defineConfig({
   
   devServer: {
     port: 3000,
-    open: true,
-    host: 'localhost',
+    open: false,
+    host: '0.0.0.0',
+    proxy: {
+      '/SCSE@hbut': {
+        target: process.env.VUE_APP_DEV_PROXY_TARGET || 'http://localhost:1010',
+        changeOrigin: true
+      }
+    },
     client: {
       overlay: {
         errors: true,

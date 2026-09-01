@@ -7,6 +7,8 @@ import org.springframework.stereotype.Component;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.crypto.SecretKey;
+import javax.annotation.PostConstruct;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -25,11 +27,18 @@ public class JwtUtil {
     private long refreshThreshold;
     
     private SecretKey key;
+
+    @PostConstruct
+    public void validateConfiguration() {
+        if (secretKey == null || secretKey.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException("JWT_SECRET must contain at least 32 bytes");
+        }
+    }
     
     // 初始化密钥
     private SecretKey getKey() {
         if (key == null) {
-            key = Keys.hmacShaKeyFor(secretKey.getBytes());
+            key = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
         }
         return key;
     }
@@ -161,4 +170,4 @@ public class JwtUtil {
         log.info("刷新Token，用户ID: {}, 用户类型: {}", userId, userType);
         return generateToken(userId, userType, username);
     }
-} 
+}

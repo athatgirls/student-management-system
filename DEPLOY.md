@@ -1,72 +1,129 @@
-# MIS 部署说明
+# 服务器上线手册
 
-当前项目已经整理成可构建的前后端结构：
+本文以一台有公网 IP 的 Linux 服务器和一个已解析域名为例。建议至少 2 核 CPU、4 GB 内存、30 GB 磁盘；正式保存真实学生信息前，应再按学校的数据合规要求做权限、审计和备份评审。
 
-- 前端：`index/`
-- 后端：`disciplinary_construction/`
-- 一键编排：根目录 `docker-compose.yml`
+## 1. 准备服务器和域名
 
-## 本机已验证
+1. 安装 Git、Docker Engine 和 Docker Compose 插件；Docker 请按官方文档安装，确认 `docker version` 和 `docker compose version` 可用。
+2. 将域名 A/AAAA 记录指向服务器公网 IP。
+3. 云安全组和系统防火墙只放行 SSH、TCP 80、TCP/UDP 443。
+4. MongoDB、Redis、后端 1010 端口不要暴露到公网。
 
-- Node/npm 已安装，前端 `npm run build` 通过。
-- Java 11 已安装，Maven 使用项目内 `.tools/apache-maven-3.9.9`。
-- 后端 `mvn -DskipTests package` 通过，jar 已生成。
-- Git 已安装在 `C:\Program Files\Git\cmd\git.exe`。
-- Docker Desktop 安装器已下载并执行，但当前机器安装器返回 Windows 错误码 `4294967291`，需要手动确认 UAC/重启/系统虚拟化组件后再试。
+## 2. 上传代码
 
-## 推荐部署方式：Docker Compose
-
-安装并启动 Docker Desktop 后，在仓库根目录执行：
-
-```powershell
-docker compose up -d --build
+```bash
+git clone https://github.com/athatgirls/student-management-system.git
+cd student-management-system
+cp .env.example .env
 ```
 
-启动后访问：
+如果本地代码尚未推送，就先将整个项目目录上传到服务器，再进入项目根目录。
 
-- 前端：`http://localhost:8080`
-- 后端代理：`http://localhost:8080/SCSE@hbut/msi`
-- 后端直连容器内端口：`1010`
+## 3. 配置生产变量
 
-会一起启动：
+用下面命令生成十六进制随机值，避免 URI 中的特殊字符转义问题：
 
-- `frontend`
-- `backend`
-- `mongo`
-- `redis`
-
-## 本地分开运行
-
-前端：
-
-```powershell
-cd index
-npm install
-npm run serve
+```bash
+openssl rand -hex 32
+openssl rand -hex 32
+openssl rand -hex 48
+openssl rand -hex 24
 ```
 
-后端：
+编辑 `.env`，至少填写：
 
-```powershell
-cd disciplinary_construction
-$env:JAVA_HOME='C:\Program Files\Eclipse Adoptium\jdk-11.0.30.7-hotspot'
-$env:Path="$env:JAVA_HOME\bin;..\.tools\apache-maven-3.9.9\bin;$env:Path"
-..\.tools\apache-maven-3.9.9\bin\mvn.cmd -Dmaven.repo.local=..\.m2\repository -DskipTests package
-java -jar target\disciplinary_construction-1.0-SNAPSHOT.jar
+```dotenv
+APP_PORT=8080
+BIND_ADDRESS=127.0.0.1
+APP_DOMAIN=mis.example.com
+
+MONGO_ROOT_USERNAME=mis_admin
+MONGO_ROOT_PASSWORD=第一条随机值
+REDIS_PASSWORD=第二条随机值
+JWT_SECRET=第三条随机值
+
+APP_CORS_ALLOWED_ORIGINS=https://mis.example.com
+APP_BOOTSTRAP_ENABLED=true
+APP_BOOTSTRAP_ADMIN_USERNAME=admin
+APP_BOOTSTRAP_ADMIN_PASSWORD=第四条随机值
+
+APP_DEMO_DATA_ENABLED=false
+APP_DEMO_STUDENT_PASSWORD=不要使用默认值
 ```
 
-## 生产环境必须改的配置
+不要把 `.env` 提交到 Git，也不要通过聊天或截图发送其中的值。
 
-- `JWT_SECRET`：必须换成随机长密钥，不要用默认开发占位值。
-- `APP_CORS_ALLOWED_ORIGINS`：改成真实前端域名。
-- `MONGODB_URI`、`REDIS_HOST`、`REDIS_PASSWORD`：改成生产数据库配置。
-- `APP_UPLOAD_DIR`：确认有持久化卷或宿主机目录。
+## 4. 检查并启动
 
-## 已补齐的能力
+```bash
+docker compose -f docker-compose.yml -f docker-compose.https.yml config --quiet
+docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.https.yml ps
+```
 
-- 前端生产接口不再写死 `localhost`。
-- 后端 MongoDB、Redis、JWT、上传目录、CORS 都支持环境变量。
-- 后端新增成绩导入与成绩查询接口。
-- 前后端都提供 Dockerfile，根目录提供整套 compose。
-- 上传接口修了无后缀文件崩溃和路径穿越风险。
-- 安全配置恢复了登录白名单、静态上传文件、健康检查和默认鉴权规则。
+检查服务：
+
+```bash
+curl -f http://127.0.0.1:8080/health
+curl -f https://mis.example.com/health
+docker compose -f docker-compose.yml -f docker-compose.https.yml logs --tail=100 backend frontend caddy
+```
+
+Caddy 会在域名解析正确且 80/443 可访问时自动申请和续期 HTTPS 证书。首次登录后立即修改管理员密码；确认管理员账号已持久化后，可将 `APP_BOOTSTRAP_ENABLED=false` 再重启后端。
+
+## 5. 更新版本
+
+更新前先备份，然后重新构建：
+
+```bash
+chmod +x scripts/backup.sh
+./scripts/backup.sh
+git pull --ff-only
+docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.https.yml ps
+```
+
+上线变更应先在测试服务器验证。保留上一个 Git 标签和备份文件，以便出现问题时回退代码和数据。
+
+## 6. 备份与恢复
+
+执行：
+
+```bash
+./scripts/backup.sh
+```
+
+会在 `backups/` 生成 MongoDB 压缩归档和上传文件压缩包。建议再把备份同步到另一台机器或对象存储，并配置定时任务：
+
+```cron
+30 2 * * * cd /opt/student-management-system && ./scripts/backup.sh >> /var/log/mis-backup.log 2>&1
+```
+
+恢复会覆盖数据，必须先停写并再次备份。示例：
+
+```bash
+set -a
+. ./.env
+set +a
+
+docker compose exec -T mongo mongorestore \
+  --username "$MONGO_ROOT_USERNAME" \
+  --password "$MONGO_ROOT_PASSWORD" \
+  --authenticationDatabase admin \
+  --archive --gzip --drop < backups/mongo_时间.archive.gz
+
+docker compose exec -T backend tar -xzf - -C /app < backups/uploads_时间.tar.gz
+```
+
+恢复后检查登录、学生列表、文件访问和统计数据。
+
+## 7. 上线验收清单
+
+- `https://域名/health` 返回 `ok`；
+- 浏览器证书有效，HTTP 自动跳转 HTTPS；
+- 管理员和学生能登录，学生访问管理员接口返回 403；
+- 新建、修改、查询、上传和 `.xlsx` 导入可用；
+- 重启容器后数据仍存在；
+- 备份文件可以在测试环境恢复；
+- `.env` 权限已限制，例如 `chmod 600 .env`；
+- 演示数据关闭，默认密码全部更换。

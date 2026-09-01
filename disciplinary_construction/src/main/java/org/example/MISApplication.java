@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.example.service.Impl.StudentServiceImpl;
@@ -23,11 +24,20 @@ public class MISApplication {
     }
 
     @Bean
-    public ApplicationRunner runner(StudentServiceImpl studentService, AdminServiceImpl adminService, PartyMemberServiceImpl partyMemberService) {
+    public ApplicationRunner runner(
+            StudentServiceImpl studentService,
+            AdminServiceImpl adminService,
+            PartyMemberServiceImpl partyMemberService,
+            @Value("${app.bootstrap.enabled:true}") boolean bootstrapEnabled,
+            @Value("${app.demo-data.enabled:true}") boolean demoDataEnabled) {
         return args -> {
-            studentService.createDefaultStudent();
-            adminService.createDefaultAdmin();
-            partyMemberService.createDefaultPartyMember();
+            if (bootstrapEnabled) {
+                adminService.createDefaultAdmin();
+            }
+            if (demoDataEnabled) {
+                studentService.createDefaultStudent();
+                partyMemberService.createDefaultPartyMember();
+            }
         };
     }
 }

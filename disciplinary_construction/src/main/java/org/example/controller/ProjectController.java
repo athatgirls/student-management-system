@@ -1,6 +1,8 @@
 package org.example.controller;
 
+import org.example.annotation.CurrentUser;
 import org.example.model.ProjectModel;
+import org.example.service.CurrentUserAccessService;
 import org.example.service.ProjectService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -16,10 +18,15 @@ public class ProjectController {
     @Autowired
     private ProjectService projectService;
 
+    @Autowired
+    private CurrentUserAccessService currentUserAccessService;
+
     // ==================== 学生端接口 ====================
 
     @GetMapping("/student/{studentId}")
-    public ResponseEntity<?> getStudentProjects(@PathVariable String studentId) {
+    public ResponseEntity<?> getStudentProjects(@PathVariable String studentId,
+                                                @CurrentUser Map<String, Object> currentUser) {
+        currentUserAccessService.requireStudentAccess(currentUser, studentId);
         try {
             List<ProjectModel> projects = projectService.getProjectsByStudentId(studentId);
             return ResponseEntity.ok(projects);
@@ -29,11 +36,12 @@ public class ProjectController {
     }
 
     @PostMapping
-    public ResponseEntity<?> addProject(@RequestBody ProjectModel project) {
+    public ResponseEntity<?> addProject(@RequestBody ProjectModel project,
+                                        @CurrentUser Map<String, Object> currentUser) {
+        project.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
+        project.setStudentName((String) currentUser.get("username"));
         try {
-            if (project.getAuditStatus() == null) {
-                project.setAuditStatus("待审核");
-            }
+            resetProjectAudit(project);
             ProjectModel saved = projectService.saveProject(project);
             return ResponseEntity.ok(saved);
         } catch (Exception e) {
@@ -42,9 +50,18 @@ public class ProjectController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateProject(@PathVariable String id, @RequestBody ProjectModel project) {
+    public ResponseEntity<?> updateProject(@PathVariable String id, @RequestBody ProjectModel project,
+                                           @CurrentUser Map<String, Object> currentUser) {
+        ProjectModel existing = projectService.getProjectById(id);
+        if (existing == null) {
+            return ResponseEntity.notFound().build();
+        }
+        currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
         try {
             project.setId(id);
+            project.setStudentId(existing.getStudentId());
+            project.setStudentName(existing.getStudentName());
+            resetProjectAudit(project);
             ProjectModel updated = projectService.saveProject(project);
             return ResponseEntity.ok(updated);
         } catch (Exception e) {
@@ -53,7 +70,13 @@ public class ProjectController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteProject(@PathVariable String id) {
+    public ResponseEntity<?> deleteProject(@PathVariable String id,
+                                           @CurrentUser Map<String, Object> currentUser) {
+        ProjectModel existing = projectService.getProjectById(id);
+        if (existing == null) {
+            return ResponseEntity.notFound().build();
+        }
+        currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
         try {
             projectService.deleteProject(id);
             return ResponseEntity.ok("删除成功");
@@ -64,13 +87,17 @@ public class ProjectController {
 
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getProject(@PathVariable String id) {
+    public ResponseEntity<?> getProject(@PathVariable String id,
+                                        @CurrentUser Map<String, Object> currentUser) {
         try {
             ProjectModel project = projectService.getProjectById(id);
             if (project == null) {
                 return ResponseEntity.badRequest().body("项目不存在");
             }
+            currentUserAccessService.requireStudentAccess(currentUser, project.getStudentId());
             return ResponseEntity.ok(project);
+        } catch (org.springframework.security.access.AccessDeniedException e) {
+            throw e;
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("获取项目失败: " + e.getMessage());
         }
@@ -99,12 +126,13 @@ public class ProjectController {
     }
 
     @PutMapping("/admin/{id}/audit")
-    public ResponseEntity<?> auditProject(@PathVariable String id, @RequestBody Map<String, String> auditData) {
+    public ResponseEntity<?> auditProject(@PathVariable String id, @RequestBody Map<String, String> auditData,
+                                          @CurrentUser Map<String, Object> currentUser) {
         try {
             String auditStatus = auditData.get("auditStatus");
             String auditComment = auditData.get("auditComment");
-            String auditorId = auditData.get("auditorId"); 
-            String auditorName = auditData.get("auditorName");
+            String auditorId = currentUserAccessService.requireUserId(currentUser);
+            String auditorName = (String) currentUser.get("username");
 
             ProjectModel project = projectService.getProjectById(id);
             if (project == null) {
@@ -122,5 +150,12 @@ public class ProjectController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("审核失败: " + e.getMessage());
         }
+    }
+
+    private void resetProjectAudit(ProjectModel project) {
+        project.setAuditStatus("待审核");
+        project.setAuditComment(null);
+        project.setAuditorId(null);
+        project.setAuditorName(null);
     }
 }

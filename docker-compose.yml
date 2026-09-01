@@ -1,55 +1,87 @@
-version: "3.9"
+name: mis
 
 services:
   mongo:
-    image: mongo:6.0
-    container_name: mis-mongo
+    image: mongo:7.0
     restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-mis_admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD in .env}
     volumes:
       - mongo_data:/data/db
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --username \"$${MONGO_INITDB_ROOT_USERNAME}\" --password \"$${MONGO_INITDB_ROOT_PASSWORD}\" --authenticationDatabase admin --eval 'db.adminCommand({ ping: 1 })' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   redis:
     image: redis:7.2-alpine
-    container_name: mis-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$${REDIS_PASSWORD}\""]
     volumes:
       - redis_data:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   backend:
     build:
       context: ./disciplinary_construction
       dockerfile: Dockerfile
-    container_name: mis-backend
     restart: unless-stopped
     depends_on:
-      - mongo
-      - redis
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SERVER_PORT: 1010
       SERVER_CONTEXT_PATH: /SCSE@hbut
-      MONGODB_URI: mongodb://mongo:27017/disciplinary_construction
+      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME:-mis_admin}:${MONGO_ROOT_PASSWORD}@mongo:27017/disciplinary_construction?authSource=admin
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      JWT_SECRET: ${JWT_SECRET:-MIS_DEV_ONLY_CHANGE_THIS_64_CHAR_MINIMUM_SECRET_20260424_DEPLOY}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?Set a random JWT_SECRET of at least 32 bytes in .env}
       APP_UPLOAD_DIR: /app/uploads
-      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080,http://localhost:3000}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:?Set APP_CORS_ALLOWED_ORIGINS in .env}
+      APP_BOOTSTRAP_ENABLED: ${APP_BOOTSTRAP_ENABLED:-true}
+      APP_BOOTSTRAP_ADMIN_USERNAME: ${APP_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      APP_BOOTSTRAP_ADMIN_PASSWORD: ${APP_BOOTSTRAP_ADMIN_PASSWORD:?Set APP_BOOTSTRAP_ADMIN_PASSWORD in .env}
+      APP_DEMO_DATA_ENABLED: ${APP_DEMO_DATA_ENABLED:-false}
+      APP_DEMO_STUDENT_PASSWORD: ${APP_DEMO_STUDENT_PASSWORD:-Student123!}
       KNIFE4J_ENABLE: "false"
     volumes:
       - uploads_data:/app/uploads
+    networks:
+      - backend
 
   frontend:
     build:
       context: ./index
       dockerfile: Dockerfile
-    container_name: mis-frontend
     restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
-      - "8080:80"
+      - "${BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-8080}:80"
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
 
 volumes:
   mongo_data:

@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.annotation.CurrentUser;
 import org.example.model.VolunteerServiceModel;
 import org.example.response.ResponseResult;
+import org.example.service.CurrentUserAccessService;
 import org.example.service.VolunteerServiceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -20,11 +21,17 @@ public class VolunteerServiceController {
     @Autowired
     private VolunteerServiceService volunteerServiceService;
 
+    @Autowired
+    private CurrentUserAccessService currentUserAccessService;
+
     @Operation(summary = "添加志愿服务记录")
     @PostMapping("/add")
     public ResponseResult<VolunteerServiceModel> addVolunteerService(@RequestBody VolunteerServiceModel volunteerService, @CurrentUser Map<String, Object> currentUser) {
-        String userId = (String) currentUser.get("userId");
-        volunteerService.setStudentId(userId);
+        if (!currentUserAccessService.isAdmin(currentUser)) {
+            volunteerService.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
+            volunteerService.setStudentName((String) currentUser.get("username"));
+            resetAudit(volunteerService);
+        }
         VolunteerServiceModel result = volunteerServiceService.addVolunteerService(volunteerService);
         return ResponseResult.success(result);
     }
@@ -32,30 +39,48 @@ public class VolunteerServiceController {
     @Operation(summary = "更新志愿服务记录")
     @PutMapping("/update")
     public ResponseResult<VolunteerServiceModel> updateVolunteerService(@RequestBody VolunteerServiceModel volunteerService, @CurrentUser Map<String, Object> currentUser) {
-        String userId = (String) currentUser.get("userId");
-        volunteerService.setStudentId(userId);
+        VolunteerServiceModel existing = volunteerServiceService.getVolunteerServiceById(volunteerService.getId());
+        if (existing != null) {
+            currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+        }
+        if (!currentUserAccessService.isAdmin(currentUser)) {
+            volunteerService.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
+            volunteerService.setStudentName((String) currentUser.get("username"));
+            resetAudit(volunteerService);
+        }
         VolunteerServiceModel result = volunteerServiceService.updateVolunteerService(volunteerService);
         return ResponseResult.success(result);
     }
 
     @Operation(summary = "删除志愿服务记录")
     @DeleteMapping("/delete/{id}")
-    public ResponseResult<String> deleteVolunteerService(@PathVariable String id) {
+    public ResponseResult<String> deleteVolunteerService(@PathVariable String id,
+                                                         @CurrentUser Map<String, Object> currentUser) {
+        VolunteerServiceModel existing = volunteerServiceService.getVolunteerServiceById(id);
+        if (existing != null) {
+            currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+        }
         volunteerServiceService.deleteVolunteerService(id);
         return ResponseResult.success("删除成功");
     }
 
     @Operation(summary = "获取学生志愿服务记录")
     @GetMapping("/student/{studentId}")
-    public ResponseResult<List<VolunteerServiceModel>> getStudentVolunteerServices(@PathVariable String studentId) {
+    public ResponseResult<List<VolunteerServiceModel>> getStudentVolunteerServices(@PathVariable String studentId,
+                                                                                    @CurrentUser Map<String, Object> currentUser) {
+        currentUserAccessService.requireStudentAccess(currentUser, studentId);
         List<VolunteerServiceModel> result = volunteerServiceService.getStudentVolunteerServices(studentId);
         return ResponseResult.success(result);
     }
 
     @Operation(summary = "根据ID获取志愿服务记录")
     @GetMapping("/{id}")
-    public ResponseResult<VolunteerServiceModel> getVolunteerServiceById(@PathVariable String id) {
+    public ResponseResult<VolunteerServiceModel> getVolunteerServiceById(@PathVariable String id,
+                                                                         @CurrentUser Map<String, Object> currentUser) {
         VolunteerServiceModel result = volunteerServiceService.getVolunteerServiceById(id);
+        if (result != null) {
+            currentUserAccessService.requireStudentAccess(currentUser, result.getStudentId());
+        }
         return ResponseResult.success(result);
     }
 
@@ -113,5 +138,12 @@ public class VolunteerServiceController {
     public ResponseResult<List<VolunteerServiceModel>> getVolunteerServicesByOrganization(@PathVariable String organization) {
         List<VolunteerServiceModel> result = volunteerServiceService.getVolunteerServicesByOrganization(organization);
         return ResponseResult.success(result);
+    }
+
+    private void resetAudit(VolunteerServiceModel service) {
+        service.setAuditStatus("待审核");
+        service.setAuditComment(null);
+        service.setAuditorId(null);
+        service.setAuditTime(null);
     }
 } 

@@ -43,7 +43,7 @@
       <template #header>
         <div class="card-header">
           <span>上传成绩表</span>
-          <el-tag type="info" effect="plain">支持 .xlsx / .xls</el-tag>
+          <el-tag type="info" effect="plain">支持 .xlsx</el-tag>
         </div>
       </template>
 
@@ -61,7 +61,7 @@
         action="#"
         :auto-upload="false"
         :limit="1"
-        accept=".xlsx,.xls"
+        accept=".xlsx"
         :on-change="handleFileChange"
         :on-remove="handleFileRemove"
       >
@@ -120,8 +120,8 @@
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Download, UploadFilled } from '@element-plus/icons-vue'
-import * as XLSX from 'xlsx'
 import { importGrades } from '@/api/grade'
+import { downloadExcel, readExcelObjects } from '@/utils/excel'
 
 const uploadRef = ref()
 const selectedFile = ref(null)
@@ -191,24 +191,17 @@ const handleFileRemove = () => {
   parsedRows.value = []
 }
 
-const parseExcel = (file) => {
-  const reader = new FileReader()
-  reader.onload = (event) => {
-    try {
-      const workbook = XLSX.read(event.target.result, { type: 'array' })
-      const firstSheetName = workbook.SheetNames[0]
-      const worksheet = workbook.Sheets[firstSheetName]
-      const rows = XLSX.utils.sheet_to_json(worksheet, { defval: '' })
+const parseExcel = async (file) => {
+  try {
+      const rows = await readExcelObjects(file)
       parsedRows.value = rows.map(normalizeRow).filter(row => row.studentId || row.studentName || row.courseName)
       if (parsedRows.value.length === 0) {
         ElMessage.warning('没有解析到有效成绩数据')
       }
-    } catch (error) {
-      console.error('解析成绩表失败', error)
-      ElMessage.error('Excel 解析失败，请检查文件格式')
-    }
+  } catch (error) {
+    console.error('解析成绩表失败', error)
+    ElMessage.error(error.message || 'Excel 解析失败，请检查文件格式')
   }
-  reader.readAsArrayBuffer(file)
 }
 
 const clearImport = () => {
@@ -253,15 +246,12 @@ const submitImport = async () => {
   }
 }
 
-const downloadTemplate = () => {
+const downloadTemplate = async () => {
   const rows = [
     ['学号', '姓名', '学期', '课程名称', '成绩', '学分', '状态'],
     ['10240001', '张同学', '2025-2026-1', 'Web 前端开发', 92, 3, '已通过']
   ]
-  const worksheet = XLSX.utils.aoa_to_sheet(rows)
-  const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, worksheet, '成绩导入模板')
-  XLSX.writeFile(workbook, '成绩导入模板.xlsx')
+  await downloadExcel(rows, '成绩导入模板', '成绩导入模板.xlsx')
 }
 </script>
 

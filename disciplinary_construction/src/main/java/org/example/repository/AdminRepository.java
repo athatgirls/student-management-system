@@ -19,9 +19,6 @@ public interface AdminRepository extends MongoRepository<AdminModel, String> {
     // 根据邮箱查找
     Optional<AdminModel> findByEmail(String email);
     
-    // 根据用户名和密码查找（用于登录验证）
-    Optional<AdminModel> findByUsernameAndPassword(String username, String password);
-    
     // 查找所有激活的管理员
     List<AdminModel> findByIsActiveTrue();
     
@@ -30,4 +27,4 @@ public interface AdminRepository extends MongoRepository<AdminModel, String> {
     
     // 根据部门查找管理员
     List<AdminModel> findByDepartment(String department);
-} 
+}

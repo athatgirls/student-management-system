@@ -203,7 +203,7 @@
               <template #header>
                 <div class="card-header">
                   <span>历史记录</span>
-                  <el-button type="text" @click="loadReports">刷新</el-button>
+                  <el-button link @click="loadReports">刷新</el-button>
                 </div>
               </template>
               <el-table :data="reportList" v-loading="reportListLoading" stripe>
@@ -287,7 +287,7 @@
               <template #header>
                 <div class="card-header">
                   <span>历史记录</span>
-                  <el-button type="text" @click="loadCourses">刷新</el-button>
+                  <el-button link @click="loadCourses">刷新</el-button>
                 </div>
               </template>
               <el-table :data="courseList" v-loading="courseListLoading" stripe>
@@ -368,7 +368,7 @@
               <template #header>
                 <div class="card-header">
                   <span>历史记录</span>
-                  <el-button type="text" @click="loadServices">刷新</el-button>
+                  <el-button link @click="loadServices">刷新</el-button>
                 </div>
               </template>
               <el-table :data="serviceList" v-loading="serviceListLoading" stripe>

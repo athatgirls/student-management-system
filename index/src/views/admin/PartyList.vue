@@ -322,12 +322,12 @@
               show-icon
             >
               <template #default>
-                <div>需要安装xlsx库才能使用Excel导入功能</div>
+                <div>Excel 组件加载失败，请刷新页面后重试</div>
                 <div style="margin-top: 10px;">
                   <el-button type="primary" size="small" @click="importTab = 'manual'">切换到手动输入</el-button>
                 </div>
                 <div style="margin-top: 10px; font-size: 12px; color: #909399;">
-                  安装命令: npm install xlsx
+                  当前仅支持 .xlsx 文件
                 </div>
               </template>
             </el-alert>
@@ -338,7 +338,7 @@
             :auto-upload="false"
             :on-change="handleFileChange"
             :file-list="fileList"
-            accept=".xlsx,.xls"
+            accept=".xlsx"
             drag
           >
             <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
@@ -347,7 +347,7 @@
             </div>
             <template #tip>
               <div class="el-upload__tip">
-                只能上传 xlsx/xls 文件，Excel格式：第一行为表头（姓名、学号），从第二行开始为数据
+                只能上传 .xlsx 文件，第一行为表头（姓名、学号），从第二行开始为数据
               </div>
             </template>
           </el-upload>
@@ -425,17 +425,10 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Upload, UploadFilled } from '@element-plus/icons-vue'
-import { partyMemberApi, partyApplicationApi } from '@/api/party'
+import { partyMemberApi } from '@/api/party'
+import { readExcelObjects } from '@/utils/excel'
 
-// 动态导入xlsx库（如果已安装）
-let XLSX = null
-let xlsxAvailable = false
-try {
-  XLSX = require('xlsx')
-  xlsxAvailable = true
-} catch (e) {
-  console.warn('xlsx库未安装，Excel导入功能不可用。如需使用Excel导入，请运行: npm install xlsx')
-}
+const xlsxAvailable = true
 
 // 数据
 const partyMembers = ref([])
@@ -614,20 +607,9 @@ const handleSelectionChange = (selection) => {
 }
 
 // 批量导入相关函数
-const handleFileChange = (file) => {
-  if (!xlsxAvailable) {
-    ElMessage.warning('xlsx库未安装，无法使用Excel导入功能')
-    return
-  }
-  
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    try {
-      const data = new Uint8Array(e.target.result)
-      const workbook = XLSX.read(data, { type: 'array' })
-      const firstSheetName = workbook.SheetNames[0]
-      const worksheet = workbook.Sheets[firstSheetName]
-      const jsonData = XLSX.utils.sheet_to_json(worksheet)
+const handleFileChange = async (file) => {
+  try {
+      const jsonData = await readExcelObjects(file.raw)
       
       // 清空手动输入列表
       manualStudents.value = []
@@ -650,12 +632,10 @@ const handleFileChange = (file) => {
       } else {
         ElMessage.warning('Excel文件中没有找到有效数据')
       }
-    } catch (error) {
-      console.error('解析Excel文件失败:', error)
-      ElMessage.error('解析Excel文件失败，请检查文件格式')
-    }
+  } catch (error) {
+    console.error('解析Excel文件失败:', error)
+    ElMessage.error(error.message || '解析Excel文件失败，请检查文件格式')
   }
-  reader.readAsArrayBuffer(file.raw)
 }
 
 const addStudentRow = () => {

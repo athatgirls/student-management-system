@@ -91,7 +91,7 @@
             </el-timeline-item>
           </el-timeline>
           <div v-if="recentActivities.length > maxRecentActivities" class="more-actions">
-            <el-button text type="primary" @click="showAllRecentActivities = !showAllRecentActivities">
+            <el-button link type="primary" @click="showAllRecentActivities = !showAllRecentActivities">
               {{ showAllRecentActivities ? '收起' : `查看更多 (${recentActivities.length - maxRecentActivities}条)` }}
             </el-button>
           </div>
@@ -263,7 +263,7 @@
           </div>
           
           <div v-if="displayedTodoList.length > maxTodoList && (todoTab === 'all' || (todoTab === 'normal' && normalTodos.length > maxTodoList) || (todoTab === 'registration' && registrationTodos.length > maxTodoList))" class="more-actions">
-            <el-button text type="primary" @click="showAllTodoList = !showAllTodoList">
+            <el-button link type="primary" @click="showAllTodoList = !showAllTodoList">
               {{ showAllTodoList ? '收起' : `查看更多 (${displayedTodoList.length - maxTodoList}条)` }}
             </el-button>
           </div>

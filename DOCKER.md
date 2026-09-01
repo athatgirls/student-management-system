@@ -1,63 +1,76 @@
-# Docker Team Workflow
+# Docker 使用与排障
 
-This project now has two Docker Compose entry points.
+## 两套编排
 
-## Development
-
-Use this when several teammates are editing the project together:
+本地完整联调：
 
 ```powershell
-Copy-Item .env.example .env
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-Open:
+生产基础服务（仅本机 `127.0.0.1:8080` 可访问）：
 
-- Frontend dev server: `http://localhost:3000`
-- Backend API: `http://localhost:1010/SCSE@hbut/msi`
-- Backend docs: `http://localhost:1010/SCSE@hbut/doc.html`
-- MongoDB: `localhost:27017`
-- Redis: `localhost:6379`
-
-In development mode, source folders are mounted into containers:
-
-- `./index` -> frontend container
-- `./disciplinary_construction` -> backend container
-
-So teammates can edit files locally and let Docker provide the same Node, Java, Maven, MongoDB, and Redis environment.
-
-## Deployment Preview
-
-Use this when you want a closer-to-production preview:
-
-```powershell
-Copy-Item .env.example .env
+```bash
+cp .env.example .env
 docker compose up -d --build
 ```
 
-Open:
+生产域名与自动 HTTPS：
 
-- Frontend: `http://localhost:8080`
-- Backend through Nginx: `http://localhost:8080/SCSE@hbut/msi`
+```bash
+docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build
+```
 
-## Common Commands
+## 服务和持久化
+
+| 服务 | 作用 | 公网端口 |
+|---|---|---|
+| `frontend` | Nginx 静态前端、API 反向代理、登录限流 | 无（基础编排仅回环 8080） |
+| `backend` | Spring Boot API | 无 |
+| `mongo` | 主数据库 | 无 |
+| `redis` | 在线状态和缓存 | 无 |
+| `caddy` | HTTPS 证书和公网入口 | 80、443 |
+
+持久化卷包括 `mongo_data`、`redis_data`、`uploads_data`、`caddy_data`。普通 `down` 不会删除卷。
+
+## 常用命令
+
+```bash
+docker compose ps
+docker compose logs -f --tail=200 backend
+docker compose logs -f --tail=200 frontend
+docker compose restart backend
+docker compose build --pull
+docker compose up -d
+docker compose config --quiet
+```
+
+开发环境命令需要加 `-f docker-compose.dev.yml`；HTTPS 环境需要同时加两个 `-f` 参数。
+
+## 常见问题
+
+### 页面能开但接口 502
+
+先看 `docker compose ps` 中 backend 是否 healthy，再看后端日志。常见原因是 MongoDB/Redis 密码不一致、JWT 少于 32 字节，或数据库首次初始化尚未完成。
+
+### 域名没有 HTTPS
+
+检查域名是否解析到本机、80/443 是否放行，以及 Caddy 日志。若同机已有 Nginx/Apache 占用 80/443，需先调整端口冲突。
+
+### 修改 `.env` 没生效
+
+环境变量是在容器创建时注入，执行：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --force-recreate
+```
+
+### 想清空本地测试数据
+
+以下命令会永久删除该编排的数据库、缓存和上传卷，只能用于确认可丢弃的测试环境：
 
 ```powershell
-docker compose -f docker-compose.dev.yml logs -f
-docker compose -f docker-compose.dev.yml down
 docker compose -f docker-compose.dev.yml down -v
-docker compose up -d --build
-docker compose down
 ```
 
-`down -v` removes database/upload/cache volumes, so only use it when you are sure local test data can be deleted.
-
-## Production Notes
-
-Before real deployment, change these values in `.env`:
-
-- `JWT_SECRET`
-- `APP_CORS_ALLOWED_ORIGINS`
-- `REDIS_PASSWORD` if Redis is exposed or shared
-
-The default secret is only a development placeholder.
+生产环境不要执行 `down -v`。

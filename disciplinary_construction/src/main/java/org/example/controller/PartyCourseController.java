@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.annotation.CurrentUser;
 import org.example.model.PartyCourseModel;
 import org.example.response.ResponseResult;
+import org.example.service.CurrentUserAccessService;
 import org.example.service.PartyCourseService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -20,13 +21,17 @@ public class PartyCourseController {
     @Autowired
     private PartyCourseService partyCourseService;
 
+    @Autowired
+    private CurrentUserAccessService currentUserAccessService;
+
     @Operation(summary = "添加党课记录")
     @PostMapping("/add")
     public ResponseResult<PartyCourseModel> addPartyCourse(@RequestBody PartyCourseModel partyCourse, @CurrentUser Map<String, Object> currentUser) {
-        String userId = (String) currentUser.get("userId");
-        String userName = (String) currentUser.get("userName");
-        partyCourse.setStudentId(userId);
-        partyCourse.setStudentName(userName);
+        if (!currentUserAccessService.isAdmin(currentUser)) {
+            partyCourse.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
+            partyCourse.setStudentName((String) currentUser.get("username"));
+            resetAudit(partyCourse);
+        }
         PartyCourseModel result = partyCourseService.addPartyCourse(partyCourse);
         return ResponseResult.success(result);
     }
@@ -34,32 +39,48 @@ public class PartyCourseController {
     @Operation(summary = "更新党课记录")
     @PutMapping("/update")
     public ResponseResult<PartyCourseModel> updatePartyCourse(@RequestBody PartyCourseModel partyCourse, @CurrentUser Map<String, Object> currentUser) {
-        String userId = (String) currentUser.get("userId");
-        String userName = (String) currentUser.get("userName");
-        partyCourse.setStudentId(userId);
-        partyCourse.setStudentName(userName);
+        PartyCourseModel existing = partyCourseService.getPartyCourseById(partyCourse.getId());
+        if (existing != null) {
+            currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+        }
+        if (!currentUserAccessService.isAdmin(currentUser)) {
+            partyCourse.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
+            partyCourse.setStudentName((String) currentUser.get("username"));
+            resetAudit(partyCourse);
+        }
         PartyCourseModel result = partyCourseService.updatePartyCourse(partyCourse);
         return ResponseResult.success(result);
     }
 
     @Operation(summary = "删除党课记录")
     @DeleteMapping("/delete/{id}")
-    public ResponseResult<String> deletePartyCourse(@PathVariable String id) {
+    public ResponseResult<String> deletePartyCourse(@PathVariable String id,
+                                                    @CurrentUser Map<String, Object> currentUser) {
+        PartyCourseModel existing = partyCourseService.getPartyCourseById(id);
+        if (existing != null) {
+            currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+        }
         partyCourseService.deletePartyCourse(id);
         return ResponseResult.success("删除成功");
     }
 
     @Operation(summary = "获取学生党课记录")
     @GetMapping("/student/{studentId}")
-    public ResponseResult<List<PartyCourseModel>> getStudentPartyCourses(@PathVariable String studentId) {
+    public ResponseResult<List<PartyCourseModel>> getStudentPartyCourses(@PathVariable String studentId,
+                                                                         @CurrentUser Map<String, Object> currentUser) {
+        currentUserAccessService.requireStudentAccess(currentUser, studentId);
         List<PartyCourseModel> result = partyCourseService.getStudentPartyCourses(studentId);
         return ResponseResult.success(result);
     }
 
     @Operation(summary = "根据ID获取党课记录")
     @GetMapping("/{id}")
-    public ResponseResult<PartyCourseModel> getPartyCourseById(@PathVariable String id) {
+    public ResponseResult<PartyCourseModel> getPartyCourseById(@PathVariable String id,
+                                                               @CurrentUser Map<String, Object> currentUser) {
         PartyCourseModel result = partyCourseService.getPartyCourseById(id);
+        if (result != null) {
+            currentUserAccessService.requireStudentAccess(currentUser, result.getStudentId());
+        }
         return ResponseResult.success(result);
     }
 
@@ -117,5 +138,12 @@ public class PartyCourseController {
     public ResponseResult<List<PartyCourseModel>> getPartyCoursesByInstructor(@PathVariable String instructor) {
         List<PartyCourseModel> result = partyCourseService.getPartyCoursesByInstructor(instructor);
         return ResponseResult.success(result);
+    }
+
+    private void resetAudit(PartyCourseModel course) {
+        course.setAuditStatus("待审核");
+        course.setAuditComment(null);
+        course.setAuditorId(null);
+        course.setAuditTime(null);
     }
 } 

@@ -1,12 +1,22 @@
 package org.example.controller;
 
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.example.annotation.CurrentUser;
 import org.example.model.InternshipEmploymentModel;
+import org.example.service.CurrentUserAccessService;
 import org.example.service.InternshipEmploymentService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -22,6 +32,9 @@ public class InternshipEmploymentController {
     @Autowired
     private InternshipEmploymentService service;
 
+    @Autowired
+    private CurrentUserAccessService currentUserAccessService;
+
     /**
      * 添加实习就业记录
      */
@@ -29,17 +42,20 @@ public class InternshipEmploymentController {
     public ResponseEntity<Map<String, Object>> add(@RequestBody InternshipEmploymentModel model, @CurrentUser Map<String, Object> currentUser) {
         Map<String, Object> result = new HashMap<>();
         try {
-            // 设置当前用户ID
-            String userId = (String) currentUser.get("userId");
-            model.setUserId(userId);
+            if (!currentUserAccessService.isAdmin(currentUser)) {
+                model.setUserId(currentUserAccessService.requireUserId(currentUser));
+                model.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
+                model.setStudentName((String) currentUser.get("username"));
+            }
             
             InternshipEmploymentModel savedModel = service.add(model);
             
             result.put("code", 200);
             result.put("data", savedModel);
             result.put("msg", "添加成功");
+        } catch (org.springframework.security.access.AccessDeniedException e) {
+            throw e;
         } catch (Exception e) {
-            e.printStackTrace(); // 打印详细错误信息
             result.put("code", 500);
             result.put("data", null);
             result.put("msg", "添加失败：" + e.getMessage());
@@ -54,14 +70,31 @@ public class InternshipEmploymentController {
     public ResponseEntity<Map<String, Object>> update(@RequestBody InternshipEmploymentModel model, @CurrentUser Map<String, Object> currentUser) {
         Map<String, Object> result = new HashMap<>();
         try {
-            // 确保只能更新自己的记录
-            String userId = (String) currentUser.get("userId");
-            model.setUserId(userId);
+            InternshipEmploymentModel existing = service.getById(model.getId());
+            if (existing == null) {
+                result.put("code", 404);
+                result.put("data", null);
+                result.put("msg", "记录不存在");
+                return ResponseEntity.ok(result);
+            }
+            currentUserAccessService.requireStudentAccess(currentUser,
+                    existing.getUserId() != null ? existing.getUserId() : existing.getStudentId());
+            model.setUserId(existing.getUserId());
+            model.setStudentId(existing.getStudentId());
+            model.setStudentName(existing.getStudentName());
+            if (!currentUserAccessService.isAdmin(currentUser)) {
+                model.setApprovalStatus("待审批");
+                model.setApprovalRemark(null);
+                model.setApprovalBy(null);
+                model.setApprovalTime(null);
+            }
             
             InternshipEmploymentModel updatedModel = service.update(model);
             result.put("code", 200);
             result.put("data", updatedModel);
             result.put("msg", "更新成功");
+        } catch (org.springframework.security.access.AccessDeniedException e) {
+            throw e;
         } catch (Exception e) {
             result.put("code", 500);
             result.put("data", null);
@@ -74,13 +107,21 @@ public class InternshipEmploymentController {
      * 删除实习就业记录（软删除）
      */
     @DeleteMapping("/delete/{id}")
-    public ResponseEntity<Map<String, Object>> delete(@PathVariable String id) {
+    public ResponseEntity<Map<String, Object>> delete(@PathVariable String id,
+                                                      @CurrentUser Map<String, Object> currentUser) {
         Map<String, Object> result = new HashMap<>();
         try {
+            InternshipEmploymentModel existing = service.getById(id);
+            if (existing != null) {
+                currentUserAccessService.requireStudentAccess(currentUser,
+                        existing.getUserId() != null ? existing.getUserId() : existing.getStudentId());
+            }
             service.delete(id);
             result.put("code", 200);
             result.put("data", null);
             result.put("msg", "删除成功");
+        } catch (org.springframework.security.access.AccessDeniedException e) {
+            throw e;
         } catch (Exception e) {
             result.put("code", 500);
             result.put("data", null);
@@ -93,25 +134,25 @@ public class InternshipEmploymentController {
      * 根据ID获取实习就业记录
      */
     @GetMapping("/get/{id}")
-    public ResponseEntity<Map<String, Object>> getById(@PathVariable String id) {
+    public ResponseEntity<Map<String, Object>> getById(@PathVariable String id,
+                                                       @CurrentUser Map<String, Object> currentUser) {
         Map<String, Object> result = new HashMap<>();
         try {
-            System.out.println("请求获取ID: " + id);
             InternshipEmploymentModel model = service.getById(id);
             if (model != null) {
-                System.out.println("找到记录: " + model.getId());
+                currentUserAccessService.requireStudentAccess(currentUser,
+                        model.getUserId() != null ? model.getUserId() : model.getStudentId());
                 result.put("code", 200);
                 result.put("data", model);
                 result.put("msg", "获取成功");
             } else {
-                System.out.println("记录不存在，ID: " + id);
                 result.put("code", 404);
                 result.put("data", null);
                 result.put("msg", "记录不存在");
             }
+        } catch (org.springframework.security.access.AccessDeniedException e) {
+            throw e;
         } catch (Exception e) {
-            System.out.println("获取记录异常: " + e.getMessage());
-            e.printStackTrace();
             result.put("code", 500);
             result.put("data", null);
             result.put("msg", "获取失败：" + e.getMessage());
@@ -147,16 +188,10 @@ public class InternshipEmploymentController {
         Map<String, Object> result = new HashMap<>();
         try {
             List<InternshipEmploymentModel> models = service.getAll();
-            System.out.println("获取所有记录，数量: " + models.size());
-            if (!models.isEmpty()) {
-                System.out.println("第一条记录ID: " + models.get(0).getId());
-            }
             result.put("code", 200);
             result.put("data", models);
             result.put("msg", "获取成功");
         } catch (Exception e) {
-            System.out.println("获取所有记录异常: " + e.getMessage());
-            e.printStackTrace();
             result.put("code", 500);
             result.put("data", null);
             result.put("msg", "获取失败：" + e.getMessage());
@@ -166,7 +201,9 @@ public class InternshipEmploymentController {
 
     // 基础查询API
     @GetMapping("/student/{studentId}")
-    public ResponseEntity<Map<String, Object>> getByStudentId(@PathVariable String studentId) {
+    public ResponseEntity<Map<String, Object>> getByStudentId(@PathVariable String studentId,
+                                                              @CurrentUser Map<String, Object> currentUser) {
+        currentUserAccessService.requireStudentAccess(currentUser, studentId);
         Map<String, Object> result = new HashMap<>();
         result.put("code", 200);
         result.put("data", service.getByStudentId(studentId));
@@ -230,12 +267,11 @@ public class InternshipEmploymentController {
 
     @GetMapping("/date-range")
     public ResponseEntity<Map<String, Object>> getByDateRange(
-            @RequestParam String startDate, 
-            @RequestParam String endDate) {
-        // 这里需要日期转换逻辑
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate) {
         Map<String, Object> result = new HashMap<>();
         result.put("code", 200);
-        result.put("data", service.getAll()); // 临时返回所有数据
+        result.put("data", service.getByDateRange(startDate, endDate));
         result.put("msg", "success");
         return ResponseEntity.ok(result);
     }
@@ -266,13 +302,12 @@ public class InternshipEmploymentController {
     @PostMapping("/approve/{id}")
     public ResponseEntity<Map<String, Object>> approve(
             @PathVariable String id,
-            @RequestBody Map<String, String> requestBody) {
+            @RequestBody Map<String, String> requestBody,
+            @CurrentUser Map<String, Object> currentUser) {
         Map<String, Object> result = new HashMap<>();
         try {
             String approvalRemark = requestBody.get("approvalRemark");
-            String approvalBy = requestBody.get("approvalBy");
-            
-            System.out.println("审批请求 - ID: " + id + ", 备注: " + approvalRemark + ", 审批人: " + approvalBy);
+            String approvalBy = currentUserAccessService.requireUserId(currentUser);
             
             InternshipEmploymentModel model = service.approve(id, approvalRemark, approvalBy);
             if (model != null) {
@@ -285,8 +320,6 @@ public class InternshipEmploymentController {
                 result.put("msg", "审批失败");
             }
         } catch (Exception e) {
-            System.out.println("审批异常: " + e.getMessage());
-            e.printStackTrace();
             result.put("code", 500);
             result.put("data", null);
             result.put("msg", "审批失败：" + e.getMessage());
@@ -297,13 +330,12 @@ public class InternshipEmploymentController {
     @PostMapping("/reject/{id}")
     public ResponseEntity<Map<String, Object>> reject(
             @PathVariable String id,
-            @RequestBody Map<String, String> requestBody) {
+            @RequestBody Map<String, String> requestBody,
+            @CurrentUser Map<String, Object> currentUser) {
         Map<String, Object> result = new HashMap<>();
         try {
             String approvalRemark = requestBody.get("approvalRemark");
-            String approvalBy = requestBody.get("approvalBy");
-            
-            System.out.println("拒绝请求 - ID: " + id + ", 备注: " + approvalRemark + ", 审批人: " + approvalBy);
+            String approvalBy = currentUserAccessService.requireUserId(currentUser);
             
             InternshipEmploymentModel model = service.reject(id, approvalRemark, approvalBy);
             if (model != null) {
@@ -316,8 +348,6 @@ public class InternshipEmploymentController {
                 result.put("msg", "操作失败");
             }
         } catch (Exception e) {
-            System.out.println("拒绝异常: " + e.getMessage());
-            e.printStackTrace();
             result.put("code", 500);
             result.put("data", null);
             result.put("msg", "操作失败：" + e.getMessage());
@@ -475,6 +505,38 @@ public class InternshipEmploymentController {
         return ResponseEntity.ok(result);
     }
 
+    @GetMapping("/export/statistics")
+    public ResponseEntity<byte[]> exportStatisticsReport() throws IOException {
+        Map<String, Object> statistics = service.getStatistics();
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("实习就业统计");
+            int rowIndex = 0;
+            rowIndex = addStatisticRow(sheet, rowIndex, "统计项", "数值");
+            rowIndex = addStatisticRow(sheet, rowIndex, "记录总数", statistics.get("totalCount"));
+            rowIndex = addStatisticRow(sheet, rowIndex, "实习人数", statistics.get("internshipCount"));
+            rowIndex = addStatisticRow(sheet, rowIndex, "就业人数", statistics.get("employmentCount"));
+            rowIndex = addStatisticRow(sheet, rowIndex, "待审批", statistics.get("pendingApprovalCount"));
+            rowIndex = addStatisticRow(sheet, rowIndex, "已通过", statistics.get("approvedCount"));
+            addStatisticRow(sheet, rowIndex, "已拒绝", statistics.get("rejectedCount"));
+            sheet.autoSizeColumn(0);
+            sheet.autoSizeColumn(1);
+            workbook.write(output);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType(
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+            headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=internship-statistics.xlsx");
+            return ResponseEntity.ok().headers(headers).body(output.toByteArray());
+        }
+    }
+
+    private int addStatisticRow(Sheet sheet, int rowIndex, String label, Object value) {
+        Row row = sheet.createRow(rowIndex);
+        row.createCell(0).setCellValue(label);
+        row.createCell(1).setCellValue(value == null ? "0" : String.valueOf(value));
+        return rowIndex + 1;
+    }
+
     // 搜索相关API
     @GetMapping("/search")
     public ResponseEntity<Map<String, Object>> search(@RequestParam String keyword) {
@@ -511,4 +573,4 @@ public class InternshipEmploymentController {
         result.put("msg", "success");
         return ResponseEntity.ok(result);
     }
-} 
+}

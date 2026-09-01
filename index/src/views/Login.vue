@@ -57,7 +57,7 @@
       </el-form>
       
       <div class="login-footer">
-        <p v-if="!isAdminLogin">学生默认账号：10240001 / 密码：123456</p>
+        <p v-if="!isAdminLogin">演示学生：10240001 / Student123!</p>
         <p v-else>管理员默认账号：admin / 密码：admin123</p>
       </div>
     </div>
@@ -269,4 +269,4 @@ const handleReset = () => {
   color: #909399;
   font-size: 12px;
 }
-</style> 
+</style>

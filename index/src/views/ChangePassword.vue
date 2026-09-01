@@ -33,6 +33,16 @@
         <el-form-item label="姓名">
           <el-input v-model="studentInfo.studentName" disabled />
         </el-form-item>
+        <el-form-item label="初始密码" prop="initialPassword">
+          <el-input
+            v-model="passwordForm.initialPassword"
+            type="password"
+            placeholder="请再次输入当前初始密码"
+            show-password
+            size="large"
+            autocomplete="current-password"
+          />
+        </el-form-item>
         <el-form-item label="新密码" prop="newPassword">
           <el-input
             v-model="passwordForm.newPassword"
@@ -100,6 +110,7 @@ const studentInfo = reactive({
 
 // 密码表单
 const passwordForm = reactive({
+  initialPassword: '',
   newPassword: '',
   confirmPassword: ''
 })
@@ -140,6 +151,9 @@ const validateConfirmPassword = (rule, value, callback) => {
 }
 
 const passwordRules = {
+  initialPassword: [
+    { required: true, message: '请输入当前初始密码', trigger: 'blur' }
+  ],
   newPassword: [
     { required: true, message: '请输入新密码', trigger: 'blur' },
     { validator: validatePassword, trigger: 'blur' }
@@ -165,6 +179,7 @@ const handleChangePassword = async () => {
     // 调用修改初始密码接口
     const res = await changeInitialPassword(
       studentInfo.studentId,
+      passwordForm.initialPassword,
       passwordForm.newPassword
     )
     
@@ -291,4 +306,3 @@ onMounted(() => {
   }
 }
 </style>
-

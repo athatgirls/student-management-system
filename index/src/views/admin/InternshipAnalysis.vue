@@ -422,15 +422,19 @@ const loadTrendChart = async () => {
 const exportStatistics = async () => {
   try {
     const res = await exportStatisticsReport()
-    if (res.data) {
-      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    if (res instanceof Blob) {
+      const blob = res
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
       link.download = '实习就业统计报告.xlsx'
+      document.body.appendChild(link)
       link.click()
+      link.remove()
       window.URL.revokeObjectURL(url)
       ElMessage.success('导出成功')
+    } else {
+      throw new Error('导出文件格式不正确')
     }
   } catch (error) {
     ElMessage.error('导出失败')
@@ -573,4 +577,4 @@ onMounted(() => {
     height: 200px !important;
   }
 }
-</style> 
+</style>

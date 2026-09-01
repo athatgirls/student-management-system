@@ -122,7 +122,7 @@
             </el-timeline-item>
           </el-timeline>
           <div v-if="recentActivities.length > maxRecentActivities" class="more-actions" style="text-align: center; margin-top: 10px;">
-            <el-button text type="primary" @click="showAllRecentActivities = !showAllRecentActivities">
+            <el-button link type="primary" @click="showAllRecentActivities = !showAllRecentActivities">
               {{ showAllRecentActivities ? '收起' : `查看更多 (${recentActivities.length - maxRecentActivities}条)` }}
             </el-button>
           </div>
@@ -692,4 +692,4 @@ onMounted(() => {
     margin-bottom: 8px;
   }
 }
-</style> 
+</style>

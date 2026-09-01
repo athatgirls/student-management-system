@@ -37,10 +37,7 @@ public class InternshipEmploymentServiceImpl implements InternshipEmploymentServ
             model.setDuration(diffInDays + "天");
         }
         
-        // 保存并返回包含ID的记录
-        InternshipEmploymentModel savedModel = repository.save(model);
-        System.out.println("新创建的记录ID: " + savedModel.getId());
-        return savedModel;
+        return repository.save(model);
     }
 
     @Override
@@ -185,6 +182,7 @@ public class InternshipEmploymentServiceImpl implements InternshipEmploymentServ
         
         // 按状态统计
         Map<String, Long> statusStats = allRecords.stream()
+                .filter(r -> hasText(r.getStatus()))
                 .collect(Collectors.groupingBy(
                         InternshipEmploymentModel::getStatus,
                         Collectors.counting()
@@ -193,6 +191,7 @@ public class InternshipEmploymentServiceImpl implements InternshipEmploymentServ
         
         // 按行业统计
         Map<String, Long> industryStats = allRecords.stream()
+                .filter(r -> hasText(r.getIndustry()))
                 .collect(Collectors.groupingBy(
                         InternshipEmploymentModel::getIndustry,
                         Collectors.counting()
@@ -201,6 +200,7 @@ public class InternshipEmploymentServiceImpl implements InternshipEmploymentServ
         
         // 按公司类型统计
         Map<String, Long> companyTypeStats = allRecords.stream()
+                .filter(r -> hasText(r.getCompanyType()))
                 .collect(Collectors.groupingBy(
                         InternshipEmploymentModel::getCompanyType,
                         Collectors.counting()
@@ -209,9 +209,10 @@ public class InternshipEmploymentServiceImpl implements InternshipEmploymentServ
         
         // 按技术栈统计
         Map<String, Long> techStackStats = allRecords.stream()
-                .filter(r -> r.getTechnologyStack() != null)
+                .filter(r -> hasText(r.getTechnologyStack()))
                 .flatMap(r -> Arrays.stream(r.getTechnologyStack().split(",")))
                 .map(String::trim)
+                .filter(tech -> !tech.isEmpty())
                 .collect(Collectors.groupingBy(
                         tech -> tech,
                         Collectors.counting()
@@ -220,7 +221,7 @@ public class InternshipEmploymentServiceImpl implements InternshipEmploymentServ
         
         // 按薪资范围统计
         Map<String, Long> salaryRangeStats = allRecords.stream()
-                .filter(r -> r.getSalaryRange() != null)
+                .filter(r -> hasText(r.getSalaryRange()))
                 .collect(Collectors.groupingBy(
                         InternshipEmploymentModel::getSalaryRange,
                         Collectors.counting()
@@ -229,7 +230,7 @@ public class InternshipEmploymentServiceImpl implements InternshipEmploymentServ
         
         // 按年级统计
         Map<String, Long> gradeStats = allRecords.stream()
-                .filter(r -> r.getGrade() != null)
+                .filter(r -> hasText(r.getGrade()))
                 .collect(Collectors.groupingBy(
                         InternshipEmploymentModel::getGrade,
                         Collectors.counting()
@@ -238,7 +239,7 @@ public class InternshipEmploymentServiceImpl implements InternshipEmploymentServ
         
         // 按专业统计
         Map<String, Long> majorStats = allRecords.stream()
-                .filter(r -> r.getMajor() != null)
+                .filter(r -> hasText(r.getMajor()))
                 .collect(Collectors.groupingBy(
                         InternshipEmploymentModel::getMajor,
                         Collectors.counting()
@@ -252,6 +253,7 @@ public class InternshipEmploymentServiceImpl implements InternshipEmploymentServ
     public Map<String, Long> getStatusStatistics() {
         List<InternshipEmploymentModel> allRecords = repository.findByIsDeletedFalse();
         return allRecords.stream()
+                .filter(r -> hasText(r.getStatus()))
                 .collect(Collectors.groupingBy(
                         InternshipEmploymentModel::getStatus,
                         Collectors.counting()
@@ -262,6 +264,7 @@ public class InternshipEmploymentServiceImpl implements InternshipEmploymentServ
     public Map<String, Long> getIndustryStatistics() {
         List<InternshipEmploymentModel> allRecords = repository.findByIsDeletedFalse();
         return allRecords.stream()
+                .filter(r -> hasText(r.getIndustry()))
                 .collect(Collectors.groupingBy(
                         InternshipEmploymentModel::getIndustry,
                         Collectors.counting()
@@ -272,6 +275,7 @@ public class InternshipEmploymentServiceImpl implements InternshipEmploymentServ
     public Map<String, Long> getCompanyTypeStatistics() {
         List<InternshipEmploymentModel> allRecords = repository.findByIsDeletedFalse();
         return allRecords.stream()
+                .filter(r -> hasText(r.getCompanyType()))
                 .collect(Collectors.groupingBy(
                         InternshipEmploymentModel::getCompanyType,
                         Collectors.counting()
@@ -282,6 +286,7 @@ public class InternshipEmploymentServiceImpl implements InternshipEmploymentServ
     public Map<String, Long> getApprovalStatusStatistics() {
         List<InternshipEmploymentModel> allRecords = repository.findByIsDeletedFalse();
         return allRecords.stream()
+                .filter(r -> hasText(r.getApprovalStatus()))
                 .collect(Collectors.groupingBy(
                         InternshipEmploymentModel::getApprovalStatus,
                         Collectors.counting()
@@ -321,9 +326,10 @@ public class InternshipEmploymentServiceImpl implements InternshipEmploymentServ
     public Map<String, Long> getTechnologyStackStatistics() {
         List<InternshipEmploymentModel> allRecords = repository.findByIsDeletedFalse();
         return allRecords.stream()
-                .filter(r -> r.getTechnologyStack() != null)
+                .filter(r -> hasText(r.getTechnologyStack()))
                 .flatMap(r -> Arrays.stream(r.getTechnologyStack().split(",")))
                 .map(String::trim)
+                .filter(tech -> !tech.isEmpty())
                 .collect(Collectors.groupingBy(
                         tech -> tech,
                         Collectors.counting()
@@ -335,7 +341,7 @@ public class InternshipEmploymentServiceImpl implements InternshipEmploymentServ
     public Map<String, Long> getSalaryRangeStatistics() {
         List<InternshipEmploymentModel> allRecords = repository.findByIsDeletedFalse();
         return allRecords.stream()
-                .filter(r -> r.getSalaryRange() != null)
+                .filter(r -> hasText(r.getSalaryRange()))
                 .collect(Collectors.groupingBy(
                         InternshipEmploymentModel::getSalaryRange,
                         Collectors.counting()
@@ -430,4 +436,8 @@ public class InternshipEmploymentServiceImpl implements InternshipEmploymentServ
                 })
                 .collect(Collectors.toList());
     }
-} 
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+}

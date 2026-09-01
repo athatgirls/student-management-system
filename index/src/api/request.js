@@ -3,12 +3,15 @@ import { ElMessage } from 'element-plus'
 import { isPreviewMode } from '@/utils/previewMode'
 import { previewAdapter } from '@/mock/previewData'
 
-const API_BASE_URL = process.env.VUE_APP_API_BASE_URL || 'http://localhost:1010/SCSE@hbut/msi'
+// Use a same-origin path by default. In production Nginx proxies this path to
+// the backend; in development vue.config.js provides the same proxy. This
+// avoids shipping a bundle that points every visitor to their own localhost.
+const API_BASE_URL = process.env.VUE_APP_API_BASE_URL || '/SCSE@hbut/msi'
 
 // 创建axios实例
 const request = axios.create({
     baseURL: API_BASE_URL,
-    timeout: 10000,
+    timeout: 15000,
     headers: {
         'Content-Type': 'application/json'
     }

@@ -1,5 +1,7 @@
 node_modules
 dist
+.env
+*.log
+.git
 .idea
-vue-serve.log
-vue-serve.err.log
+.vscode
