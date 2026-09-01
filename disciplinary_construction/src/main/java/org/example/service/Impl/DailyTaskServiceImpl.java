@@ -5,18 +5,18 @@ import cn.hutool.poi.excel.ExcelWriter;
 import org.example.model.DailyTaskModel;
 import org.example.model.DailyTaskSubmissionModel;
 import org.example.model.StudentModel;
-import org.example.model.PartyApplicationModel;
 import org.example.repository.DailyTaskRepository;
 import org.example.repository.DailyTaskSubmissionRepository;
 import org.example.repository.StudentRepository;
+import org.example.service.DailyTaskAudienceService;
 import org.example.service.DailyTaskService;
-import org.example.service.PartyApplicationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import com.mongodb.client.result.UpdateResult;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
@@ -40,10 +40,11 @@ public class DailyTaskServiceImpl implements DailyTaskService {
     private MongoTemplate mongoTemplate;
     
     @Autowired
-    private PartyApplicationService partyApplicationService;
+    private DailyTaskAudienceService dailyTaskAudienceService;
 
     @Override
     public DailyTaskModel createTask(DailyTaskModel task) {
+        dailyTaskAudienceService.validateAndNormalize(task);
         task.setCreateTime(LocalDateTime.now());
         task.setUpdateTime(LocalDateTime.now());
         // 如果是报名型任务，初始化当前报名人数为0
@@ -79,6 +80,11 @@ public class DailyTaskServiceImpl implements DailyTaskService {
         DailyTaskModel task = taskRepository.findById(submission.getTaskId()).orElse(null);
         if (task == null) {
             throw new RuntimeException("任务不存在");
+        }
+
+        StudentModel student = studentRepository.findById(submission.getStudentId()).orElse(null);
+        if (!dailyTaskAudienceService.matches(task, student)) {
+            throw new AccessDeniedException("您不在该任务的接收范围内");
         }
         
         // 检查是否已经提交过
@@ -199,37 +205,9 @@ public class DailyTaskServiceImpl implements DailyTaskService {
             List<StudentModel> allStudents = studentRepository.findAll();
             
             // 根据任务限制条件过滤学生
-            List<StudentModel> filteredStudents = allStudents.stream().filter(student -> {
-                // 检查年级限制
-                if (task != null && task.getAllowedGrades() != null && !task.getAllowedGrades().isEmpty()) {
-                    if (student.getGrade() == null || !task.getAllowedGrades().contains(student.getGrade())) {
-                        return false;
-                    }
-                }
-                
-                // 检查政治面貌限制
-                if (task != null && task.getAllowedPoliticalStatuses() != null && !task.getAllowedPoliticalStatuses().isEmpty()) {
-                    if (student.getPoliticalStatus() == null || !task.getAllowedPoliticalStatuses().contains(student.getPoliticalStatus())) {
-                        return false;
-                    }
-                }
-                
-                // 检查入党阶段限制
-                if (task != null && task.getAllowedPartyStages() != null && !task.getAllowedPartyStages().isEmpty()) {
-                    String studentPartyStage = null;
-                    if (student.getStudentId() != null) {
-                        PartyApplicationModel partyApplication = partyApplicationService.getByStudentId(student.getStudentId());
-                        if (partyApplication != null) {
-                            studentPartyStage = partyApplication.getCurrentStage();
-                        }
-                    }
-                    if (studentPartyStage == null || !task.getAllowedPartyStages().contains(studentPartyStage)) {
-                        return false;
-                    }
-                }
-                
-                return true;
-            }).collect(Collectors.toList());
+            List<StudentModel> filteredStudents = allStudents.stream()
+                    .filter(student -> dailyTaskAudienceService.matches(task, student))
+                    .collect(Collectors.toList());
             
             for (StudentModel student : filteredStudents) {
                 Map<String, Object> row = new HashMap<>();
@@ -368,47 +346,14 @@ public class DailyTaskServiceImpl implements DailyTaskService {
                     .put(submission.getTaskId(), submission);
         }
         
-        // 获取所有学生的入党申请信息（用于判断限制条件）
-        Map<String, String> studentPartyStageMap = new HashMap<>();
-        for (StudentModel student : students) {
-            if (student.getStudentId() != null) {
-                PartyApplicationModel partyApplication = partyApplicationService.getByStudentId(student.getStudentId());
-                if (partyApplication != null) {
-                    studentPartyStageMap.put(student.getId(), partyApplication.getCurrentStage());
-                }
-            }
-        }
-        
         List<Map<String, Object>> analysis = new ArrayList<>();
-        final Map<String, String> finalPartyStageMap = studentPartyStageMap;
         
         for (StudentModel student : students) {
             // 计算该学生需要完成的任务（根据限制条件）
-            List<DailyTaskModel> requiredTasks = normalTasks.stream().filter(task -> {
-                // 检查年级限制
-                if (task.getAllowedGrades() != null && !task.getAllowedGrades().isEmpty()) {
-                    if (student.getGrade() == null || !task.getAllowedGrades().contains(student.getGrade())) {
-                        return false;
-                    }
-                }
-                
-                // 检查政治面貌限制
-                if (task.getAllowedPoliticalStatuses() != null && !task.getAllowedPoliticalStatuses().isEmpty()) {
-                    if (student.getPoliticalStatus() == null || !task.getAllowedPoliticalStatuses().contains(student.getPoliticalStatus())) {
-                        return false;
-                    }
-                }
-                
-                // 检查入党阶段限制
-                if (task.getAllowedPartyStages() != null && !task.getAllowedPartyStages().isEmpty()) {
-                    String studentPartyStage = finalPartyStageMap.get(student.getId());
-                    if (studentPartyStage == null || !task.getAllowedPartyStages().contains(studentPartyStage)) {
-                        return false;
-                    }
-                }
-                
-                return true;
-            }).collect(Collectors.toList());
+            String studentPartyStage = dailyTaskAudienceService.resolvePartyStage(student);
+            List<DailyTaskModel> requiredTasks = normalTasks.stream()
+                    .filter(task -> dailyTaskAudienceService.matches(task, student, studentPartyStage))
+                    .collect(Collectors.toList());
             
             // 计算已完成的任务
             Map<String, DailyTaskSubmissionModel> studentSubmissions = studentSubmissionsMap.getOrDefault(student.getId(), new HashMap<>());
@@ -505,41 +450,12 @@ public class DailyTaskServiceImpl implements DailyTaskService {
         Map<String, DailyTaskSubmissionModel> submissionMap = studentSubmissions.stream()
                 .collect(Collectors.toMap(DailyTaskSubmissionModel::getTaskId, s -> s));
         
-        // 获取学生的入党申请信息
-        String studentPartyStage = null;
-        if (finalStudent.getStudentId() != null) {
-            PartyApplicationModel partyApplication = partyApplicationService.getByStudentId(finalStudent.getStudentId());
-            if (partyApplication != null) {
-                studentPartyStage = partyApplication.getCurrentStage();
-            }
-        }
-        final String finalPartyStage = studentPartyStage;
+        final String studentPartyStage = dailyTaskAudienceService.resolvePartyStage(finalStudent);
         
         // 筛选该学生需要完成的任务
-        List<DailyTaskModel> requiredTasks = normalTasks.stream().filter(task -> {
-            // 检查年级限制
-            if (task.getAllowedGrades() != null && !task.getAllowedGrades().isEmpty()) {
-                if (finalStudent.getGrade() == null || !task.getAllowedGrades().contains(finalStudent.getGrade())) {
-                    return false;
-                }
-            }
-            
-            // 检查政治面貌限制
-            if (task.getAllowedPoliticalStatuses() != null && !task.getAllowedPoliticalStatuses().isEmpty()) {
-                if (finalStudent.getPoliticalStatus() == null || !task.getAllowedPoliticalStatuses().contains(finalStudent.getPoliticalStatus())) {
-                    return false;
-                }
-            }
-            
-            // 检查入党阶段限制
-            if (task.getAllowedPartyStages() != null && !task.getAllowedPartyStages().isEmpty()) {
-                if (finalPartyStage == null || !task.getAllowedPartyStages().contains(finalPartyStage)) {
-                    return false;
-                }
-            }
-            
-            return true;
-        }).collect(Collectors.toList());
+        List<DailyTaskModel> requiredTasks = normalTasks.stream()
+                .filter(task -> dailyTaskAudienceService.matches(task, finalStudent, studentPartyStage))
+                .collect(Collectors.toList());
         
         // 找出未完成的任务
         List<Map<String, Object>> incompleteTasks = new ArrayList<>();
@@ -558,4 +474,3 @@ public class DailyTaskServiceImpl implements DailyTaskService {
         return incompleteTasks;
     }
 }
-

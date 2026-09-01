@@ -27,6 +27,7 @@ public class DailyTaskModel {
     
     // 范围限制
     private List<String> allowedGrades; // 允许的年级列表（如：["2023", "2024"]），为空表示不限制
+    private List<String> allowedIdentities; // 接收身份（如：入党积极分子、发展对象），为空表示全体身份
     private List<String> allowedPoliticalStatuses; // 允许的政治面貌列表（如：["党员", "预备党员"]），为空表示不限制
     private List<String> allowedPartyStages; // 允许的入党阶段列表（如：["入党积极分子", "发展对象"]），为空表示不限制
     
@@ -42,4 +43,3 @@ public class DailyTaskModel {
         private String conditionalValue; // 条件值：当依赖字段等于此值时才显示当前字段
     }
 }
-

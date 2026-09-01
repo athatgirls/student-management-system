@@ -4,21 +4,20 @@ import org.example.annotation.CurrentUser;
 import org.example.model.DailyTaskModel;
 import org.example.model.DailyTaskSubmissionModel;
 import org.example.model.StudentModel;
-import org.example.model.PartyApplicationModel;
 import org.example.repository.StudentRepository;
+import org.example.service.DailyTaskAudienceService;
 import org.example.service.DailyTaskService;
-import org.example.service.PartyApplicationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/msi/daily-tasks")
@@ -31,7 +30,7 @@ public class DailyTaskController {
     private StudentRepository studentRepository;
     
     @Autowired
-    private PartyApplicationService partyApplicationService;
+    private DailyTaskAudienceService dailyTaskAudienceService;
 
     // 管理员：发布任务
     @PostMapping("/create")
@@ -44,6 +43,9 @@ public class DailyTaskController {
             result.put("code", 200);
             result.put("data", createdTask);
             result.put("msg", "任务发布成功");
+        } catch (IllegalArgumentException e) {
+            result.put("code", 400);
+            result.put("msg", "任务发布失败: " + e.getMessage());
         } catch (Exception e) {
             result.put("code", 500);
             result.put("msg", "任务发布失败: " + e.getMessage());
@@ -69,46 +71,14 @@ public class DailyTaskController {
             
             // 获取当前学生信息
             StudentModel student = studentRepository.findById(userId).orElse(null);
-            final String studentGrade = student != null ? student.getGrade() : null;
-            final String studentPoliticalStatus = student != null ? student.getPoliticalStatus() : null;
-            
-            // 获取当前学生的入党申请信息
-            String partyStage = null;
-            if (student != null && student.getStudentId() != null) {
-                PartyApplicationModel partyApplication = partyApplicationService.getByStudentId(student.getStudentId());
-                if (partyApplication != null) {
-                    partyStage = partyApplication.getCurrentStage();
-                }
-            }
-            final String studentPartyStage = partyStage;
+            final String studentPartyStage = dailyTaskAudienceService.resolvePartyStage(student);
             
             List<DailyTaskModel> tasks = dailyTaskService.getActiveTasks();
             
             // 根据范围限制过滤任务
-            List<DailyTaskModel> filteredTasks = tasks.stream().filter(task -> {
-                // 检查年级限制
-                if (task.getAllowedGrades() != null && !task.getAllowedGrades().isEmpty()) {
-                    if (studentGrade == null || !task.getAllowedGrades().contains(studentGrade)) {
-                        return false;
-                    }
-                }
-                
-                // 检查政治面貌限制
-                if (task.getAllowedPoliticalStatuses() != null && !task.getAllowedPoliticalStatuses().isEmpty()) {
-                    if (studentPoliticalStatus == null || !task.getAllowedPoliticalStatuses().contains(studentPoliticalStatus)) {
-                        return false;
-                    }
-                }
-                
-                // 检查入党阶段限制
-                if (task.getAllowedPartyStages() != null && !task.getAllowedPartyStages().isEmpty()) {
-                    if (studentPartyStage == null || !task.getAllowedPartyStages().contains(studentPartyStage)) {
-                        return false;
-                    }
-                }
-                
-                return true;
-            }).collect(Collectors.toList());
+            List<DailyTaskModel> filteredTasks = tasks.stream()
+                    .filter(task -> dailyTaskAudienceService.matches(task, student, studentPartyStage))
+                    .collect(java.util.stream.Collectors.toList());
             
             // 为每个任务附加当前用户的完成状态
             java.util.stream.Stream<Map<String, Object>> taskStream = filteredTasks.stream().map(task -> {
@@ -143,6 +113,8 @@ public class DailyTaskController {
             
             result.put("code", 200);
             result.put("data", taskStream.collect(java.util.stream.Collectors.toList()));
+        } catch (AccessDeniedException e) {
+            throw e;
         } catch (Exception e) {
             result.put("code", 500);
             result.put("msg", "获取任务列表失败: " + e.getMessage());
@@ -163,6 +135,8 @@ public class DailyTaskController {
             result.put("code", 200);
             result.put("data", savedSubmission);
             result.put("msg", "任务提交成功");
+        } catch (AccessDeniedException e) {
+            throw e;
         } catch (Exception e) {
             result.put("code", 500);
             result.put("msg", "任务提交失败: " + e.getMessage());

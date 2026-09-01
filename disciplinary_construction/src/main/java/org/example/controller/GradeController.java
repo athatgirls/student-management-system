@@ -10,6 +10,7 @@ import org.example.model.StudyRecordModel;
 import org.example.repository.StudentRepository;
 import org.example.repository.StudyRecordRepository;
 import org.example.service.GradeService;
+import org.example.util.StudentGradePolicy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -49,13 +50,7 @@ public class GradeController {
     public ResponseEntity<Map<String, Object>> createGrade(@RequestBody Map<String, Object> requestBody) {
         Map<String, Object> result = new HashMap<>();
         try {
-            String gradeName = trim((String) requestBody.get("gradeName"));
-            if (gradeName.isEmpty()) {
-                result.put("code", 400);
-                result.put("data", null);
-                result.put("msg", "Grade name is required");
-                return ResponseEntity.ok(result);
-            }
+            String gradeName = StudentGradePolicy.requireValid((String) requestBody.get("gradeName"));
 
             GradeModel grade = new GradeModel();
             grade.setGradeName(gradeName);
@@ -79,10 +74,17 @@ public class GradeController {
     public ResponseEntity<Map<String, Object>> getAllGrades() {
         Map<String, Object> result = new HashMap<>();
         try {
-            List<GradeModel> grades = gradeService.getAllGrades();
-            List<String> gradeNames = grades.stream()
+            List<String> gradeNames = gradeService.getAllGrades().stream()
                     .map(GradeModel::getGradeName)
-                    .collect(Collectors.toList());
+                    .map(StudentGradePolicy::normalize)
+                    .filter(name -> name != null && !name.isEmpty())
+                    .collect(Collectors.toCollection(ArrayList::new));
+            StudentGradePolicy.DEFAULT_GRADES.forEach(grade -> {
+                if (!gradeNames.contains(grade)) {
+                    gradeNames.add(grade);
+                }
+            });
+            gradeNames.sort(String::compareTo);
             result.put("code", 200);
             result.put("data", gradeNames);
             result.put("msg", "Grade list loaded");

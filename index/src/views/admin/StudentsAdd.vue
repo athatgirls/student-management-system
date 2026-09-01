@@ -54,7 +54,7 @@
           </el-col>
           <el-col :xs="24" :sm="24" :md="12" :lg="12">
             <el-form-item label="年级" prop="grade">
-              <el-input v-model="form.grade" placeholder="请输入年级" />
+              <el-input v-model="form.grade" placeholder="请输入年级，例如：2024级" />
             </el-form-item>
           </el-col>
         </el-row>

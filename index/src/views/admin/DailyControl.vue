@@ -200,18 +200,11 @@
                   年级限制
                 </el-button>
                 <el-button 
-                  :type="restrictionFilter === 'political' ? 'primary' : ''" 
+                  :type="restrictionFilter === 'identity' ? 'primary' : ''"
                   size="small"
-                  @click="restrictionFilter = 'political'; selectedGradeFilter = null"
+                  @click="restrictionFilter = 'identity'; selectedGradeFilter = null"
                 >
-                  政治面貌限制
-                </el-button>
-                <el-button 
-                  :type="restrictionFilter === 'party' ? 'primary' : ''" 
-                  size="small"
-                  @click="restrictionFilter = 'party'; selectedGradeFilter = null"
-                >
-                  入党阶段限制
+                  接收身份限制
                 </el-button>
                 <el-button 
                   :type="restrictionFilter === 'none' ? 'primary' : ''" 
@@ -264,6 +257,10 @@
                   <el-tag type="info" size="small" effect="plain" style="margin-right: 4px;">年级</el-tag>
                   <span>{{ scope.row.allowedGrades.join(', ') }}</span>
                 </div>
+                <div v-if="scope.row.allowedIdentities && scope.row.allowedIdentities.length > 0" style="margin-bottom: 4px;">
+                  <el-tag type="warning" size="small" effect="plain" style="margin-right: 4px;">接收身份</el-tag>
+                  <span>{{ scope.row.allowedIdentities.join(', ') }}</span>
+                </div>
                 <div v-if="scope.row.allowedPoliticalStatuses && scope.row.allowedPoliticalStatuses.length > 0" style="margin-bottom: 4px;">
                   <el-tag type="success" size="small" effect="plain" style="margin-right: 4px;">政治面貌</el-tag>
                   <span>{{ scope.row.allowedPoliticalStatuses.join(', ') }}</span>
@@ -273,6 +270,7 @@
                   <span>{{ scope.row.allowedPartyStages.join(', ') }}</span>
                 </div>
                 <div v-if="(!scope.row.allowedGrades || scope.row.allowedGrades.length === 0) && 
+                           (!scope.row.allowedIdentities || scope.row.allowedIdentities.length === 0) &&
                            (!scope.row.allowedPoliticalStatuses || scope.row.allowedPoliticalStatuses.length === 0) && 
                            (!scope.row.allowedPartyStages || scope.row.allowedPartyStages.length === 0)" 
                      style="color: #909399;">
@@ -313,15 +311,18 @@
         </el-text>
         <el-text type="info" v-else>
           <el-icon style="margin-right: 4px;"><InfoFilled /></el-icon>
-          <span v-if="currentTaskRestrictions && (currentTaskRestrictions.grades || currentTaskRestrictions.political || currentTaskRestrictions.party)">
+          <span v-if="hasCurrentTaskRestrictions">
             普通任务：根据限制条件显示符合条件的学生
-            <span v-if="currentTaskRestrictions.grades" style="margin-left: 8px;">
+            <span v-if="currentTaskRestrictions.grades.length" style="margin-left: 8px;">
               <el-tag type="info" size="small" effect="plain">年级: {{ currentTaskRestrictions.grades.join(', ') }}</el-tag>
             </span>
-            <span v-if="currentTaskRestrictions.political" style="margin-left: 8px;">
+            <span v-if="currentTaskRestrictions.identities.length" style="margin-left: 8px;">
+              <el-tag type="warning" size="small" effect="plain">接收身份: {{ currentTaskRestrictions.identities.join(', ') }}</el-tag>
+            </span>
+            <span v-if="currentTaskRestrictions.political.length" style="margin-left: 8px;">
               <el-tag type="success" size="small" effect="plain">政治面貌: {{ currentTaskRestrictions.political.join(', ') }}</el-tag>
             </span>
-            <span v-if="currentTaskRestrictions.party" style="margin-left: 8px;">
+            <span v-if="currentTaskRestrictions.party.length" style="margin-left: 8px;">
               <el-tag type="warning" size="small" effect="plain">入党阶段: {{ currentTaskRestrictions.party.join(', ') }}</el-tag>
             </span>
             ，共 {{ taskStats.length }} 人
@@ -390,7 +391,7 @@
         
         <el-form-item label="任务类别" required>
           <el-radio-group v-model="taskForm.taskCategory">
-            <el-radio label="normal">普通任务（所有人都需要完成）</el-radio>
+            <el-radio label="normal">普通任务（按接收范围完成）</el-radio>
             <el-radio label="registration">报名型任务（限制报名人数）</el-radio>
           </el-radio-group>
         </el-form-item>
@@ -422,6 +423,8 @@
             style="width: 100%"
             clearable
             filterable
+            allow-create
+            default-first-option
             :loading="gradeListLoading"
             @focus="loadGradeListIfNeeded"
           >
@@ -433,46 +436,29 @@
             />
           </el-select>
           <div style="margin-top: 8px; color: #909399; font-size: 12px;">
-            <span v-if="gradeList.length === 0" style="color: #E6A23C;">提示：当前没有可用的年级，请先在学生管理中创建年级</span>
-            <span v-else>已选择 {{ taskForm.allowedGrades.length }} 个年级，只有指定年级的学生可以看到此任务</span>
+            <span>可直接输入年级；已选择 {{ taskForm.allowedGrades.length }} 个年级，只有指定年级的学生可以看到此任务</span>
           </div>
         </el-form-item>
         
-        <el-form-item label="政治面貌限制">
+        <el-form-item label="接收身份">
           <el-select 
-            v-model="taskForm.allowedPoliticalStatuses" 
+            v-model="taskForm.allowedIdentities"
             multiple 
-            placeholder="不选择表示不限制政治面貌"
+            placeholder="不选择表示发送给全体身份"
             style="width: 100%"
             clearable
+            collapse-tags
+            collapse-tags-tooltip
           >
-            <el-option label="中共党员" value="中共党员" />
-            <el-option label="中共预备党员" value="中共预备党员" />
-            <el-option label="共青团员" value="共青团员" />
-            <el-option label="群众" value="群众" />
-            <el-option label="民主党派" value="民主党派" />
+            <el-option
+              v-for="identity in identityOptions"
+              :key="identity"
+              :label="identity"
+              :value="identity"
+            />
           </el-select>
           <div style="margin-top: 8px; color: #909399; font-size: 12px;">
-            选择后，只有指定政治面貌的学生可以看到此任务
-          </div>
-        </el-form-item>
-        
-        <el-form-item label="入党阶段限制">
-          <el-select 
-            v-model="taskForm.allowedPartyStages" 
-            multiple 
-            placeholder="不选择表示不限制入党阶段"
-            style="width: 100%"
-            clearable
-          >
-            <el-option label="提交申请书" value="提交申请书" />
-            <el-option label="入党积极分子" value="入党积极分子" />
-            <el-option label="发展对象" value="发展对象" />
-            <el-option label="预备党员" value="预备党员" />
-            <el-option label="正式党员" value="正式党员" />
-          </el-select>
-          <div style="margin-top: 8px; color: #909399; font-size: 12px;">
-            选择后，只有处于指定入党阶段的学生可以看到此任务（需在入党申请模块中填写）
+            可同时选择多个身份；例如只选“入党积极分子”，任务就只发给积极分子
           </div>
         </el-form-item>
         
@@ -746,10 +732,25 @@ const statsVisible = ref(false)
 const taskDialogVisible = ref(false)
 const gradeList = ref([]) // 年级列表
 const gradeListLoading = ref(false) // 年级列表加载状态
+const identityOptions = [
+  '群众',
+  '共青团员',
+  '入党申请人',
+  '入党积极分子',
+  '发展对象',
+  '预备党员',
+  '正式党员',
+  '民主党派'
+]
+const hasCurrentTaskRestrictions = computed(() => {
+  if (!currentTaskRestrictions.value) return false
+  return ['grades', 'identities', 'political', 'party']
+    .some(key => currentTaskRestrictions.value[key]?.length > 0)
+})
 
 // 筛选条件
 const taskCategoryFilter = ref('all') // 任务类型筛选：all(全部) | normal(普通任务) | registration(报名型任务)
-const restrictionFilter = ref('all') // 限制类型筛选：all(全部) | grade(年级限制) | political(政治面貌限制) | party(入党阶段限制) | none(无限制)
+const restrictionFilter = ref('all') // 限制类型筛选：all(全部) | grade(年级限制) | identity(身份限制) | none(无限制)
 const selectedGradeFilter = ref(null) // 选中的年级筛选（当restrictionFilter为'grade'时使用）
 
 // 过滤后的任务列表
@@ -782,12 +783,13 @@ const filteredDailyTasks = computed(() => {
         }
         // 如果没有选择具体年级，显示所有有年级限制的任务
         return true
-      } else if (restrictionFilter.value === 'political') {
-        return task.allowedPoliticalStatuses && task.allowedPoliticalStatuses.length > 0
-      } else if (restrictionFilter.value === 'party') {
-        return task.allowedPartyStages && task.allowedPartyStages.length > 0
+      } else if (restrictionFilter.value === 'identity') {
+        return (task.allowedIdentities && task.allowedIdentities.length > 0) ||
+               (task.allowedPoliticalStatuses && task.allowedPoliticalStatuses.length > 0) ||
+               (task.allowedPartyStages && task.allowedPartyStages.length > 0)
       } else if (restrictionFilter.value === 'none') {
         return (!task.allowedGrades || task.allowedGrades.length === 0) &&
+               (!task.allowedIdentities || task.allowedIdentities.length === 0) &&
                (!task.allowedPoliticalStatuses || task.allowedPoliticalStatuses.length === 0) &&
                (!task.allowedPartyStages || task.allowedPartyStages.length === 0)
       }
@@ -812,6 +814,7 @@ const taskForm = reactive({
   taskCategory: 'normal', // 任务类别：normal(普通任务) 或 registration(报名型任务)
   maxParticipants: null, // 报名人数限制（仅报名型任务有效）
   allowedGrades: [], // 允许的年级列表
+  allowedIdentities: [], // 接收身份列表
   allowedPoliticalStatuses: [], // 允许的政治面貌列表
   allowedPartyStages: [], // 允许的入党阶段列表
   fields: [] // 字段定义列表
@@ -911,6 +914,7 @@ const handleCreateTask = async () => {
         taskCategory: 'normal',
         maxParticipants: null,
         allowedGrades: [],
+        allowedIdentities: [],
         allowedPoliticalStatuses: [],
         allowedPartyStages: [],
         fields: []
@@ -943,6 +947,7 @@ const showStats = async (row) => {
       // 保存限制条件用于显示
       currentTaskRestrictions.value = {
         grades: task?.allowedGrades || [],
+        identities: task?.allowedIdentities || [],
         political: task?.allowedPoliticalStatuses || [],
         party: task?.allowedPartyStages || []
       }

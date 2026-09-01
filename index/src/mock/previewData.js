@@ -16,7 +16,7 @@ const success = (data = null, msg = '预览数据加载成功') => ({
   data
 })
 
-const grades = ['2021级', '2022级', '2023级', '2024级']
+const grades = ['2024级', '2025级', '2026级']
 
 const defaultGradeRecords = [
   { id: 'grade-001', studentId: previewStudent.studentId, studentName: previewStudent.name, courseName: 'Web 前端开发', score: 92, credit: 3, semester: '2025-2026-1', status: '已通过' },
@@ -53,9 +53,9 @@ const students = [
     name: '李同学',
     gender: '女',
     major: '计算机科学与技术',
-    grade: '2023级',
-    studentClass: '计科2302',
-    className: '计科2302',
+    grade: '2025级',
+    studentClass: '计科2502',
+    className: '计科2502',
     dormitory: '北苑 2 栋 318',
     phone: '13800000003',
     email: 'student2@example.com',
@@ -67,9 +67,9 @@ const students = [
     name: '王同学',
     gender: '男',
     major: '人工智能',
-    grade: '2022级',
-    studentClass: '人工智能2201',
-    className: '人工智能2201',
+    grade: '2026级',
+    studentClass: '人工智能2601',
+    className: '人工智能2601',
     dormitory: '东苑 5 栋 616',
     phone: '13800000004',
     email: 'student3@example.com',

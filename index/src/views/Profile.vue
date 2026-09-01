@@ -84,14 +84,7 @@
           </el-col>
           <el-col :xs="24" :sm="24" :md="12" :lg="12">
             <el-form-item label="年级" prop="grade">
-              <el-select v-model="profileForm.grade" placeholder="请选择年级" style="width: 100%">
-                <el-option
-                  v-for="grade in gradeList"
-                  :key="grade"
-                  :label="grade"
-                  :value="grade"
-                />
-              </el-select>
+              <el-input v-model="profileForm.grade" placeholder="请输入年级，例如：2024级" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -274,7 +267,7 @@ import { ref, reactive, onMounted, computed, watch, nextTick } from 'vue'
 import { useStore } from 'vuex'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getProfile, updateProfile, getStudyRecords, getAllGrades, changePassword } from '@/api/student'
+import { getProfile, updateProfile, getStudyRecords, changePassword } from '@/api/student'
 
 const store = useStore()
 const route = useRoute()
@@ -291,9 +284,6 @@ const isMobile = computed(() => windowWidth.value <= 768)
 
 // 获取当前用户信息
 const userInfo = computed(() => store.state.user || {})
-
-// 年级列表
-const gradeList = ref([])
 
 const profileForm = reactive({
   studentId: '',
@@ -452,18 +442,6 @@ watch(() => [route.path, route.query.tab], () => {
   }
 }, { immediate: true })
 
-// 加载年级列表
-const loadGradeList = async () => {
-  try {
-    const res = await getAllGrades()
-    if (res.code === 200) {
-      gradeList.value = res.data || []
-    }
-  } catch (error) {
-    console.error('加载年级列表失败', error)
-  }
-}
-
 const loadProfile = async () => {
   try {
     // 获取个人信息（自动获取当前用户）
@@ -591,7 +569,6 @@ const handlePasswordDialogClose = () => {
 }
 
 onMounted(() => {
-  loadGradeList()
   loadProfile()
   // 初始化窗口宽度并监听变化
   if (typeof window !== 'undefined') {

@@ -8,6 +8,7 @@ import org.example.repository.StudentRepository;
 import org.example.repository.DailyTaskRepository;
 import org.example.repository.DailyTaskSubmissionRepository;
 import org.example.service.StudentService;
+import org.example.util.StudentGradePolicy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -38,9 +39,6 @@ public class StudentServiceImpl implements StudentService {
     @Autowired
     private MongoTemplate mongoTemplate;
     
-    @Autowired(required = false)
-    private org.example.service.GradeService gradeService;
-
     @Override
     public StudentModel login(String account, String password) {
         StudentModel student = studentRepository.findByStudentId(account);
@@ -49,6 +47,14 @@ public class StudentServiceImpl implements StudentService {
         }
         if (student == null) {
             return null;
+        }
+
+        // 兼容旧数据中的“2024”写法，统一保存为“2024级”。
+        String normalizedGrade = StudentGradePolicy.normalize(student.getGrade());
+        if (normalizedGrade != null && normalizedGrade.matches("\\d{4}级")
+                && !normalizedGrade.equals(student.getGrade())) {
+            student.setGrade(normalizedGrade);
+            studentRepository.save(student);
         }
 
         // 自动修复：如果数据库中密码为空，为其设置初始密码
@@ -143,6 +149,7 @@ public class StudentServiceImpl implements StudentService {
 
     @Override
     public StudentModel createStudent(StudentModel student) {
+        student.setGrade(StudentGradePolicy.requireValid(student.getGrade()));
         student.setCreateTime(new java.util.Date());
         student.setUpdateTime(new java.util.Date());
         // 加密密码
@@ -171,7 +178,9 @@ public class StudentServiceImpl implements StudentService {
             existing.setAge(calculateAgeFromDate(student.getBirthDate()));
         }
         if (student.getMajor() != null) existing.setMajor(student.getMajor());
-        if (student.getGrade() != null) existing.setGrade(student.getGrade());
+        if (student.getGrade() != null) {
+            existing.setGrade(StudentGradePolicy.requireValid(student.getGrade()));
+        }
         if (student.getClassName() != null) existing.setClassName(student.getClassName());
         if (student.getEducationType() != null) existing.setEducationType(student.getEducationType());
         if (student.getPhone() != null) existing.setPhone(student.getPhone());
@@ -257,6 +266,9 @@ public class StudentServiceImpl implements StudentService {
 
     @Override
     public void importStudents(java.io.InputStream inputStream, String grade) throws Exception {
+        final String selectedGrade = grade == null || grade.trim().isEmpty()
+                ? null
+                : StudentGradePolicy.requireValid(grade);
         cn.hutool.poi.excel.ExcelReader reader = cn.hutool.poi.excel.ExcelUtil.getReader(inputStream);
         
         // 设置表头映射，只保留核心必填字段
@@ -290,9 +302,9 @@ public class StudentServiceImpl implements StudentService {
             }
             
             // 如果指定了年级，无论Excel中是否有年级信息，都设置为指定的年级
-            if (grade != null && !grade.isEmpty()) {
-                student.setGrade(grade);
-            }
+            student.setGrade(selectedGrade != null
+                    ? selectedGrade
+                    : StudentGradePolicy.requireValid(student.getGrade()));
             
             // 初始密码为 Hbut_（学号后六位）
             String sid = student.getStudentId();
@@ -335,48 +347,12 @@ public class StudentServiceImpl implements StudentService {
 
     @Override
     public List<String> getAllGrades() {
-        // 从年级表获取所有年级名称
-        List<String> gradeNames = new java.util.ArrayList<>();
-        java.util.Set<String> standardGradeYears = new java.util.HashSet<>();
-        
-        // 从年级表获取标准年级
-        if (gradeService != null) {
-            try {
-                List<org.example.model.GradeModel> grades = gradeService.getAllGrades();
-                for (org.example.model.GradeModel grade : grades) {
-                    String gradeName = grade.getGradeName();
-                    gradeNames.add(gradeName);
-                    // 提取标准年级的年份部分（如"2023级" -> "2023"）
-                    if (gradeName.endsWith("级")) {
-                        String year = gradeName.substring(0, gradeName.length() - 1);
-                        standardGradeYears.add(year);
-                    }
-                }
-            } catch (Exception e) {
-                // 如果年级服务不可用，继续使用学生表中的年级
-            }
-        }
-        
-        // 从学生表中获取已存在的年级（用于兼容旧数据）
-        List<String> studentGrades = mongoTemplate.findDistinct(new Query(), "grade", StudentModel.class, String.class)
-                .stream()
-                .filter(grade -> grade != null && !grade.trim().isEmpty())
-                .collect(java.util.stream.Collectors.toList());
-        
-        // 合并并去重，但过滤掉已被标准年级覆盖的非标准年级
-        for (String grade : studentGrades) {
-            // 如果年级表中已有对应的标准年级（如"2023级"），则跳过非标准年级（如"2023"）
-            if (standardGradeYears.contains(grade)) {
-                continue; // 跳过，因为已有标准年级
-            }
-            // 如果年级表中没有这个年级，则添加
-            if (!gradeNames.contains(grade)) {
-                gradeNames.add(grade);
-            }
-        }
-        
-        // 排序
-        return gradeNames.stream().sorted().collect(java.util.stream.Collectors.toList());
+        java.util.Set<String> grades = new java.util.TreeSet<>(StudentGradePolicy.DEFAULT_GRADES);
+        mongoTemplate.findDistinct(new Query(), "grade", StudentModel.class, String.class).stream()
+                .map(StudentGradePolicy::normalize)
+                .filter(value -> value != null && !value.isEmpty())
+                .forEach(grades::add);
+        return new java.util.ArrayList<>(grades);
     }
 
     @Override
@@ -414,7 +390,7 @@ public class StudentServiceImpl implements StudentService {
             student1.setEmail("default@student.edu.cn");
             student1.setPhone("13800000000");
             student1.setMajor("计算机科学与技术");
-            student1.setGrade("2024");
+            student1.setGrade("2024级");
             student1.setClassName("研一1班");
             student1.setSupervisor("张老师");
             student1.setResearchDirection("人工智能");
@@ -444,7 +420,7 @@ public class StudentServiceImpl implements StudentService {
             student2.setEmail("student111@edu.cn");
             student2.setPhone("13900000001");
             student2.setMajor("软件工程");
-            student2.setGrade("2024");
+            student2.setGrade("2025级");
             student2.setClassName("研一2班");
             student2.setSupervisor("李老师");
             student2.setResearchDirection("软件工程");
@@ -474,7 +450,7 @@ public class StudentServiceImpl implements StudentService {
             testStudent.setEmail("test@student.edu.cn");
             testStudent.setPhone("13800000002");
             testStudent.setMajor("计算机科学与技术");
-            testStudent.setGrade("2024");
+            testStudent.setGrade("2026级");
             testStudent.setClassName("研一1班");
             testStudent.setSupervisor("测试导师");
             testStudent.setResearchDirection("软件测试");

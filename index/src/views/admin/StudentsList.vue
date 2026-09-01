@@ -5,10 +5,7 @@
       <div class="grade-sidebar">
         <div class="grade-header">
           <h3>年级管理</h3>
-          <el-button type="primary" size="small" @click="showCreateGradeDialog = true">
-            <el-icon><Plus /></el-icon>
-            创建年级
-          </el-button>
+          <el-tag type="info">年级手动填写</el-tag>
         </div>
         <div class="grade-list">
           <div 
@@ -235,7 +232,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="年级" prop="grade">
-              <el-input v-model="form.grade" placeholder="请输入年级" />
+              <el-input v-model="form.grade" placeholder="请输入年级，例如：2024级" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -355,29 +352,6 @@
       </template>
     </el-dialog>
 
-     <!-- 创建年级对话框 -->
-     <el-dialog
-       v-model="showCreateGradeDialog"
-       title="创建年级"
-       width="400px"
-     >
-       <el-form :model="gradeForm" label-width="80px">
-         <el-form-item label="年级名称" required>
-           <el-input 
-             v-model="gradeForm.name" 
-             placeholder="例如：2024级"
-             @keyup.enter="handleCreateGrade"
-           />
-         </el-form-item>
-       </el-form>
-       <template #footer>
-         <span class="dialog-footer">
-           <el-button @click="showCreateGradeDialog = false">取消</el-button>
-           <el-button type="primary" @click="handleCreateGrade">确定</el-button>
-         </span>
-       </template>
-     </el-dialog>
-
      <!-- 批量修改状态对话框 -->
      <el-dialog
        v-model="showBatchStatusDialog"
@@ -432,9 +406,8 @@
 <script setup>
 import { ref, reactive, onMounted, computed, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, ArrowDown } from '@element-plus/icons-vue'
+import { ArrowDown } from '@element-plus/icons-vue'
 import { getStudentList, createStudent, updateStudent, deleteStudent, importStudents, batchDeleteStudents, getAllGrades, batchUpdateStatus, resetStudentPassword } from '@/api/student'
-import { createGrade as createGradeApi } from '@/api/grade'
 
 const loading = ref(false)
 const students = ref([])
@@ -450,10 +423,6 @@ const isMobile = computed(() => windowWidth.value <= 768)
 // 年级管理
 const gradeList = ref([])
 const selectedGrade = ref('')
-const showCreateGradeDialog = ref(false)
-const gradeForm = reactive({
-  name: ''
-})
 const gradeStudentCounts = ref({})
 
 // 搜索表单
@@ -559,46 +528,6 @@ const selectGrade = (grade) => {
   selectedGrade.value = grade
   pagination.currentPage = 1
   loadStudents()
-}
-
-// 创建年级
-const handleCreateGrade = async () => {
-  if (!gradeForm.name || !gradeForm.name.trim()) {
-    ElMessage.warning('请输入年级名称')
-    return
-  }
-
-  const gradeName = gradeForm.name.trim()
-  
-  // 检查年级是否已存在
-  if (gradeList.value.includes(gradeName)) {
-    ElMessage.warning('该年级已存在')
-    return
-  }
-
-  try {
-    // 调用后端API创建年级
-    const res = await createGradeApi({ gradeName })
-    if (res.code === 200) {
-      // 重新加载年级列表
-      await loadGradeList()
-      
-      // 选中新创建的年级
-      selectedGrade.value = gradeName
-      gradeStudentCounts.value[gradeName] = 0
-      
-      showCreateGradeDialog.value = false
-      gradeForm.name = ''
-      
-      ElMessage.success('年级创建成功')
-      loadStudents()
-    } else {
-      ElMessage.error(res.msg || '创建失败')
-    }
-  } catch (error) {
-    console.error('创建年级失败', error)
-    ElMessage.error('创建年级失败，请重试')
-  }
 }
 
 // 加载学生列表
