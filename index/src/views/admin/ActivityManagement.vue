@@ -133,6 +133,48 @@
               style="width: 100%"
             />
           </el-form-item>
+
+          <el-divider>接收范围（可选）</el-divider>
+
+          <el-form-item label="接收年级">
+            <el-select
+              v-model="activityForm.allowedGrades"
+              multiple
+              filterable
+              allow-create
+              default-first-option
+              placeholder="不选择表示发送给全部年级"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="grade in gradeList"
+                :key="grade"
+                :label="grade"
+                :value="grade"
+              />
+            </el-select>
+            <div class="range-tip">年级可直接手填，例如：2024级</div>
+          </el-form-item>
+
+          <el-form-item label="接收身份">
+            <el-select
+              v-model="activityForm.allowedIdentities"
+              multiple
+              filterable
+              collapse-tags
+              collapse-tags-tooltip
+              placeholder="不选择表示发送给全部身份"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="identity in identityOptions"
+                :key="identity"
+                :label="identity"
+                :value="identity"
+              />
+            </el-select>
+            <div class="range-tip">可以多选；例如只选择“入党积极分子”，任务就只发给积极分子</div>
+          </el-form-item>
         </template>
 
         <!-- 关联已有任务 -->
@@ -335,6 +377,16 @@ const availableTasks = ref([])
 const tasksLoading = ref(false)
 const createLoading = ref(false)
 const gradeList = ref([])
+const identityOptions = [
+  '群众',
+  '共青团员',
+  '入党申请人',
+  '入党积极分子',
+  '发展对象',
+  '预备党员',
+  '正式党员',
+  '民主党派'
+]
 
 const activityForm = reactive({
   title: '', // 任务标题（同时也是活动标题）
@@ -346,6 +398,8 @@ const activityForm = reactive({
   // 创建新任务相关
   taskCategory: 'normal',
   maxParticipants: null,
+  allowedGrades: [],
+  allowedIdentities: [],
   // 关联已有任务
   taskId: ''
 })
@@ -402,6 +456,8 @@ const handleOpenCreateDialog = () => {
   activityForm.taskMode = 'create'
   activityForm.taskCategory = 'normal'
   activityForm.maxParticipants = null
+  activityForm.allowedGrades = []
+  activityForm.allowedIdentities = []
   activityForm.taskId = ''
   loadGradeList()
   createDialogVisible.value = true
@@ -450,6 +506,8 @@ const handleCreateActivity = async () => {
         type: '信息填写',
         taskCategory: activityForm.taskCategory,
         maxParticipants: activityForm.taskCategory === 'registration' ? activityForm.maxParticipants : null,
+        allowedGrades: activityForm.allowedGrades,
+        allowedIdentities: activityForm.allowedIdentities,
         fields: []
       }
       
@@ -693,5 +751,12 @@ onMounted(() => {
   font-size: 18px;
   font-weight: 600;
   color: #303133;
+}
+
+.range-tip {
+  margin-top: 5px;
+  color: #909399;
+  font-size: 12px;
+  line-height: 1.5;
 }
 </style>

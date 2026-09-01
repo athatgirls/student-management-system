@@ -4,13 +4,12 @@ import org.example.model.ActivityModel;
 import org.example.model.DailyTaskModel;
 import org.example.model.DailyTaskSubmissionModel;
 import org.example.model.StudentModel;
-import org.example.model.PartyApplicationModel;
 import org.example.repository.ActivityRepository;
 import org.example.repository.DailyTaskRepository;
 import org.example.repository.DailyTaskSubmissionRepository;
 import org.example.repository.StudentRepository;
 import org.example.service.ActivityService;
-import org.example.service.PartyApplicationService;
+import org.example.service.DailyTaskAudienceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -38,7 +37,7 @@ public class ActivityServiceImpl implements ActivityService {
     private DailyTaskSubmissionRepository submissionRepository;
 
     @Autowired
-    private PartyApplicationService partyApplicationService;
+    private DailyTaskAudienceService dailyTaskAudienceService;
 
     @Autowired
     private MongoTemplate mongoTemplate;
@@ -154,45 +153,10 @@ public class ActivityServiceImpl implements ActivityService {
             }
 
             final StudentModel student = foundStudent;
-            participantIds.add(student.getId());
 
-            // 获取学生的入党申请信息（用于判断任务限制条件）
-            String studentPartyStage = null;
-            if (student.getStudentId() != null) {
-                PartyApplicationModel partyApplication = partyApplicationService.getByStudentId(student.getStudentId());
-                if (partyApplication != null) {
-                    studentPartyStage = partyApplication.getCurrentStage();
-                }
-            }
-            final String finalPartyStage = studentPartyStage;
-
-            // 检查该学生是否符合这个特定任务的限制条件
-            boolean canCompleteTask = true;
-            String restrictionReason = null;
-
-            // 检查年级限制
-            if (associatedTask.getAllowedGrades() != null && !associatedTask.getAllowedGrades().isEmpty()) {
-                if (student.getGrade() == null || !associatedTask.getAllowedGrades().contains(student.getGrade())) {
-                    canCompleteTask = false;
-                    restrictionReason = "不符合年级限制";
-                }
-            }
-
-            // 检查政治面貌限制
-            if (canCompleteTask && associatedTask.getAllowedPoliticalStatuses() != null && !associatedTask.getAllowedPoliticalStatuses().isEmpty()) {
-                if (student.getPoliticalStatus() == null || !associatedTask.getAllowedPoliticalStatuses().contains(student.getPoliticalStatus())) {
-                    canCompleteTask = false;
-                    restrictionReason = "不符合政治面貌限制";
-                }
-            }
-
-            // 检查入党阶段限制
-            if (canCompleteTask && associatedTask.getAllowedPartyStages() != null && !associatedTask.getAllowedPartyStages().isEmpty()) {
-                if (finalPartyStage == null || !associatedTask.getAllowedPartyStages().contains(finalPartyStage)) {
-                    canCompleteTask = false;
-                    restrictionReason = "不符合入党阶段限制";
-                }
-            }
+            // 活动导入与学生任务列表、任务提交使用同一套接收范围判断。
+            boolean canCompleteTask = dailyTaskAudienceService.matches(associatedTask, student);
+            String restrictionReason = canCompleteTask ? null : "不符合任务接收范围";
 
             int matchedCount = 0;
             if (canCompleteTask) {
@@ -254,6 +218,7 @@ public class ActivityServiceImpl implements ActivityService {
                     // 已经提交过，也算匹配成功
                     matchedCount = 1;
                 }
+                participantIds.add(student.getId());
             } else {
                 // 不符合任务限制条件
                 Map<String, Object> unmatched = new HashMap<>();
@@ -286,4 +251,3 @@ public class ActivityServiceImpl implements ActivityService {
         return result;
     }
 }
-
