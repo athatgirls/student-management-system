@@ -204,7 +204,7 @@
                   size="small"
                   @click="restrictionFilter = 'identity'; selectedGradeFilter = null"
                 >
-                  接收身份限制
+                  政治面貌限制
                 </el-button>
                 <el-button 
                   :type="restrictionFilter === 'none' ? 'primary' : ''" 
@@ -258,7 +258,7 @@
                   <span>{{ scope.row.allowedGrades.join(', ') }}</span>
                 </div>
                 <div v-if="scope.row.allowedIdentities && scope.row.allowedIdentities.length > 0" style="margin-bottom: 4px;">
-                  <el-tag type="warning" size="small" effect="plain" style="margin-right: 4px;">接收身份</el-tag>
+                  <el-tag type="warning" size="small" effect="plain" style="margin-right: 4px;">政治面貌</el-tag>
                   <span>{{ scope.row.allowedIdentities.join(', ') }}</span>
                 </div>
                 <div v-if="scope.row.allowedPoliticalStatuses && scope.row.allowedPoliticalStatuses.length > 0" style="margin-bottom: 4px;">
@@ -317,7 +317,7 @@
               <el-tag type="info" size="small" effect="plain">年级: {{ currentTaskRestrictions.grades.join(', ') }}</el-tag>
             </span>
             <span v-if="currentTaskRestrictions.identities.length" style="margin-left: 8px;">
-              <el-tag type="warning" size="small" effect="plain">接收身份: {{ currentTaskRestrictions.identities.join(', ') }}</el-tag>
+              <el-tag type="warning" size="small" effect="plain">接收政治面貌: {{ currentTaskRestrictions.identities.join(', ') }}</el-tag>
             </span>
             <span v-if="currentTaskRestrictions.political.length" style="margin-left: 8px;">
               <el-tag type="success" size="small" effect="plain">政治面貌: {{ currentTaskRestrictions.political.join(', ') }}</el-tag>
@@ -440,11 +440,11 @@
           </div>
         </el-form-item>
         
-        <el-form-item label="接收身份">
+        <el-form-item label="接收政治面貌">
           <el-select 
             v-model="taskForm.allowedIdentities"
             multiple 
-            placeholder="不选择表示发送给全体身份"
+            placeholder="不选择表示发送给全部政治面貌"
             style="width: 100%"
             clearable
             collapse-tags
@@ -458,7 +458,7 @@
             />
           </el-select>
           <div style="margin-top: 8px; color: #909399; font-size: 12px;">
-            可同时选择多个身份；例如只选“入党积极分子”，任务就只发给积极分子
+            可同时选择多种政治面貌；例如只选“入党积极分子”，任务就只发给积极分子
           </div>
         </el-form-item>
         
@@ -698,6 +698,7 @@ import {
 } from '@/api/daily'
 import { getAllLeaveRequests, auditLeaveRequest, updateLeaveStatus } from '@/api/leave'
 import { getAllGrades } from '@/api/student'
+import { POLITICAL_STATUS_OPTIONS } from '@/constants/politicalStatus'
 
 /** ========= 字典 ========= */
 const dict = {
@@ -732,16 +733,7 @@ const statsVisible = ref(false)
 const taskDialogVisible = ref(false)
 const gradeList = ref([]) // 年级列表
 const gradeListLoading = ref(false) // 年级列表加载状态
-const identityOptions = [
-  '群众',
-  '共青团员',
-  '入党申请人',
-  '入党积极分子',
-  '发展对象',
-  '预备党员',
-  '正式党员',
-  '民主党派'
-]
+const identityOptions = POLITICAL_STATUS_OPTIONS
 const hasCurrentTaskRestrictions = computed(() => {
   if (!currentTaskRestrictions.value) return false
   return ['grades', 'identities', 'political', 'party']
@@ -750,7 +742,7 @@ const hasCurrentTaskRestrictions = computed(() => {
 
 // 筛选条件
 const taskCategoryFilter = ref('all') // 任务类型筛选：all(全部) | normal(普通任务) | registration(报名型任务)
-const restrictionFilter = ref('all') // 限制类型筛选：all(全部) | grade(年级限制) | identity(身份限制) | none(无限制)
+const restrictionFilter = ref('all') // 限制类型筛选：all(全部) | grade(年级限制) | identity(政治面貌限制) | none(无限制)
 const selectedGradeFilter = ref(null) // 选中的年级筛选（当restrictionFilter为'grade'时使用）
 
 // 过滤后的任务列表
@@ -814,7 +806,7 @@ const taskForm = reactive({
   taskCategory: 'normal', // 任务类别：normal(普通任务) 或 registration(报名型任务)
   maxParticipants: null, // 报名人数限制（仅报名型任务有效）
   allowedGrades: [], // 允许的年级列表
-  allowedIdentities: [], // 接收身份列表
+  allowedIdentities: [], // 接收政治面貌列表
   allowedPoliticalStatuses: [], // 允许的政治面貌列表
   allowedPartyStages: [], // 允许的入党阶段列表
   fields: [] // 字段定义列表

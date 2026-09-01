@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 public class DailyTaskAudienceService {
 
     public static final List<String> SUPPORTED_IDENTITIES = Collections.unmodifiableList(Arrays.asList(
-            "群众", "共青团员", "入党申请人", "入党积极分子", "发展对象", "预备党员", "正式党员", "民主党派"));
+            "中共党员", "中共预备党员", "发展对象", "入党积极分子", "共青团员", "群众"));
 
     @Autowired
     private PartyApplicationService partyApplicationService;
@@ -48,7 +48,7 @@ public class DailyTaskAudienceService {
                     .distinct()
                     .collect(Collectors.toList());
             if (identities.stream().anyMatch(identity -> !SUPPORTED_IDENTITIES.contains(identity))) {
-                throw new IllegalArgumentException("任务接收身份包含不支持的选项");
+                throw new IllegalArgumentException("任务接收政治面貌包含不支持的选项");
             }
             task.setAllowedIdentities(identities);
         }
@@ -131,11 +131,11 @@ public class DailyTaskAudienceService {
                 return "入党申请人";
             case "积极分子":
                 return "入党积极分子";
-            case "中共预备党员":
-                return "预备党员";
-            case "中共党员":
+            case "预备党员":
+                return "中共预备党员";
+            case "正式党员":
             case "党员":
-                return "正式党员";
+                return "中共党员";
             default:
                 return identity;
         }

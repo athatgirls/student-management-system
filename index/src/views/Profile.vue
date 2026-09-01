@@ -135,11 +135,12 @@
           <el-col :xs="24" :sm="24" :md="12" :lg="12">
             <el-form-item label="政治面貌" prop="politicalStatus">
               <el-select v-model="profileForm.politicalStatus" placeholder="请选择政治面貌" style="width: 100%">
-                <el-option label="中共党员" value="中共党员" />
-                <el-option label="中共预备党员" value="中共预备党员" />
-                <el-option label="入党积极分子" value="入党积极分子" />
-                <el-option label="共青团员" value="共青团员" />
-                <el-option label="群众" value="群众" />
+                <el-option
+                  v-for="status in POLITICAL_STATUS_OPTIONS"
+                  :key="status"
+                  :label="status"
+                  :value="status"
+                />
               </el-select>
             </el-form-item>
           </el-col>
@@ -268,6 +269,7 @@ import { useStore } from 'vuex'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getProfile, updateProfile, getStudyRecords, changePassword } from '@/api/student'
+import { POLITICAL_STATUS_OPTIONS } from '@/constants/politicalStatus'
 
 const store = useStore()
 const route = useRoute()

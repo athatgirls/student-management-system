@@ -50,7 +50,7 @@ class DailyTaskAudienceServiceTest {
     @Test
     void unrelatedIdentityCannotSeeTask() {
         DailyTaskModel task = new DailyTaskModel();
-        task.setAllowedIdentities(Collections.singletonList("正式党员"));
+        task.setAllowedIdentities(Collections.singletonList("中共党员"));
         assertFalse(audienceService.matches(task, student));
     }
 
@@ -75,6 +75,21 @@ class DailyTaskAudienceServiceTest {
         IllegalArgumentException error = assertThrows(
                 IllegalArgumentException.class,
                 () -> audienceService.validateAndNormalize(task));
-        assertEquals("任务接收身份包含不支持的选项", error.getMessage());
+        assertEquals("任务接收政治面貌包含不支持的选项", error.getMessage());
+    }
+
+    @Test
+    void selectableIdentitiesMatchStudentPoliticalStatusOptions() {
+        assertEquals(Arrays.asList(
+                "中共党员", "中共预备党员", "发展对象", "入党积极分子", "共青团员", "群众"),
+                DailyTaskAudienceService.SUPPORTED_IDENTITIES);
+    }
+
+    @Test
+    void legacyPartyStageNamesNormalizeToPoliticalStatusNames() {
+        DailyTaskModel task = new DailyTaskModel();
+        task.setAllowedIdentities(Collections.singletonList("预备党员"));
+        audienceService.validateAndNormalize(task);
+        assertEquals(Collections.singletonList("中共预备党员"), task.getAllowedIdentities());
     }
 }

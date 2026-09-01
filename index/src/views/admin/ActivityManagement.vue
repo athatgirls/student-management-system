@@ -156,14 +156,14 @@
             <div class="range-tip">年级可直接手填，例如：2024级</div>
           </el-form-item>
 
-          <el-form-item label="接收身份">
+          <el-form-item label="接收政治面貌">
             <el-select
               v-model="activityForm.allowedIdentities"
               multiple
               filterable
               collapse-tags
               collapse-tags-tooltip
-              placeholder="不选择表示发送给全部身份"
+              placeholder="不选择表示发送给全部政治面貌"
               style="width: 100%"
             >
               <el-option
@@ -360,6 +360,7 @@ import {
 } from '@/api/daily'
 import { getAllGrades } from '@/api/student'
 import { readExcelObjects } from '@/utils/excel'
+import { POLITICAL_STATUS_OPTIONS } from '@/constants/politicalStatus'
 
 const xlsxAvailable = true
 
@@ -377,16 +378,7 @@ const availableTasks = ref([])
 const tasksLoading = ref(false)
 const createLoading = ref(false)
 const gradeList = ref([])
-const identityOptions = [
-  '群众',
-  '共青团员',
-  '入党申请人',
-  '入党积极分子',
-  '发展对象',
-  '预备党员',
-  '正式党员',
-  '民主党派'
-]
+const identityOptions = POLITICAL_STATUS_OPTIONS
 
 const activityForm = reactive({
   title: '', // 任务标题（同时也是活动标题）
