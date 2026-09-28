@@ -101,7 +101,8 @@ export function importStudents(formData) {
     data: formData,
     timeout: 60000, // 批量导入可能耗时较长，增加超时时间到60秒
     headers: {
-      'Content-Type': 'multipart/form-data'
+      // 清除实例的 JSON 默认头，让浏览器自动添加 multipart boundary。
+      'Content-Type': null
     }
   })
 }

@@ -38,7 +38,7 @@ public interface StudentService {
     List<StudentModel> findByGrade(String grade);
 
     // 批量导入学生
-    void importStudents(java.io.InputStream inputStream, String grade) throws Exception;
+    java.util.Map<String, Object> importStudents(java.io.InputStream inputStream, String grade) throws Exception;
 
     // 分页搜索学生
     java.util.Map<String, Object> findStudentsPage(int page, int size, String name, String studentId, String major, String grade);

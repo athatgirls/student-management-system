@@ -17,11 +17,15 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class StudentServiceImpl implements StudentService {
@@ -265,56 +269,193 @@ public class StudentServiceImpl implements StudentService {
     }
 
     @Override
-    public void importStudents(java.io.InputStream inputStream, String grade) throws Exception {
+    public Map<String, Object> importStudents(java.io.InputStream inputStream, String grade) throws Exception {
         final String selectedGrade = grade == null || grade.trim().isEmpty()
                 ? null
                 : StudentGradePolicy.requireValid(grade);
         cn.hutool.poi.excel.ExcelReader reader = cn.hutool.poi.excel.ExcelUtil.getReader(inputStream);
-        
-        // 设置表头映射，只保留核心必填字段
-        reader.addHeaderAlias("学号", "studentId");
-        reader.addHeaderAlias("姓名", "name");
-        reader.addHeaderAlias("专业", "major");
-        reader.addHeaderAlias("年级", "grade");
-        reader.addHeaderAlias("班级", "className");
+        try {
+            List<List<Object>> rows = reader.read();
+            Map<String, Object> summary = new HashMap<>();
+            List<String> sampleErrors = new ArrayList<>();
+            summary.put("total", 0);
+            summary.put("imported", 0);
+            summary.put("invalid", 0);
+            summary.put("duplicate", 0);
+            summary.put("sampleErrors", sampleErrors);
 
-        List<StudentModel> students = reader.readAll(StudentModel.class);
-        
-        for (StudentModel student : students) {
-            // 姓名和学号是必填项，如果缺失则跳过
-            if (student.getStudentId() == null || student.getStudentId().isEmpty() || 
-                student.getName() == null || student.getName().isEmpty()) {
-                continue;
+            int headerRowIndex = findHeaderRow(rows);
+            if (headerRowIndex < 0) {
+                sampleErrors.add("未找到包含“学号”和“姓名”的表头行，请检查Excel模板");
+                return summary;
             }
 
-            // 检查学号是否已存在
-            if (studentRepository.findByStudentId(student.getStudentId()) != null) {
-                continue; // 保持现有记录，不覆盖
+            Map<String, Integer> columns = resolveColumns(rows.get(headerRowIndex));
+            if (columns.get("studentId") == null || columns.get("name") == null) {
+                sampleErrors.add("表头缺少“学号”或“姓名”列（支持“学生学号”“学生姓名”等别名）");
+                return summary;
             }
-            
-            // 设置初始信息
-            student.setCreateTime(new java.util.Date());
-            student.setUpdateTime(new java.util.Date());
-            
-            // 设置默认状态
-            if (student.getStatus() == null || student.getStatus().isEmpty()) {
+
+            int total = 0;
+            int imported = 0;
+            int invalid = 0;
+            int duplicate = 0;
+            Set<String> importedStudentIds = new HashSet<>();
+
+            for (int rowIndex = headerRowIndex + 1; rowIndex < rows.size(); rowIndex++) {
+                List<Object> row = rows.get(rowIndex);
+                if (isBlankRow(row)) {
+                    continue;
+                }
+
+                total++;
+                int excelRowNumber = rowIndex + 1;
+                String studentId = cellAt(row, columns.get("studentId"));
+                String name = cellAt(row, columns.get("name"));
+                if (studentId.isEmpty() || name.isEmpty()) {
+                    invalid++;
+                    addSampleError(sampleErrors, "第" + excelRowNumber + "行："
+                            + (studentId.isEmpty() ? "学号为空" : "姓名为空"));
+                    continue;
+                }
+
+                String rowGrade = cellAt(row, columns.get("grade"));
+                String effectiveGrade = selectedGrade != null
+                        ? selectedGrade
+                        : StudentGradePolicy.normalize(rowGrade);
+                if (effectiveGrade == null || effectiveGrade.isEmpty()) {
+                    invalid++;
+                    addSampleError(sampleErrors, "第" + excelRowNumber + "行：缺少年级");
+                    continue;
+                }
+
+                if (!importedStudentIds.add(studentId)
+                        || studentRepository.findByStudentId(studentId) != null) {
+                    duplicate++;
+                    addSampleError(sampleErrors, "第" + excelRowNumber + "行：学号" + studentId + "重复");
+                    continue;
+                }
+
+                StudentModel student = new StudentModel();
+                student.setStudentId(studentId);
+                student.setName(name);
+                String major = cellAt(row, columns.get("major"));
+                if (!major.isEmpty()) {
+                    student.setMajor(major);
+                }
+                String className = cellAt(row, columns.get("className"));
+                if (!className.isEmpty()) {
+                    student.setClassName(className);
+                }
+                student.setGrade(effectiveGrade);
+                student.setCreateTime(new java.util.Date());
+                student.setUpdateTime(new java.util.Date());
                 student.setStatus("在读");
+                String lastSix = studentId.length() > 6 ? studentId.substring(studentId.length() - 6) : studentId;
+                student.setPassword(passwordEncoder.encode("Hbut_" + lastSix));
+                studentRepository.save(student);
+                imported++;
             }
-            
-            // 如果指定了年级，无论Excel中是否有年级信息，都设置为指定的年级
-            student.setGrade(selectedGrade != null
-                    ? selectedGrade
-                    : StudentGradePolicy.requireValid(student.getGrade()));
-            
-            // 初始密码为 Hbut_（学号后六位）
-            String sid = student.getStudentId();
-            String lastSix = sid.length() > 6 ? sid.substring(sid.length() - 6) : sid;
-            String rawPassword = "Hbut_" + lastSix;
-            student.setPassword(passwordEncoder.encode(rawPassword));
-            
-            studentRepository.save(student);
+
+            summary.put("total", total);
+            summary.put("imported", imported);
+            summary.put("invalid", invalid);
+            summary.put("duplicate", duplicate);
+            return summary;
+        } finally {
+            reader.close();
         }
-        reader.close();
+    }
+
+    private int findHeaderRow(List<List<Object>> rows) {
+        int limit = Math.min(rows.size(), 5);
+        int partialMatch = -1;
+        for (int rowIndex = 0; rowIndex < limit; rowIndex++) {
+            boolean hasStudentId = false;
+            boolean hasName = false;
+            for (Object cell : rows.get(rowIndex)) {
+                String header = normalizeHeader(cell);
+                hasStudentId |= header.contains("学号");
+                hasName |= header.contains("姓名");
+            }
+            if (hasStudentId && hasName) {
+                return rowIndex;
+            }
+            if (partialMatch < 0 && (hasStudentId || hasName)) {
+                partialMatch = rowIndex;
+            }
+        }
+        return partialMatch;
+    }
+
+    private Map<String, Integer> resolveColumns(List<Object> headerRow) {
+        Map<String, Integer> columns = new HashMap<>();
+        columns.put("studentId", findColumn(headerRow, "学号"));
+        columns.put("name", findColumn(headerRow, "姓名"));
+        columns.put("major", findColumn(headerRow, "专业"));
+        columns.put("grade", findColumn(headerRow, "年级"));
+        columns.put("className", findColumn(headerRow, "班级"));
+        return columns;
+    }
+
+    private Integer findColumn(List<Object> headerRow, String keyword) {
+        List<Integer> matches = new ArrayList<>();
+        for (int index = 0; index < headerRow.size(); index++) {
+            String header = normalizeHeader(headerRow.get(index));
+            if (header.equals(keyword)) {
+                return index;
+            }
+            if (header.contains(keyword)) {
+                matches.add(index);
+            }
+        }
+        return matches.size() == 1 ? matches.get(0) : null;
+    }
+
+    private boolean isBlankRow(List<Object> row) {
+        if (row == null || row.isEmpty()) {
+            return true;
+        }
+        for (Object cell : row) {
+            if (!cellToString(cell).isEmpty()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private String cellAt(List<Object> row, Integer columnIndex) {
+        if (columnIndex == null || columnIndex < 0 || columnIndex >= row.size()) {
+            return "";
+        }
+        return cellToString(row.get(columnIndex));
+    }
+
+    private String normalizeHeader(Object value) {
+        return cellToString(value)
+                .replace("\uFEFF", "")
+                .replace("\u3000", "")
+                .replaceAll("\\s+", "");
+    }
+
+    private String cellToString(Object value) {
+        if (value == null) {
+            return "";
+        }
+        if (value instanceof Number) {
+            try {
+                return new BigDecimal(value.toString()).stripTrailingZeros().toPlainString();
+            } catch (NumberFormatException ignored) {
+                // Fall through to the regular string conversion below.
+            }
+        }
+        return String.valueOf(value).trim();
+    }
+
+    private void addSampleError(List<String> sampleErrors, String message) {
+        if (sampleErrors.size() < 5) {
+            sampleErrors.add(message);
+        }
     }
 
     @Override

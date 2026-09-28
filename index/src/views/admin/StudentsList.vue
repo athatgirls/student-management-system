@@ -331,7 +331,7 @@
             </template>
             <template #tip>
               <div class="el-upload__tip">
-                只能上传 .xlsx 或 .xls 文件，且仅需包含"学号"和"姓名"列
+                只能上传 .xlsx 或 .xls 文件，需包含"学号"和"姓名"列；可选"专业"、"年级"、"班级"列
               </div>
             </template>
           </el-upload>
@@ -408,6 +408,7 @@ import { ref, reactive, onMounted, computed, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { getStudentList, createStudent, updateStudent, deleteStudent, importStudents, batchDeleteStudents, getAllGrades, batchUpdateStatus, resetStudentPassword } from '@/api/student'
+import { isPreviewMode } from '@/utils/previewMode'
 
 const loading = ref(false)
 const students = ref([])
@@ -588,6 +589,10 @@ const importForm = reactive({
 })
 
 const handleImport = () => {
+  if (isPreviewMode()) {
+    ElMessage.warning('预览模式不支持导入名单，数据不会保存')
+    return
+  }
   if (!selectedGrade.value) {
     ElMessage.warning('请先选择年级')
     return
@@ -600,6 +605,10 @@ const handleFileChange = (file) => {
 }
 
 const handleImportSubmit = async () => {
+  if (isPreviewMode()) {
+    ElMessage.warning('预览模式不支持导入名单，数据不会保存')
+    return
+  }
   if (!selectedGrade.value) {
     ElMessage.warning('请先选择年级')
     return
@@ -617,14 +626,32 @@ const handleImportSubmit = async () => {
   try {
     const res = await importStudents(formData)
     if (res.code === 200) {
-      ElMessage.success('导入成功')
+      const summary = res.data || {}
+      const message = `共 ${summary.total || 0} 行，成功导入 ${summary.imported || 0} 人（无效 ${summary.invalid || 0}、重复 ${summary.duplicate || 0}）`
+      const sampleErrors = Array.isArray(summary.sampleErrors) ? summary.sampleErrors : []
+
+      ElMessage.success(message)
+      if (sampleErrors.length > 0) {
+        ElMessageBox.alert(sampleErrors.join('；'), '以下行未导入', {
+          type: 'warning',
+          confirmButtonText: '知道了'
+        }).catch(() => {})
+      }
       showImportDialog.value = false
       importForm.file = null
       uploadRef.value?.clearFiles()
       loadStudents()
       loadGradeStudentCounts()
     } else {
-      ElMessage.error(res.msg || '导入失败')
+      const sampleErrors = Array.isArray(res.data?.sampleErrors) ? res.data.sampleErrors : []
+      if (sampleErrors.length > 0) {
+        ElMessageBox.alert(`${res.msg || '导入失败'}：${sampleErrors.join('；')}`, '导入失败', {
+          type: 'error',
+          confirmButtonText: '知道了'
+        }).catch(() => {})
+      } else {
+        ElMessage.error(res.msg || '导入失败')
+      }
     }
   } catch (error) {
     ElMessage.error('导入出错')

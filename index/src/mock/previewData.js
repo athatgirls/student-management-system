@@ -622,6 +622,10 @@ export function createPreviewResponse(config = {}) {
     return success(['/uploads/preview-file.png'])
   }
 
+  if (path === '/student/import') {
+    return { code: 400, data: null, msg: '预览模式不支持导入名单，数据不会保存' }
+  }
+
   if (['post', 'put', 'delete'].includes((config.method || '').toLowerCase())) {
     return success({ id: `preview-${Date.now()}`, success: true }, '预览模式操作成功')
   }

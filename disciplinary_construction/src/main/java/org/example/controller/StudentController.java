@@ -481,9 +481,19 @@ public class StudentController {
             @RequestParam(value = "grade", required = false) String grade) {
         Map<String, Object> result = new HashMap<>();
         try {
-            studentService.importStudents(file.getInputStream(), grade);
-            result.put("code", 200);
-            result.put("msg", "导入成功");
+            Map<String, Object> summary = studentService.importStudents(file.getInputStream(), grade);
+            result.put("data", summary);
+            Object importedValue = summary.get("imported");
+            int imported = importedValue instanceof Number
+                    ? ((Number) importedValue).intValue()
+                    : 0;
+            if (imported > 0) {
+                result.put("code", 200);
+                result.put("msg", "导入成功");
+            } else {
+                result.put("code", 400);
+                result.put("msg", "未导入任何学生，请检查Excel表头、必填字段或重复学号");
+            }
         } catch (Exception e) {
             result.put("code", 500);
             result.put("msg", "导入失败: " + e.getMessage());
