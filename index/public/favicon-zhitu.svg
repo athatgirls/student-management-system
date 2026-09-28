@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>智途</title>
+  <rect width="64" height="64" rx="16" fill="#183B66"/>
+  <!-- An open book and ascending path remain legible at tab-icon size. -->
+  <path d="M12 19c7-2 13-1 20 3 7-4 13-5 20-3v28c-7-2-13-1-20 3-7-4-13-5-20-3Z" fill="#F6F8FC"/>
+  <path d="M32 23v25" fill="none" stroke="#183B66" stroke-width="3"/>
+  <path d="m19 39 8-8 7 5 11-13" fill="none" stroke="#38BDB3" stroke-linecap="round" stroke-linejoin="round" stroke-width="5"/>
+  <path d="M38 23h7v7" fill="none" stroke="#38BDB3" stroke-linecap="round" stroke-linejoin="round" stroke-width="5"/>
+</svg>
