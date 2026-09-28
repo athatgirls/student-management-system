@@ -16,7 +16,25 @@ const success = (data = null, msg = '预览数据加载成功') => ({
   data
 })
 
-const grades = ['2024级', '2025级', '2026级']
+const defaultPreviewGrades = ['2024级', '2025级', '2026级']
+const grades = [...defaultPreviewGrades]
+
+const normalizeGradeName = (name) => {
+  const value = String(name || '').trim()
+  return /^\d{4}$/.test(value) ? `${value}级` : value
+}
+
+const parseBody = (data) => {
+  if (!data) return {}
+  if (typeof data === 'string') {
+    try {
+      return JSON.parse(data)
+    } catch {
+      return {}
+    }
+  }
+  return data
+}
 
 const defaultGradeRecords = [
   { id: 'grade-001', studentId: previewStudent.studentId, studentName: previewStudent.name, courseName: 'Web 前端开发', score: 92, credit: 3, semester: '2025-2026-1', status: '已通过' },
@@ -539,6 +557,22 @@ export function createPreviewResponse(config = {}) {
     return success({ token: 'preview-token-refreshed' }, 'Token刷新成功')
   }
   if (path === '/student/grades' || path === '/grade/list') return success(grades)
+  if (path === '/grade/create') {
+    const name = normalizeGradeName(parseBody(config.data).gradeName)
+    if (!name) return { code: 400, data: null, msg: '请选择年级' }
+    if (grades.includes(name)) return { code: 400, data: null, msg: '该年级已存在' }
+    grades.push(name)
+    return success({ gradeName: name }, '年级添加成功')
+  }
+  if (path === '/grade/delete-by-name') {
+    const name = normalizeGradeName((config.params || {}).gradeName)
+    if (!name) return { code: 400, data: null, msg: '请选择年级' }
+    if (defaultPreviewGrades.includes(name)) return { code: 400, data: null, msg: '默认年级不可删除' }
+    const index = grades.indexOf(name)
+    if (index < 0) return { code: 400, data: null, msg: '该年级不是手动添加的，无法删除' }
+    grades.splice(index, 1)
+    return success(null, '年级已删除')
+  }
   if (path === '/grade/records') return success(getPreviewGradeRecords())
   if (path === '/grade/import') return success({ imported: true }, '成绩导入成功')
   if (path === '/student/list') return success({ records: students, total: students.length })

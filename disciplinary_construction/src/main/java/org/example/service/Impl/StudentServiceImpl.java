@@ -4,9 +4,11 @@ package org.example.service.Impl;
 import org.example.model.StudentModel;
 import org.example.model.DailyTaskModel;
 import org.example.model.DailyTaskSubmissionModel;
+import org.example.model.GradeModel;
 import org.example.repository.StudentRepository;
 import org.example.repository.DailyTaskRepository;
 import org.example.repository.DailyTaskSubmissionRepository;
+import org.example.repository.GradeRepository;
 import org.example.service.StudentService;
 import org.example.util.StudentGradePolicy;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +42,8 @@ public class StudentServiceImpl implements StudentService {
     private DailyTaskRepository dailyTaskRepository;
     @Autowired
     private DailyTaskSubmissionRepository dailyTaskSubmissionRepository;
+    @Autowired
+    private GradeRepository gradeRepository;
     @Autowired
     private MongoTemplate mongoTemplate;
     
@@ -490,6 +494,11 @@ public class StudentServiceImpl implements StudentService {
     public List<String> getAllGrades() {
         java.util.Set<String> grades = new java.util.TreeSet<>(StudentGradePolicy.DEFAULT_GRADES);
         mongoTemplate.findDistinct(new Query(), "grade", StudentModel.class, String.class).stream()
+                .map(StudentGradePolicy::normalize)
+                .filter(value -> value != null && !value.isEmpty())
+                .forEach(grades::add);
+        gradeRepository.findAll().stream()
+                .map(GradeModel::getGradeName)
                 .map(StudentGradePolicy::normalize)
                 .filter(value -> value != null && !value.isEmpty())
                 .forEach(grades::add);

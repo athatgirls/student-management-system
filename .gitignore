@@ -49,3 +49,7 @@
 # System generated files
 .DS_Store
 Thumbs.db
+
+# Local AI assistant knowledge base (not committed)
+/note/
+/AGENTS.md
