@@ -56,10 +56,6 @@
         </el-form-item>
       </el-form>
       
-      <div class="login-footer">
-        <p v-if="!isAdminLogin">演示学生：10240001 / Student123!</p>
-        <p v-else>管理员默认账号：admin / 密码：admin123</p>
-      </div>
     </div>
   </div>
 </template>
@@ -232,9 +228,6 @@ const handleReset = () => {
     font-size: 12px;
   }
 
-  .login-footer p {
-    font-size: 11px;
-  }
 }
 
 .login-header {
@@ -261,12 +254,4 @@ const handleReset = () => {
   margin-bottom: 20px;
 }
 
-.login-footer {
-  text-align: center;
-}
-
-.login-footer p {
-  color: #909399;
-  font-size: 12px;
-}
 </style>
