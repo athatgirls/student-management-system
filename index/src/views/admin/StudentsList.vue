@@ -6,6 +6,7 @@
         <div class="grade-header">
           <h3>年级管理</h3>
           <el-tag type="info">年级手动填写</el-tag>
+          <el-button type="primary" size="small" @click="openAddGradeDialog">添加年级</el-button>
         </div>
         <div class="grade-list">
           <div 
@@ -23,11 +24,20 @@
             @click="selectGrade(grade)"
           >
             <span>{{ grade }}</span>
-            <el-badge 
-              :value="getGradeStudentCount(grade)" 
-              :max="99"
-              class="grade-badge"
-            />
+            <span class="grade-item-right">
+              <el-badge 
+                :value="getGradeStudentCount(grade)" 
+                :max="99"
+                class="grade-badge"
+              />
+              <el-icon
+                class="grade-remove"
+                title="删除年级"
+                @click.stop="handleDeleteGrade(grade)"
+              >
+                <Delete />
+              </el-icon>
+            </span>
           </div>
         </div>
       </div>
@@ -352,6 +362,30 @@
       </template>
     </el-dialog>
 
+    <!-- 添加年级对话框 -->
+    <el-dialog
+      v-model="showAddGradeDialog"
+      title="添加年级"
+      width="420px"
+    >
+      <el-form label-width="90px" @submit.prevent>
+        <el-form-item label="年级名称" required>
+          <el-input
+            v-model="newGradeName"
+            placeholder="如 2027级（只填 2027 会自动补“级”）"
+            clearable
+            @keyup.enter="handleAddGrade"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showAddGradeDialog = false">取消</el-button>
+          <el-button type="primary" :loading="addGradeLoading" @click="handleAddGrade">确定</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
      <!-- 批量修改状态对话框 -->
      <el-dialog
        v-model="showBatchStatusDialog"
@@ -406,8 +440,9 @@
 <script setup>
 import { ref, reactive, onMounted, computed, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowDown } from '@element-plus/icons-vue'
+import { ArrowDown, Delete } from '@element-plus/icons-vue'
 import { getStudentList, createStudent, updateStudent, deleteStudent, importStudents, batchDeleteStudents, getAllGrades, batchUpdateStatus, resetStudentPassword } from '@/api/student'
+import { createGrade, deleteGradeByName } from '@/api/grade'
 import { isPreviewMode } from '@/utils/previewMode'
 
 const loading = ref(false)
@@ -425,6 +460,9 @@ const isMobile = computed(() => windowWidth.value <= 768)
 const gradeList = ref([])
 const selectedGrade = ref('')
 const gradeStudentCounts = ref({})
+const showAddGradeDialog = ref(false)
+const newGradeName = ref('')
+const addGradeLoading = ref(false)
 
 // 搜索表单
 const searchForm = reactive({
@@ -529,6 +567,64 @@ const selectGrade = (grade) => {
   selectedGrade.value = grade
   pagination.currentPage = 1
   loadStudents()
+}
+
+// 添加年级
+const openAddGradeDialog = () => {
+  newGradeName.value = ''
+  showAddGradeDialog.value = true
+}
+
+const handleAddGrade = async () => {
+  const gradeName = (newGradeName.value || '').trim()
+  if (!gradeName) {
+    ElMessage.warning('请输入年级名称')
+    return
+  }
+  addGradeLoading.value = true
+  try {
+    const res = await createGrade({ gradeName })
+    if (res.code === 200) {
+      ElMessage.success('年级添加成功')
+      showAddGradeDialog.value = false
+      await loadGradeList()
+    } else {
+      ElMessage.error(res.msg || '添加失败')
+    }
+  } catch (error) {
+    ElMessage.error('添加失败')
+  } finally {
+    addGradeLoading.value = false
+  }
+}
+
+// 删除年级
+const handleDeleteGrade = async (grade) => {
+  try {
+    await ElMessageBox.confirm(
+      `确认删除年级「${grade}」吗？删除后不影响该年级下的学生数据。`,
+      '删除年级',
+      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+    )
+  } catch (error) {
+    return
+  }
+  try {
+    const res = await deleteGradeByName(grade)
+    if (res.code === 200) {
+      ElMessage.success(res.msg || '年级已删除')
+      if (selectedGrade.value === grade) {
+        selectedGrade.value = ''
+        pagination.currentPage = 1
+        loadStudents()
+      }
+      await loadGradeList()
+    } else {
+      ElMessage.error(res.msg || '删除失败')
+    }
+  } catch (error) {
+    ElMessage.error('删除失败')
+  }
 }
 
 // 加载学生列表
@@ -1157,6 +1253,26 @@ onMounted(async () => {
 
 .grade-badge {
   margin-left: 10px;
+}
+
+.grade-item-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.grade-remove {
+  display: none;
+  color: #f56c6c;
+  cursor: pointer;
+}
+
+.grade-item:hover .grade-remove {
+  display: inline-flex;
+}
+
+.grade-item.active:hover .grade-remove {
+  color: #ffffff;
 }
 
 /* 移动端适配 */

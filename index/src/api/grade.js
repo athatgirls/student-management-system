@@ -46,3 +46,12 @@ export function deleteGrade(id) {
     method: 'delete'
   })
 }
+
+// 按名称删除年级（仅限手动添加的年级）
+export function deleteGradeByName(gradeName) {
+  return request({
+    url: '/grade/delete-by-name',
+    method: 'delete',
+    params: { gradeName }
+  })
+}

@@ -10,6 +10,7 @@ import org.example.model.StudyRecordModel;
 import org.example.repository.StudentRepository;
 import org.example.repository.StudyRecordRepository;
 import org.example.service.GradeService;
+import org.example.service.StudentService;
 import org.example.util.StudentGradePolicy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -38,6 +39,9 @@ public class GradeController {
     private GradeService gradeService;
 
     @Autowired
+    private StudentService studentService;
+
+    @Autowired
     private StudyRecordRepository studyRecordRepository;
 
     @Autowired
@@ -51,13 +55,19 @@ public class GradeController {
         Map<String, Object> result = new HashMap<>();
         try {
             String gradeName = StudentGradePolicy.requireValid((String) requestBody.get("gradeName"));
+            if (studentService.getAllGrades().contains(gradeName)) {
+                result.put("code", 400);
+                result.put("data", null);
+                result.put("msg", "该年级已存在");
+                return ResponseEntity.ok(result);
+            }
 
             GradeModel grade = new GradeModel();
             grade.setGradeName(gradeName);
             GradeModel createdGrade = gradeService.createGrade(grade);
             result.put("code", 200);
             result.put("data", createdGrade);
-            result.put("msg", "Grade created");
+            result.put("msg", "年级添加成功");
         } catch (RuntimeException e) {
             result.put("code", 400);
             result.put("data", null);
@@ -104,6 +114,40 @@ public class GradeController {
             result.put("code", success ? 200 : 404);
             result.put("data", null);
             result.put("msg", success ? "Grade deleted" : "Grade not found");
+        } catch (Exception e) {
+            result.put("code", 500);
+            result.put("data", null);
+            result.put("msg", "Delete grade failed: " + e.getMessage());
+        }
+        return ResponseEntity.ok(result);
+    }
+
+    @DeleteMapping("/delete-by-name")
+    public ResponseEntity<Map<String, Object>> deleteGradeByName(@RequestParam("gradeName") String gradeName) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            String normalized = StudentGradePolicy.requireValid(gradeName);
+            if (StudentGradePolicy.DEFAULT_GRADES.contains(normalized)) {
+                result.put("code", 400);
+                result.put("data", null);
+                result.put("msg", "默认年级不可删除");
+                return ResponseEntity.ok(result);
+            }
+            GradeModel existing = gradeService.findByGradeName(normalized);
+            if (existing == null) {
+                result.put("code", 400);
+                result.put("data", null);
+                result.put("msg", "该年级不是手动添加的，无法删除");
+                return ResponseEntity.ok(result);
+            }
+            boolean success = gradeService.deleteGrade(existing.getId());
+            result.put("code", success ? 200 : 404);
+            result.put("data", null);
+            result.put("msg", success ? "年级已删除；若仍有学生属于该年级，列表中会继续显示" : "Grade not found");
+        } catch (RuntimeException e) {
+            result.put("code", 400);
+            result.put("data", null);
+            result.put("msg", e.getMessage());
         } catch (Exception e) {
             result.put("code", 500);
             result.put("data", null);
