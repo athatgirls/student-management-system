@@ -649,7 +649,8 @@ public class StudentController {
     }
 
     // 修改初始密码（不需要登录，用于首次登录时强制修改密码）
-    @PutMapping("/change-initial-password")
+    // POST is the primary method; retain PUT for older clients during rollout.
+    @RequestMapping(value = "/change-initial-password", method = {RequestMethod.POST, RequestMethod.PUT})
     public ResponseEntity<Map<String, Object>> changeInitialPassword(@RequestBody Map<String, String> requestBody) {
         Map<String, Object> result = new HashMap<>();
         try {
@@ -691,7 +692,7 @@ public class StudentController {
                 return ResponseEntity.ok(result);
             }
             
-            // 修改密码（传入空字符串作为旧密码，因为初始密码修改不需要验证旧密码）
+            // 传入用户提供的初始密码，由服务层再次校验旧密码及新密码强度。
             try {
                 boolean success = studentService.changePassword(studentId, initialPassword, newPassword);
                 if (success) {

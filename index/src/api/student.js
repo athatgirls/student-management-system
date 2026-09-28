@@ -163,7 +163,7 @@ export function changePassword(oldPassword, newPassword) {
 export function changeInitialPassword(studentId, initialPassword, newPassword) {
   return request({
     url: '/student/change-initial-password',
-    method: 'put',
+    method: 'post',
     data: { studentId, initialPassword, newPassword }
   })
 }
