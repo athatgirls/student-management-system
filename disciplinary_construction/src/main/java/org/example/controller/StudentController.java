@@ -568,6 +568,40 @@ public class StudentController {
         return ResponseEntity.ok(result);
     }
 
+    // Prefer POST for campus gateways; retain PUT for existing clients.
+    @RequestMapping(value = "/batch-update-major", method = {RequestMethod.POST, RequestMethod.PUT})
+    public ResponseEntity<Map<String, Object>> batchUpdateMajor(@RequestBody Map<String, Object> requestBody) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            List<String> ids = (List<String>) requestBody.get("ids");
+            String major = requestBody.get("major") instanceof String ? (String) requestBody.get("major") : null;
+            if (ids == null || ids.isEmpty()) {
+                result.put("code", 400);
+                result.put("data", null);
+                result.put("msg", "请先选择学生");
+                return ResponseEntity.ok(result);
+            }
+            if (major == null || major.trim().isEmpty()) {
+                result.put("code", 400);
+                result.put("data", null);
+                result.put("msg", "请选择专业");
+                return ResponseEntity.ok(result);
+            }
+
+            int updatedCount = studentService.batchUpdateMajorByIds(ids, major.trim());
+            Map<String, Object> data = new HashMap<>();
+            data.put("updatedCount", updatedCount);
+            result.put("code", 200);
+            result.put("data", data);
+            result.put("msg", "批量修改专业成功");
+        } catch (Exception e) {
+            result.put("code", 500);
+            result.put("data", null);
+            result.put("msg", "批量修改专业失败: " + e.getMessage());
+        }
+        return ResponseEntity.ok(result);
+    }
+
     // 批量删除学生
     @DeleteMapping("/batch-delete")
     public ResponseEntity<Map<String, Object>> batchDeleteStudents(@RequestBody Map<String, List<String>> requestBody) {

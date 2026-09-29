@@ -36,6 +36,9 @@ jobs:
       - name: Build
         working-directory: index
         run: npm run build
+      - name: Test frontend handlers
+        working-directory: index
+        run: npm test
       - name: Audit production dependencies
         working-directory: index
         run: npm audit --omit=dev

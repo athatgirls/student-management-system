@@ -35,10 +35,11 @@ public class SecurityConfig {
                 .antMatchers("/msi/admin/**").hasRole("ADMIN")
                 .antMatchers("/msi/**/admin/**").hasRole("ADMIN")
                 .antMatchers("/msi/student/list", "/msi/student/create", "/msi/student/import",
-                        "/msi/student/batch-delete", "/msi/student/batch-update-status",
+                        "/msi/student/batch-delete", "/msi/student/batch-update-status", "/msi/student/batch-update-major",
                         "/msi/student/reset-password", "/msi/student/statistics",
                         "/msi/student/update", "/msi/student/delete/**").hasRole("ADMIN")
                 .antMatchers("/msi/grade/**", "/msi/activities/**").hasRole("ADMIN")
+                .antMatchers("/msi/major/create", "/msi/major/delete-by-name", "/msi/major/delete/**").hasRole("ADMIN")
                 .antMatchers(HttpMethod.POST,
                         "/msi/academic-events/create", "/msi/academic-events/audit",
                         "/msi/daily-activities/create", "/msi/daily-activities/audit",

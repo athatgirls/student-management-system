@@ -45,11 +45,12 @@
         <el-row :gutter="20">
           <el-col :xs="24" :sm="24" :md="12" :lg="12">
             <el-form-item label="专业" prop="major">
-              <el-select v-model="form.major" placeholder="请选择专业" style="width: 100%">
-                <el-option label="计算机科学与技术" value="计算机科学与技术" />
-                <el-option label="软件工程" value="软件工程" />
-                <el-option label="信息安全" value="信息安全" />
-              </el-select>
+              <div class="major-field">
+                <el-select v-model="form.major" placeholder="请选择专业" style="width: 100%">
+                  <el-option v-for="major in majorOptions" :key="major" :label="major" :value="major" />
+                </el-select>
+                <el-button type="primary" link @click="showMajorManageDialog = true">管理专业</el-button>
+              </div>
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="24" :md="12" :lg="12">
@@ -107,18 +108,23 @@
         </el-form-item>
       </el-form>
     </el-card>
+    <MajorManageDialog v-model:visible="showMajorManageDialog" @changed="loadMajors" />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { createStudent } from '@/api/student'
+import { getMajors } from '@/api/major'
+import MajorManageDialog from '@/components/MajorManageDialog.vue'
 
 const router = useRouter()
 const formRef = ref()
 const loading = ref(false)
+const majorOptions = ref([])
+const showMajorManageDialog = ref(false)
 
 const form = reactive({
   studentId: '',
@@ -144,6 +150,19 @@ const rules = {
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
 }
 
+const loadMajors = async () => {
+  try {
+    const res = await getMajors()
+    if (res.code === 200) {
+      majorOptions.value = res.data || []
+    } else {
+      ElMessage.error(res.msg || '加载专业列表失败')
+    }
+  } catch (error) {
+    ElMessage.error('加载专业列表失败')
+  }
+}
+
 const handleSubmit = async () => {
   try {
     await formRef.value.validate()
@@ -166,6 +185,8 @@ const handleSubmit = async () => {
 const handleReset = () => {
   formRef.value?.resetFields()
 }
+
+onMounted(loadMajors)
 </script>
 
 <style scoped>
@@ -176,6 +197,13 @@ const handleReset = () => {
 .card-header {
   font-weight: 500;
   color: #303133;
+}
+
+.major-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
 }
 
 /* 移动端适配 */
