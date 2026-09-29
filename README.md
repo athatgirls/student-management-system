@@ -55,7 +55,7 @@ npm run serve
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-首次运行需要联网下载镜像和 Maven/npm 依赖。开发环境入口：
+首次运行需要联网下载镜像和 Maven/npm 依赖。之后依赖会保留在 Docker 命名卷中；正常停止请使用 `docker compose -f docker-compose.dev.yml down`，不要使用 `down -v`。开发环境入口：
 
 | 服务 | 地址 |
 | --- | --- |
@@ -184,7 +184,14 @@ curl -f http://127.0.0.1:8080/health
 
 ## 开发验证与贡献
 
-在项目根目录分别执行以下命令。前端需要 Node.js/npm，后端需要 Java 11 和 Maven；当前 CI 前端使用 Node.js 20，容器构建文件使用 Node.js 18，版本升级需另行验证。
+在项目根目录可使用以下容器化命令完成验证，无需在本机安装 Java、Maven 或 Node.js。测试依赖缓存于 `mis-test` 命名卷；首次执行需要下载，之后仅在 `pom.xml` 或前端锁文件变化时更新依赖。Node.js 固定为 [`.nvmrc`](.nvmrc) 中的版本，后端固定为 Maven 3.9.9 + Temurin 11。
+
+```bash
+npm run test:backend
+npm run check:frontend
+```
+
+也可在已配置相同版本运行时的本机执行：
 
 前端：
 

@@ -61,7 +61,7 @@ services:
     command: mvn spring-boot:run
 
   frontend:
-    image: node:18-alpine
+    image: node:20.19.0-alpine
     working_dir: /app
     depends_on:
       - backend
@@ -74,7 +74,17 @@ services:
     volumes:
       - ./index:/app
       - frontend_node_modules:/app/node_modules
-    command: sh -c "npm ci && npm run serve"
+      - frontend_npm_cache:/root/.npm
+    command:
+      - sh
+      - -ec
+      - |
+        lock_hash="$$(sha256sum package-lock.json | cut -d ' ' -f1)"
+        if [ ! -x node_modules/.bin/vue-cli-service ] || [ "$$(cat node_modules/.package-lock.sha256 2>/dev/null || true)" != "$$lock_hash" ]; then
+          npm ci --cache /root/.npm
+          printf '%s\n' "$$lock_hash" > node_modules/.package-lock.sha256
+        fi
+        exec npm run serve
 
 volumes:
   mongo_data:
@@ -82,3 +92,4 @@ volumes:
   uploads_data:
   maven_cache:
   frontend_node_modules:
+  frontend_npm_cache:
