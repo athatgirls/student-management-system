@@ -210,7 +210,8 @@ class SecurityRegressionTest {
                 new String[]{"POST", "/msi/major/create"},
                 new String[]{"DELETE", "/msi/major/delete-by-name"},
                 new String[]{"DELETE", "/msi/major/delete/software-engineering"},
-                new String[]{"PUT", "/msi/student/batch-update-major"});
+                new String[]{"PUT", "/msi/student/batch-update-major"},
+                new String[]{"POST", "/msi/student/batch-update-major"});
 
         for (String[] endpoint : adminOnlyEndpoints) {
             assertEquals(401, status(security, null, endpoint[0], endpoint[1]));

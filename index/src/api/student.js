@@ -137,7 +137,7 @@ export function batchUpdateStatus(data) {
 export function batchUpdateMajor(data) {
   return request({
     url: '/student/batch-update-major',
-    method: 'put',
+    method: 'post',
     data
   })
 }

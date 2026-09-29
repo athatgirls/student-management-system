@@ -8,6 +8,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -15,9 +20,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
 class StudentBatchMajorControllerTest {
@@ -27,6 +37,37 @@ class StudentBatchMajorControllerTest {
 
     @InjectMocks
     private StudentController studentController;
+
+    @Test
+    void postAndLegacyPutBothUpdateTheSelectedStudents() throws Exception {
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(studentController).build();
+        when(studentService.batchUpdateMajorByIds(Arrays.asList("student-1"), "人工智能")).thenReturn(1);
+        String body = "{\"ids\":[\"student-1\"],\"major\":\" 人工智能 \"}";
+        mvc.perform(post("/msi/student/batch-update-major").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.updatedCount").value(1));
+        mvc.perform(put("/msi/student/batch-update-major").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.updatedCount").value(1));
+        verify(studentService, times(2)).batchUpdateMajorByIds(Arrays.asList("student-1"), "人工智能");
+    }
+
+    @Test
+    void postRejectsEmptyInputWithoutWritingStudents() throws Exception {
+        MockMvcBuilders.standaloneSetup(studentController).build()
+                .perform(post("/msi/student/batch-update-major").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(400));
+        verifyNoInteractions(studentService);
+    }
+
+    @Test
+    void getCannotPerformBatchUpdate() throws Exception {
+        // GET may match the separate /{id} reader, but must never map to this writer.
+        RequestMapping mapping = StudentController.class.getMethod("batchUpdateMajor", Map.class)
+                .getAnnotation(RequestMapping.class);
+        assertArrayEquals(new RequestMethod[]{RequestMethod.POST, RequestMethod.PUT}, mapping.method());
+        verifyNoInteractions(studentService);
+    }
 
     @Test
     void batchUpdateMajorRejectsEmptyIds() {

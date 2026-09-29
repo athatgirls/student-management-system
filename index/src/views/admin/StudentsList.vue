@@ -815,6 +815,7 @@ const handleImportSubmit = async () => {
       uploadRef.value?.clearFiles()
       loadStudents()
       loadGradeStudentCounts()
+      await loadMajors()
     } else {
       const sampleErrors = Array.isArray(res.data?.sampleErrors) ? res.data.sampleErrors : []
       if (sampleErrors.length > 0) {

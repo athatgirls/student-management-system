@@ -568,7 +568,8 @@ public class StudentController {
         return ResponseEntity.ok(result);
     }
 
-    @PutMapping("/batch-update-major")
+    // Prefer POST for campus gateways; retain PUT for existing clients.
+    @RequestMapping(value = "/batch-update-major", method = {RequestMethod.POST, RequestMethod.PUT})
     public ResponseEntity<Map<String, Object>> batchUpdateMajor(@RequestBody Map<String, Object> requestBody) {
         Map<String, Object> result = new HashMap<>();
         try {
