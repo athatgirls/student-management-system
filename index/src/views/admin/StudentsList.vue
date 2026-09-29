@@ -63,6 +63,13 @@
             >
               批量删除 ({{ selectedStudents.length }})
             </el-button>
+            <el-button
+              type="warning"
+              :disabled="selectedStudents.length === 0"
+              @click="showBatchMajorDialog = true"
+            >
+              批量修改专业 ({{ selectedStudents.length }})
+            </el-button>
             <el-button 
               type="success" 
               @click="handleImport"
@@ -95,11 +102,12 @@
             />
           </el-col>
           <el-col :xs="24" :sm="12" :md="6" :lg="6">
-            <el-select v-model="searchForm.major" placeholder="请选择专业" clearable style="width: 100%">
-              <el-option label="计算机科学与技术" value="计算机科学与技术" />
-              <el-option label="软件工程" value="软件工程" />
-              <el-option label="信息安全" value="信息安全" />
-            </el-select>
+            <div class="major-field">
+              <el-select v-model="searchForm.major" placeholder="请选择专业" clearable style="width: 100%">
+                <el-option v-for="major in majorOptions" :key="major" :label="major" :value="major" />
+              </el-select>
+              <el-button type="primary" link @click="showMajorManageDialog = true">管理专业</el-button>
+            </div>
           </el-col>
           <el-col :xs="24" :sm="24" :md="6" :lg="6">
             <div :class="isMobile ? 'mobile-button-group' : ''">
@@ -113,6 +121,7 @@
       <!-- 学生列表 -->
       <div class="table-wrapper" :class="{ 'mobile-table': isMobile }">
       <el-table
+        ref="tableRef"
         :data="students"
         v-loading="loading"
           :style="isMobile ? 'min-width: 500px;' : 'width: 100%'"
@@ -233,11 +242,12 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="专业" prop="major">
-              <el-select v-model="form.major" placeholder="请选择专业">
-                <el-option label="计算机科学与技术" value="计算机科学与技术" />
-                <el-option label="软件工程" value="软件工程" />
-                <el-option label="信息安全" value="信息安全" />
-              </el-select>
+              <div class="major-field">
+                <el-select v-model="form.major" placeholder="请选择专业" style="width: 100%">
+                  <el-option v-for="major in majorOptions" :key="major" :label="major" :value="major" />
+                </el-select>
+                <el-button type="primary" link @click="showMajorManageDialog = true">管理专业</el-button>
+              </div>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -434,20 +444,62 @@
          </span>
        </template>
      </el-dialog>
-   </div>
- </template>
+
+     <!-- 批量修改专业对话框 -->
+     <el-dialog
+       v-model="showBatchMajorDialog"
+       title="批量修改专业"
+       width="500px"
+     >
+       <el-alert
+         :title="`将修改选中的 ${selectedStudents.length} 名学生的专业`"
+         type="info"
+         :closable="false"
+         style="margin-bottom: 20px;"
+       />
+       <el-form :model="batchMajorForm" label-width="100px">
+         <el-form-item label="新专业" required>
+           <div class="major-field">
+             <el-select v-model="batchMajorForm.major" placeholder="请选择专业" style="width: 100%">
+               <el-option v-for="major in majorOptions" :key="major" :label="major" :value="major" />
+             </el-select>
+             <el-button type="primary" link @click="showMajorManageDialog = true">管理专业</el-button>
+           </div>
+         </el-form-item>
+       </el-form>
+       <template #footer>
+         <span class="dialog-footer">
+           <el-button @click="showBatchMajorDialog = false">取消</el-button>
+           <el-button
+             type="primary"
+             :disabled="!batchMajorForm.major"
+             :loading="batchMajorLoading"
+             @click="handleBatchMajorSubmit"
+           >
+             确定修改
+           </el-button>
+         </span>
+       </template>
+     </el-dialog>
+
+     <MajorManageDialog v-model:visible="showMajorManageDialog" @changed="loadMajors" />
+    </div>
+  </template>
 
 <script setup>
 import { ref, reactive, onMounted, computed, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown, Delete } from '@element-plus/icons-vue'
-import { getStudentList, createStudent, updateStudent, deleteStudent, importStudents, batchDeleteStudents, getAllGrades, batchUpdateStatus, resetStudentPassword } from '@/api/student'
+import { getStudentList, createStudent, updateStudent, deleteStudent, importStudents, batchDeleteStudents, getAllGrades, batchUpdateStatus, batchUpdateMajor, resetStudentPassword } from '@/api/student'
 import { createGrade, deleteGradeByName } from '@/api/grade'
+import { getMajors } from '@/api/major'
+import MajorManageDialog from '@/components/MajorManageDialog.vue'
 import { isPreviewMode } from '@/utils/previewMode'
 
 const loading = ref(false)
 const students = ref([])
 const selectedStudents = ref([])
+const tableRef = ref()
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
 const formRef = ref()
@@ -463,6 +515,10 @@ const gradeStudentCounts = ref({})
 const showAddGradeDialog = ref(false)
 const newGradeName = ref('')
 const addGradeLoading = ref(false)
+
+// 专业管理
+const majorOptions = ref([])
+const showMajorManageDialog = ref(false)
 
 // 搜索表单
 const searchForm = reactive({
@@ -504,6 +560,13 @@ const batchStatusForm = reactive({
   statusRemark: ''
 })
 
+// 批量修改专业
+const showBatchMajorDialog = ref(false)
+const batchMajorLoading = ref(false)
+const batchMajorForm = reactive({
+  major: ''
+})
+
 // 表单验证规则
 const rules = {
   studentId: [
@@ -524,6 +587,20 @@ const rules = {
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' }
   ]
+}
+
+// 加载专业列表
+const loadMajors = async () => {
+  try {
+    const res = await getMajors()
+    if (res.code === 200) {
+      majorOptions.value = res.data || []
+    } else {
+      ElMessage.error(res.msg || '加载专业列表失败')
+    }
+  } catch (error) {
+    ElMessage.error('加载专业列表失败')
+  }
 }
 
 // 加载年级列表
@@ -790,6 +867,52 @@ const handleBatchDelete = async () => {
   }
 }
 
+// 批量修改专业
+const handleBatchMajorSubmit = async () => {
+  if (selectedStudents.value.length === 0) {
+    ElMessage.warning('请选择要修改专业的学生')
+    return
+  }
+
+  if (!batchMajorForm.major) {
+    ElMessage.warning('请选择专业')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要将选中的 ${selectedStudents.value.length} 名学生专业修改为“${batchMajorForm.major}”吗？`,
+      '批量修改确认',
+      {
+        confirmButtonText: '确定修改',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    batchMajorLoading.value = true
+    const ids = selectedStudents.value.map(student => student.id)
+    const res = await batchUpdateMajor({ ids, major: batchMajorForm.major })
+    if (res.code === 200) {
+      ElMessage.success(res.msg || '批量修改专业成功')
+      showBatchMajorDialog.value = false
+      batchMajorForm.major = ''
+      selectedStudents.value = []
+      tableRef.value?.clearSelection()
+      await loadStudents()
+      loadGradeStudentCounts()
+    } else {
+      ElMessage.error(res.msg || '批量修改失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('批量修改失败')
+    }
+  } finally {
+    batchMajorLoading.value = false
+  }
+}
+
 // 状态变化处理
 const handleStatusChange = () => {
   // 如果状态改为"在读"，清空备注
@@ -1013,6 +1136,7 @@ const handleCurrentChange = (page) => {
 
 onMounted(async () => {
   await loadGradeList()
+  await loadMajors()
   loadStudents()
   // 初始化窗口宽度并监听变化
   if (typeof window !== 'undefined') {
@@ -1137,6 +1261,13 @@ onMounted(async () => {
 .header-btns {
   display: flex;
   gap: 10px;
+}
+
+.major-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
 }
 
 .import-upload {

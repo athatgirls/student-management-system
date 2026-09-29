@@ -48,6 +48,8 @@ public interface StudentService {
     
     // 批量修改学生状态（按年级）
     int batchUpdateStatusByGrade(String grade, String status, String statusRemark);
+
+    int batchUpdateMajorByIds(List<String> ids, String major);
     
     // 管理员重置学生密码
     boolean resetStudentPassword(String studentId, String newPassword);

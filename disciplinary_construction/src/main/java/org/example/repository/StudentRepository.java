@@ -18,6 +18,8 @@ public interface StudentRepository extends MongoRepository<StudentModel, String>
 
     List<StudentModel> findByMajor(String major);
 
+    long countByMajor(String major);
+
     List<StudentModel> findByGrade(String grade);
 
     List<StudentModel> findByStatus(String status);

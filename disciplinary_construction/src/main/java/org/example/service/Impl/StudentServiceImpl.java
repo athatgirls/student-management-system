@@ -537,6 +537,22 @@ public class StudentServiceImpl implements StudentService {
         return count;
     }
 
+    @Override
+    public int batchUpdateMajorByIds(List<String> ids, String major) {
+        int count = 0;
+        for (String id : ids) {
+            Optional<StudentModel> student = studentRepository.findById(id);
+            if (student.isPresent()) {
+                StudentModel existing = student.get();
+                existing.setMajor(major.trim());
+                existing.setUpdateTime(new java.util.Date());
+                studentRepository.save(existing);
+                count++;
+            }
+        }
+        return count;
+    }
+
     // 初始化默认学生用户
     public void createDefaultStudent() {
         // 创建第一个默认学生

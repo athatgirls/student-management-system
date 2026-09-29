@@ -133,6 +133,15 @@ export function batchUpdateStatus(data) {
   })
 }
 
+// 批量修改专业
+export function batchUpdateMajor(data) {
+  return request({
+    url: '/student/batch-update-major',
+    method: 'put',
+    data
+  })
+}
+
 // 获取最近活动
 export function getRecentActivities() {
   return request({

@@ -95,6 +95,8 @@ const students = [
   }
 ]
 
+const majors = [...new Set(students.map(student => student.major))].sort()
+
 const dailyTasks = [
   {
     id: 'task-001',
@@ -557,6 +559,23 @@ export function createPreviewResponse(config = {}) {
     return success({ token: 'preview-token-refreshed' }, 'Token刷新成功')
   }
   if (path === '/student/grades' || path === '/grade/list') return success(grades)
+  if (path === '/major/list') return success(majors)
+  if (path === '/major/create') {
+    const majorName = String(parseBody(config.data).majorName || '').trim()
+    if (!majorName) return { code: 400, data: null, msg: '请选择专业' }
+    if (majors.includes(majorName)) return { code: 400, data: null, msg: '该专业已存在' }
+    majors.push(majorName)
+    majors.sort()
+    return success({ majorName }, '专业添加成功')
+  }
+  if (path === '/major/delete-by-name') {
+    const majorName = String((config.params || {}).majorName || '').trim()
+    if (!majorName) return { code: 400, data: null, msg: '请选择专业' }
+    const index = majors.indexOf(majorName)
+    if (index < 0) return { code: 400, data: null, msg: '该专业不存在或非手动添加，无法删除' }
+    majors.splice(index, 1)
+    return success(null, '专业已删除')
+  }
   if (path === '/grade/create') {
     const name = normalizeGradeName(parseBody(config.data).gradeName)
     if (!name) return { code: 400, data: null, msg: '请选择年级' }
@@ -576,6 +595,21 @@ export function createPreviewResponse(config = {}) {
   if (path === '/grade/records') return success(getPreviewGradeRecords())
   if (path === '/grade/import') return success({ imported: true }, '成绩导入成功')
   if (path === '/student/list') return success({ records: students, total: students.length })
+  if (path === '/student/batch-update-major') {
+    const { ids, major } = parseBody(config.data)
+    if (!Array.isArray(ids) || ids.length === 0) return { code: 400, data: null, msg: '请先选择学生' }
+    if (!major) return { code: 400, data: null, msg: '请选择专业' }
+    const idSet = new Set(ids.map(String))
+    const matchedStudents = students.filter(student => idSet.has(String(student.id)))
+    matchedStudents.forEach(student => {
+      student.major = major
+    })
+    if (!majors.includes(major)) {
+      majors.push(major)
+      majors.sort()
+    }
+    return success({ updatedCount: matchedStudents.length }, '批量修改专业成功')
+  }
   if (path.startsWith('/student/personal-stats')) {
     return success({ internships: 2, competitions: 1, papers: 1, projects: 1 })
   }
