@@ -11,8 +11,17 @@ import org.example.util.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.GenericApplicationContext;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.ObjectPostProcessor;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.web.FilterChainProxy;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.servlet.handler.HandlerMappingIntrospector;
 import java.nio.file.*;
 import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -194,6 +203,64 @@ class SecurityRegressionTest {
         StudentModel student = new StudentModel(); student.setStudentId("fixture");
         assertNull(audience.resolvePartyStage(student));
         application.setAuditStatus("通过"); assertEquals("中共党员", audience.resolvePartyStage(student));
+    }
+    @Test void majorWritesRequireAdminAndMajorListRequiresAuthentication() throws Exception {
+        FilterChainProxy security = securityFilterChain();
+        List<String[]> adminOnlyEndpoints = List.of(
+                new String[]{"POST", "/msi/major/create"},
+                new String[]{"DELETE", "/msi/major/delete-by-name"},
+                new String[]{"DELETE", "/msi/major/delete/software-engineering"},
+                new String[]{"PUT", "/msi/student/batch-update-major"});
+
+        for (String[] endpoint : adminOnlyEndpoints) {
+            assertEquals(401, status(security, null, endpoint[0], endpoint[1]));
+            assertEquals(403, status(security, "student-token", endpoint[0], endpoint[1]));
+            assertEquals(204, status(security, "admin-token", endpoint[0], endpoint[1]));
+        }
+
+        assertEquals(401, status(security, null, "GET", "/msi/major/list"));
+        assertEquals(204, status(security, "student-token", "GET", "/msi/major/list"));
+    }
+
+    private FilterChainProxy securityFilterChain() throws Exception {
+        JwtUtil jwt = mock(JwtUtil.class);
+        when(jwt.validateToken(anyString())).thenReturn(true);
+        when(jwt.getUserIdFromToken(anyString())).thenReturn("fixture-user");
+        when(jwt.getUsernameFromToken(anyString())).thenReturn("fixture-user");
+        when(jwt.getExpirationFromToken(anyString())).thenReturn(new Date(System.currentTimeMillis() + 60000));
+        when(jwt.getUserTypeFromToken("student-token")).thenReturn("student");
+        when(jwt.getUserTypeFromToken("admin-token")).thenReturn("admin");
+
+        org.example.config.JwtAuthenticationFilter jwtFilter = new org.example.config.JwtAuthenticationFilter();
+        ReflectionTestUtils.setField(jwtFilter, "jwtUtil", jwt);
+        ReflectionTestUtils.setField(jwtFilter, "onlineUserService", mock(OnlineUserService.class));
+        org.example.config.SecurityConfig config = new org.example.config.SecurityConfig();
+        ReflectionTestUtils.setField(config, "jwtAuthenticationFilter", jwtFilter);
+
+        ObjectPostProcessor<Object> postProcessor = new ObjectPostProcessor<Object>() {
+            @Override public <T> T postProcess(T object) { return object; }
+        };
+        AuthenticationManager testAuthenticationManager = authentication -> authentication;
+        AuthenticationManagerBuilder authenticationManager = new AuthenticationManagerBuilder(postProcessor);
+        authenticationManager.parentAuthenticationManager(testAuthenticationManager);
+        GenericApplicationContext applicationContext = new GenericApplicationContext();
+        applicationContext.registerBean("mvcHandlerMappingIntrospector", HandlerMappingIntrospector.class);
+        applicationContext.refresh();
+        Map<Class<?>, Object> sharedObjects = new HashMap<>();
+        sharedObjects.put(ApplicationContext.class, applicationContext);
+        sharedObjects.put(AuthenticationManager.class, testAuthenticationManager);
+        HttpSecurity http = new HttpSecurity(postProcessor, authenticationManager, sharedObjects);
+        SecurityFilterChain chain = config.filterChain(http);
+        return new FilterChainProxy(chain);
+    }
+
+    private int status(FilterChainProxy security, String token, String method, String path) throws Exception {
+        org.springframework.mock.web.MockHttpServletRequest request = new org.springframework.mock.web.MockHttpServletRequest(method, path);
+        request.setServletPath(path);
+        if (token != null) request.addHeader("Authorization", "Bearer " + token);
+        org.springframework.mock.web.MockHttpServletResponse response = new org.springframework.mock.web.MockHttpServletResponse();
+        security.doFilter(request, response, (req, res) -> ((javax.servlet.http.HttpServletResponse) res).setStatus(204));
+        return response.getStatus();
     }
     private JwtUtil jwt(AccountTokenStateService accounts) {
         JwtUtil jwt = new JwtUtil(); ReflectionTestUtils.setField(jwt, "accountTokenStateService", accounts);
