@@ -3,6 +3,7 @@ package org.example.service.Impl;
 import org.example.model.MajorModel;
 import org.example.model.StudentModel;
 import org.example.repository.MajorRepository;
+import org.example.repository.StudentRepository;
 import org.example.service.MajorService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -21,6 +22,9 @@ public class MajorServiceImpl implements MajorService {
 
     @Autowired
     private MajorRepository majorRepository;
+
+    @Autowired
+    private StudentRepository studentRepository;
 
     @Autowired
     private MongoTemplate mongoTemplate;
@@ -54,6 +58,24 @@ public class MajorServiceImpl implements MajorService {
                 .filter(value -> !value.isEmpty())
                 .forEach(majors::add);
         return new ArrayList<>(majors);
+    }
+
+    @Override
+    public void deleteMajorByName(String majorName) {
+        String normalized = normalize(majorName);
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException("请选择专业");
+        }
+
+        long studentCount = studentRepository.countByMajor(normalized);
+        if (studentCount > 0) {
+            throw new IllegalArgumentException("该专业下仍有 " + studentCount + " 名学生，无法删除");
+        }
+
+        MajorModel existing = findByMajorName(normalized);
+        if (existing == null || !deleteMajor(existing.getId())) {
+            throw new IllegalArgumentException("该专业不存在或非手动添加，无法删除");
+        }
     }
 
     @Override

@@ -11,5 +11,7 @@ public interface MajorService {
 
     List<String> getAllMajorNames();
 
+    void deleteMajorByName(String majorName);
+
     boolean deleteMajor(String id);
 }

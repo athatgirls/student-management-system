@@ -1,7 +1,6 @@
 package org.example.controller;
 
 import org.example.model.MajorModel;
-import org.example.repository.StudentRepository;
 import org.example.service.MajorService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -22,9 +21,6 @@ public class MajorController {
 
     @Autowired
     private MajorService majorService;
-
-    @Autowired
-    private StudentRepository studentRepository;
 
     @PostMapping("/create")
     public ResponseEntity<Map<String, Object>> createMajor(@RequestBody Map<String, Object> requestBody) {
@@ -72,24 +68,12 @@ public class MajorController {
     public ResponseEntity<Map<String, Object>> deleteMajorByName(@RequestParam("majorName") String majorName) {
         Map<String, Object> result = new HashMap<>();
         try {
-            String normalized = normalize(majorName);
-            if (normalized.isEmpty()) {
-                return failure(result, "请选择专业");
-            }
-            long studentCount = studentRepository.countByMajor(normalized);
-            if (studentCount > 0) {
-                return failure(result, "该专业下仍有 " + studentCount + " 名学生，无法删除");
-            }
-            MajorModel existing = majorService.findByMajorName(normalized);
-            if (existing == null) {
-                return failure(result, "该专业不存在或非手动添加，无法删除");
-            }
-            if (!majorService.deleteMajor(existing.getId())) {
-                return failure(result, "该专业不存在或非手动添加，无法删除");
-            }
+            majorService.deleteMajorByName(normalize(majorName));
             result.put("code", 200);
             result.put("data", null);
             result.put("msg", "专业已删除");
+        } catch (IllegalArgumentException e) {
+            return failure(result, e.getMessage());
         } catch (Exception e) {
             result.put("code", 500);
             result.put("data", null);
