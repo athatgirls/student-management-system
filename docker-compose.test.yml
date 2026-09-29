@@ -1,0 +1,35 @@
+name: mis-test
+
+services:
+  backend-test:
+    image: maven:3.9.9-eclipse-temurin-11
+    working_dir: /workspace
+    volumes:
+      - ./disciplinary_construction:/workspace
+      - maven_cache:/root/.m2
+    command: mvn -B test
+
+  frontend-check:
+    image: node:20.19.0-alpine
+    working_dir: /workspace
+    volumes:
+      - ./index:/workspace
+      - frontend_node_modules:/workspace/node_modules
+      - frontend_npm_cache:/root/.npm
+    command:
+      - sh
+      - -ec
+      - |
+        lock_hash="$$(sha256sum package-lock.json | cut -d ' ' -f1)"
+        if [ ! -x node_modules/.bin/vue-cli-service ] || [ "$$(cat node_modules/.package-lock.sha256 2>/dev/null || true)" != "$$lock_hash" ]; then
+          npm ci --cache /root/.npm
+          printf '%s\n' "$$lock_hash" > node_modules/.package-lock.sha256
+        fi
+        npm run lint
+        npm test
+        npm run build
+
+volumes:
+  maven_cache:
+  frontend_node_modules:
+  frontend_npm_cache:

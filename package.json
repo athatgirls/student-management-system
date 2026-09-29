@@ -3,7 +3,13 @@
     "docker:dev": "docker compose -f docker-compose.dev.yml up --build",
     "docker:dev:down": "docker compose -f docker-compose.dev.yml down",
     "docker:preview": "docker compose up -d --build",
-    "docker:preview:down": "docker compose down"
+    "docker:preview:down": "docker compose down",
+    "test:backend": "docker compose -f docker-compose.test.yml run --rm backend-test",
+    "check:frontend": "docker compose -f docker-compose.test.yml run --rm frontend-check"
+  },
+  "engines": {
+    "node": "20.19.x",
+    "npm": "10.x"
   },
   "dependencies": {
     "@popperjs/core": "^2.11.8"

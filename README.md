@@ -55,7 +55,7 @@ npm run serve
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-首次运行需要联网下载镜像和 Maven/npm 依赖。开发环境入口：
+首次运行需要联网下载镜像和 Maven/npm 依赖。之后依赖会保留在 Docker 命名卷中；正常停止请使用 `docker compose -f docker-compose.dev.yml down`，不要使用 `down -v`。开发环境入口：
 
 | 服务 | 地址 |
 | --- | --- |
@@ -184,7 +184,23 @@ curl -f http://127.0.0.1:8080/health
 
 ## 开发验证与贡献
 
-在项目根目录分别执行以下命令。前端需要 Node.js/npm，后端需要 Java 11 和 Maven；当前 CI 前端使用 Node.js 20，容器构建文件使用 Node.js 18，版本升级需另行验证。
+在项目根目录可使用以下容器化命令完成验证。本机只需安装并启动 Docker（含 Docker Compose），无需安装 Java、Maven 或 Node.js。测试依赖保留在 `mis-test` 项目的命名卷中；首次执行需要下载。前端仅在锁文件变化或依赖缺失时重新安装，Maven 复用本地缓存并按构建需要解析依赖。Node.js 固定为 [`.nvmrc`](.nvmrc) 中的版本，后端固定为 Maven 3.9.9 + Temurin 11。
+
+```bash
+docker compose -f docker-compose.test.yml run --rm backend-test
+docker compose -f docker-compose.test.yml run --rm frontend-check
+```
+
+`frontend-check` 依次运行 lint、前端回归测试和生产构建，任一步失败都会退出。`--rm` 只清理本次运行的容器，不删除依赖缓存卷；不要使用 `down -v`，除非确实需要清空缓存。
+
+如果本机已安装 Node.js/npm，也可使用等价的快捷命令（仍需 Docker）：
+
+```bash
+npm run test:backend
+npm run check:frontend
+```
+
+也可在已配置相同版本运行时的本机执行：
 
 前端：
 
@@ -192,6 +208,7 @@ curl -f http://127.0.0.1:8080/health
 cd index
 npm ci
 npm run lint
+npm test
 npm run build
 npm audit --omit=dev
 ```
