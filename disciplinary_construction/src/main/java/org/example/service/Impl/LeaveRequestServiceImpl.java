@@ -25,6 +25,7 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
     
     @Override
     public LeaveRequestModel createLeaveRequest(LeaveRequestModel leaveRequest) {
+        leaveRequest.setId(null);
         // 必须提供studentId（学号），自动从学生表获取所有信息
         if (leaveRequest.getStudentId() == null || leaveRequest.getStudentId().isEmpty()) {
             throw new RuntimeException("学号不能为空");

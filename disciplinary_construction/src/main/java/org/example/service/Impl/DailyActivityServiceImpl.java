@@ -17,6 +17,7 @@ public class DailyActivityServiceImpl implements DailyActivityService {
 
     @Override
     public DailyActivityModel create(DailyActivityModel model) {
+        model.setId(null);
         model.setAuditStatus("pending");
         model.setCreateTime(LocalDateTime.now());
         model.setUpdateTime(LocalDateTime.now());

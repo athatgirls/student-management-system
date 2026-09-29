@@ -19,6 +19,7 @@ public class PaperServiceImpl implements PaperService {
 
     @Override
     public PaperModel addPaper(PaperModel paper) {
+        paper.setId(null); // Creation must never update a client-selected record.
         paper.setCreateTime(LocalDateTime.now());
         paper.setUpdateTime(LocalDateTime.now());
         paper.setAuditStatus("待审核");

@@ -11,6 +11,9 @@ class JwtUtilTest {
     @Test
     void generatedTokenCanBeValidatedAndRead() {
         JwtUtil jwtUtil = new JwtUtil();
+        org.example.service.AccountTokenStateService accounts = org.mockito.Mockito.mock(org.example.service.AccountTokenStateService.class);
+        org.mockito.Mockito.when(accounts.state("user-1", "student")).thenReturn("fixture-credential");
+        ReflectionTestUtils.setField(jwtUtil, "accountTokenStateService", accounts);
         ReflectionTestUtils.setField(jwtUtil, "secretKey",
                 "test-only-secret-key-that-is-longer-than-thirty-two-bytes");
         ReflectionTestUtils.setField(jwtUtil, "expirationTime", 60_000L);

@@ -72,7 +72,7 @@ export function getProfile() {
 export function updateProfile(data) {
   return request({
     url: '/student/profile/update',
-    method: 'put',
+    method: 'post',
     data
   })
 }
@@ -141,7 +141,7 @@ export function getRecentActivities() {
   })
 }
 
-// 管理员重置学生密码（重置为初始密码：Hbut_学号后六位）
+// 管理员重置学生密码（Hbut_加学号后六位，首次登录必须修改）
 export function resetStudentPassword(studentId, newPassword = null) {
   return request({
     url: '/student/reset-password',

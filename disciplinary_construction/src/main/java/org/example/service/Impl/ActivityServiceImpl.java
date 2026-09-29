@@ -44,6 +44,7 @@ public class ActivityServiceImpl implements ActivityService {
 
     @Override
     public ActivityModel createActivity(ActivityModel activity) {
+        activity.setId(null);
         activity.setCreateTime(LocalDateTime.now());
         activity.setUpdateTime(LocalDateTime.now());
         activity.setMatched(false);

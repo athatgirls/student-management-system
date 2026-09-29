@@ -40,6 +40,15 @@ public class CurrentUserAspect implements HandlerMethodArgumentResolver {
         
         CurrentUser currentUserAnnotation = parameter.getParameterAnnotation(CurrentUser.class);
         HttpServletRequest request = webRequest.getNativeRequest(HttpServletRequest.class);
+        // Trust only the authenticated filter's attributes, including the file-only cookie path.
+        org.springframework.security.core.Authentication authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated() && request.getAttribute("userId") instanceof String) {
+            Map<String, Object> user = new HashMap<>();
+            user.put("userId", request.getAttribute("userId"));
+            user.put("userType", request.getAttribute("userType"));
+            user.put("username", request.getAttribute("username"));
+            return user;
+        }
         
         // 获取Authorization头
         String authHeader = request.getHeader("Authorization");
@@ -86,4 +95,4 @@ public class CurrentUserAspect implements HandlerMethodArgumentResolver {
         
         return userInfo;
     }
-} 
+}

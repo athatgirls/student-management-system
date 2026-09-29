@@ -19,6 +19,7 @@ public class CompetitionServiceImpl implements CompetitionService {
 
     @Override
     public CompetitionModel addCompetition(CompetitionModel competition) {
+        competition.setId(null); // Creation must never update a client-selected record.
         competition.setCreateTime(LocalDateTime.now());
         competition.setUpdateTime(LocalDateTime.now());
         competition.setAuditStatus("待审核");

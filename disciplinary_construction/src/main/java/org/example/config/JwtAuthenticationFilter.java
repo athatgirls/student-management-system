@@ -27,12 +27,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Autowired
     private OnlineUserService onlineUserService;
 
+    @org.springframework.beans.factory.annotation.Value("${app.files.cookie-secure:false}")
+    private boolean fileCookieSecure;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         
         String authHeader = request.getHeader("Authorization");
         String requestURI = request.getRequestURI();
+        boolean fileRead = requestURI.startsWith(request.getContextPath() + "/uploads/")
+                && ("GET".equals(request.getMethod()) || "HEAD".equals(request.getMethod()));
+        boolean bearerRequest = authHeader != null && authHeader.startsWith("Bearer ");
+        // A narrowly scoped HttpOnly cookie is used only for read-only image/download requests.
+        // Business mutations still require the Authorization header (CSRF protection is not weakened).
+        if (!bearerRequest && fileRead && request.getCookies() != null) {
+            for (javax.servlet.http.Cookie cookie : request.getCookies()) {
+                if ("mis_file_session".equals(cookie.getName())) authHeader = "Bearer " + cookie.getValue();
+            }
+        }
         
         log.debug("处理请求: {}, Authorization头: {}", requestURI, authHeader != null ? "存在" : "不存在");
         
@@ -62,6 +75,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     request.setAttribute("userId", userId);
                     request.setAttribute("userType", userType);
                     request.setAttribute("username", username);
+                    if (bearerRequest && !requestURI.endsWith("/session/logout")) {
+                        boolean secure = fileCookieSecure || request.isSecure();
+                        response.addHeader("Set-Cookie", org.springframework.http.ResponseCookie.from("mis_file_session", token)
+                                .httpOnly(true).secure(secure).sameSite("Strict")
+                                .path(request.getContextPath() + "/uploads")
+                                .maxAge(Math.max(0, (jwtUtil.getExpirationFromToken(token).getTime() - System.currentTimeMillis()) / 1000))
+                                .build().toString());
+                    }
                     
                     // 记录用户在线（如果Redis可用）
                     if (userId != null && userType != null) {

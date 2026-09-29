@@ -44,6 +44,7 @@ public class DailyTaskServiceImpl implements DailyTaskService {
 
     @Override
     public DailyTaskModel createTask(DailyTaskModel task) {
+        task.setId(null);
         dailyTaskAudienceService.validateAndNormalize(task);
         task.setCreateTime(LocalDateTime.now());
         task.setUpdateTime(LocalDateTime.now());
@@ -76,6 +77,7 @@ public class DailyTaskServiceImpl implements DailyTaskService {
 
     @Override
     public DailyTaskSubmissionModel submitTask(DailyTaskSubmissionModel submission) {
+        submission.setId(null); // Only the server's task/student lookup may select an existing submission.
         // 获取任务信息
         DailyTaskModel task = taskRepository.findById(submission.getTaskId()).orElse(null);
         if (task == null) {

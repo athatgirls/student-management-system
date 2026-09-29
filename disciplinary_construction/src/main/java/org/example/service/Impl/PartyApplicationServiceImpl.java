@@ -22,6 +22,7 @@ public class PartyApplicationServiceImpl implements PartyApplicationService {
 
     @Override
     public PartyApplicationModel addPartyApplication(PartyApplicationModel application) {
+        application.setId(null);
         application.setCreateTime(LocalDateTime.now());
         application.setUpdateTime(LocalDateTime.now());
         application.setAuditStatus("待审核");

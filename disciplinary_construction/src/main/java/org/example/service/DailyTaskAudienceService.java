@@ -100,7 +100,7 @@ public class DailyTaskAudienceService {
             return null;
         }
         PartyApplicationModel application = partyApplicationService.getByStudentId(student.getStudentId());
-        return application == null ? null : trim(application.getCurrentStage());
+        return application == null || !"通过".equals(application.getAuditStatus()) ? null : trim(application.getCurrentStage());
     }
 
     public Set<String> resolveIdentities(StudentModel student, String partyStage) {

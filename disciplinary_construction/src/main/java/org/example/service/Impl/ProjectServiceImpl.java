@@ -19,6 +19,7 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     public ProjectModel addProject(ProjectModel project) {
+        project.setId(null); // Creation must never update a client-selected record.
         project.setCreateTime(LocalDateTime.now());
         project.setUpdateTime(LocalDateTime.now());
         project.setAuditStatus("待审核");

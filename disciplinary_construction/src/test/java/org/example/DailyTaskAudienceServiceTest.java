@@ -29,6 +29,7 @@ class DailyTaskAudienceServiceTest {
         PartyApplicationService partyApplicationService = mock(PartyApplicationService.class);
         PartyApplicationModel application = new PartyApplicationModel();
         application.setCurrentStage("入党积极分子");
+        application.setAuditStatus("通过");
         when(partyApplicationService.getByStudentId("10240001")).thenReturn(application);
 
         audienceService = new DailyTaskAudienceService();

@@ -20,12 +20,15 @@ public class AdminController {
     
     @Autowired
     private JwtUtil jwtUtil;
+    @Autowired
+    private org.example.service.LoginAttemptLimiter loginAttemptLimiter;
     
     @Autowired
     private org.example.service.OnlineUserService onlineUserService;
 
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> loginForm) {
+        loginAttemptLimiter.check("admin", loginForm.get("username"));
         String username = loginForm.get("username");
         String password = loginForm.get("password");
         

@@ -19,6 +19,7 @@ public class PatentServiceImpl implements PatentService {
 
     @Override
     public PatentModel addPatent(PatentModel patent) {
+        patent.setId(null); // Creation must never update a client-selected record.
         patent.setCreateTime(LocalDateTime.now());
         patent.setUpdateTime(LocalDateTime.now());
         patent.setAuditStatus("待审核");

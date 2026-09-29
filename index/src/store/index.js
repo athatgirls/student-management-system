@@ -8,6 +8,8 @@ function setToken(token) {
 }
 
 function clearToken() {
+  // Clear the file-only HttpOnly cookie as well as the JS login state.
+  fetch('/SCSE@hbut/msi/session/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {})
   localStorage.removeItem('token')
   localStorage.removeItem('token_expire')
 }

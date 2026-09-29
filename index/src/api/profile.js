@@ -13,7 +13,7 @@ export function getCurrentUserProfile(studentId) {
 export function updateUserProfile(profileData) {
   return request({
     url: '/student/profile/update',
-    method: 'put',
+    method: 'post',
     data: profileData
   })
 }

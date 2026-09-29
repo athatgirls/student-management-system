@@ -29,6 +29,7 @@ class StudentInitialPasswordControllerTest {
     private static final String URL = "/msi/student/change-initial-password";
     private static final String BODY = "{\"studentId\":\"test-student\",\"initialPassword\":\"OldTest123\",\"newPassword\":\"NewTest456\"}";
     @Mock private StudentService studentService;
+    @Mock private org.example.service.LoginAttemptLimiter loginAttemptLimiter;
     @InjectMocks private StudentController controller;
     private MockMvc mvc;
 

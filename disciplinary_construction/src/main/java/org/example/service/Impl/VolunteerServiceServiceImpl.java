@@ -17,6 +17,7 @@ public class VolunteerServiceServiceImpl implements VolunteerServiceService {
 
     @Override
     public VolunteerServiceModel addVolunteerService(VolunteerServiceModel volunteerService) {
+        volunteerService.setId(null); // Creation must never update a client-selected record.
         volunteerService.setCreateTime(LocalDateTime.now());
         volunteerService.setUpdateTime(LocalDateTime.now());
         volunteerService.setAuditStatus("待审核");
@@ -89,4 +90,4 @@ public class VolunteerServiceServiceImpl implements VolunteerServiceService {
     public List<VolunteerServiceModel> getVolunteerServicesByOrganization(String organization) {
         return volunteerServiceRepository.findByOrganization(organization);
     }
-} 
+}

@@ -24,6 +24,8 @@ public class AdminModel {
     private String position; // 职位
     private List<String> permissions; // 权限列表
     private Boolean isActive; // 是否激活
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private String authVersion;
     private Date lastLoginTime; // 最后登录时间
     private String lastLoginIp; // 最后登录IP
     private Date createTime; // 创建时间

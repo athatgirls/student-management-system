@@ -159,7 +159,13 @@ public class AlumniServiceImpl implements AlumniService {
 
         SkipOperation skipOp = Aggregation.skip((currentPage - 1) * pageSize);
         LimitOperation limitOp = Aggregation.limit(pageSize);
-        Aggregation aggregation = Aggregation.newAggregation(convertId, lookup, unwind, match, skipOp, limitOp);
+        // Never join identity-card/contact/password fields into a directory response.
+        AggregationOperation publicFields = context -> new Document("$project", new Document("studentId", 1)
+                .append("enrollmentDate", 1).append("graduationDate", 1).append("workLocation", 1)
+                .append("workField", 1).append("workPlace", 1).append("jobType", 1).append("isPublic", 1)
+                .append("student", new Document("name", "$student.name").append("studentId", "$student.studentId")
+                        .append("major", "$student.major").append("grade", "$student.grade")));
+        Aggregation aggregation = Aggregation.newAggregation(convertId, lookup, unwind, match, skipOp, limitOp, publicFields);
 
         // 执行聚合查询
         return mongoTemplate.aggregate(aggregation, "alumni", AlumniModel.class).getMappedResults();

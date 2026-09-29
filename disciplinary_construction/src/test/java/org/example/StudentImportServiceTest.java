@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -55,7 +56,10 @@ class StudentImportServiceTest {
         verify(studentRepository).save(saved.capture());
         assertEquals("20240001", saved.getValue().getStudentId());
         assertEquals("2024级", saved.getValue().getGrade());
-        assertTrue(saved.getValue().getPassword().startsWith("$2"));
+        assertTrue(new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder()
+                .matches("Hbut_240001", saved.getValue().getPassword()));
+        assertNull(saved.getValue().getInitialPasswordExpiresAt());
+        assertTrue(saved.getValue().getPasswordChangeRequired());
     }
 
     @Test

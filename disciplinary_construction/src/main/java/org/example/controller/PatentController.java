@@ -42,7 +42,7 @@ public class PatentController {
         patent.setStudentName((String) currentUser.get("username"));
         try {
             resetPatentAudit(patent);
-            PatentModel saved = patentService.savePatent(patent);
+            PatentModel saved = patentService.addPatent(patent);
             return ResponseEntity.ok(saved);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("添加专利失败: " + e.getMessage());

@@ -42,7 +42,7 @@ public class PaperController {
         paper.setStudentName((String) currentUser.get("username"));
         try {
             resetPaperAudit(paper);
-            PaperModel saved = paperService.savePaper(paper);
+            PaperModel saved = paperService.addPaper(paper);
             return ResponseEntity.ok(saved);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("添加论文失败: " + e.getMessage());

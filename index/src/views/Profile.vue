@@ -32,7 +32,7 @@
           </el-col>
           <el-col :xs="24" :sm="24" :md="12" :lg="12">
             <el-form-item label="姓名" prop="name">
-              <el-input v-model="profileForm.name" />
+              <el-input v-model="profileForm.name" disabled title="请联系管理员修改" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -79,12 +79,12 @@
         <el-row :gutter="20">
           <el-col :xs="24" :sm="24" :md="12" :lg="12">
             <el-form-item label="专业" prop="major">
-              <el-input v-model="profileForm.major" />
+              <el-input v-model="profileForm.major" disabled title="请联系管理员修改" />
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="24" :md="12" :lg="12">
             <el-form-item label="年级" prop="grade">
-              <el-input v-model="profileForm.grade" placeholder="请输入年级，例如：2024级" />
+              <el-input v-model="profileForm.grade" disabled placeholder="请联系管理员设置年级" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -92,12 +92,12 @@
         <el-row :gutter="20">
           <el-col :xs="24" :sm="24" :md="12" :lg="12">
             <el-form-item label="班级" prop="className">
-              <el-input v-model="profileForm.className" />
+              <el-input v-model="profileForm.className" disabled title="请联系管理员修改" />
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="24" :md="12" :lg="12">
             <el-form-item label="学制类型" prop="educationType">
-              <el-select v-model="profileForm.educationType" placeholder="请选择学制" style="width: 100%">
+              <el-select v-model="profileForm.educationType" disabled placeholder="请联系管理员设置" style="width: 100%">
                 <el-option label="全日制" value="全日制" />
                 <el-option label="非全日制" value="非全日制" />
               </el-select>
@@ -134,7 +134,7 @@
         <el-row :gutter="20">
           <el-col :xs="24" :sm="24" :md="12" :lg="12">
             <el-form-item label="政治面貌" prop="politicalStatus">
-              <el-select v-model="profileForm.politicalStatus" placeholder="请选择政治面貌" style="width: 100%">
+              <el-select v-model="profileForm.politicalStatus" disabled placeholder="请联系管理员审核设置" style="width: 100%">
                 <el-option
                   v-for="status in POLITICAL_STATUS_OPTIONS"
                   :key="status"
@@ -158,7 +158,7 @@
         <el-row :gutter="20">
           <el-col :xs="24" :sm="24" :md="8" :lg="8">
             <el-form-item label="导师" prop="supervisor">
-              <el-input v-model="profileForm.supervisor" />
+              <el-input v-model="profileForm.supervisor" disabled title="请联系管理员修改" />
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="24" :md="8" :lg="8">
@@ -168,7 +168,7 @@
           </el-col>
           <el-col :xs="24" :sm="24" :md="8" :lg="8">
             <el-form-item label="任职情况" prop="workStatus">
-              <el-input v-model="profileForm.workStatus" />
+              <el-input v-model="profileForm.workStatus" disabled title="请联系管理员修改" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -332,23 +332,8 @@ const rules = {
   dormitory: [
     { required: true, message: '请输入宿舍信息', trigger: 'blur' }
   ],
-  politicalStatus: [
-    { required: true, message: '请选择政治面貌', trigger: 'change' }
-  ],
   nation: [
     { required: true, message: '请输入民族', trigger: 'blur' }
-  ],
-  major: [
-    { required: true, message: '请输入专业', trigger: 'blur' }
-  ],
-  grade: [
-    { required: true, message: '请选择年级', trigger: 'change' }
-  ],
-  className: [
-    { required: true, message: '请输入班级', trigger: 'blur' }
-  ],
-  educationType: [
-    { required: true, message: '请选择学制类型', trigger: 'change' }
   ],
   birthDate: [
     { required: true, message: '请选择出生日期', trigger: 'change' }
@@ -506,11 +491,18 @@ const handleEdit = async () => {
 
   try {
     await formRef.value.validate()
-    
+  } catch {
+    // Field-level messages already explain validation failures.
+    return
+  }
+
+  try {
     // 准备要更新的数据
     const updateData = {
       ...profileForm,
-      birthDate: profileForm.birthDate instanceof Date ? profileForm.birthDate : new Date(profileForm.birthDate)
+      birthDate: profileForm.birthDate
+        ? (profileForm.birthDate instanceof Date ? profileForm.birthDate : new Date(profileForm.birthDate))
+        : null
     }
     
     const response = await updateProfile(updateData)
@@ -518,13 +510,14 @@ const handleEdit = async () => {
       ElMessage.success('保存成功')
       editMode.value = false
       // 更新store中的用户信息
-      store.commit('setUser', { ...userInfo.value, ...updateData })
+      store.commit('setUser', { ...userInfo.value, ...response.data })
     } else {
       ElMessage.error(response.msg || '保存失败')
     }
   } catch (error) {
     console.error('保存失败:', error)
-    ElMessage.error('保存失败')
+    // Axios errors are shown once by the shared response interceptor.
+    if (!error.isAxiosError) ElMessage.error('保存个人信息失败，请稍后重试')
   }
 }
 

@@ -17,6 +17,7 @@ public class PartyCourseServiceImpl implements PartyCourseService {
 
     @Override
     public PartyCourseModel addPartyCourse(PartyCourseModel partyCourse) {
+        partyCourse.setId(null); // Creation must never update a client-selected record.
         partyCourse.setCreateTime(LocalDateTime.now());
         partyCourse.setUpdateTime(LocalDateTime.now());
         partyCourse.setAuditStatus("待审核");
@@ -89,4 +90,4 @@ public class PartyCourseServiceImpl implements PartyCourseService {
     public List<PartyCourseModel> getPartyCoursesByInstructor(String instructor) {
         return partyCourseRepository.findByInstructor(instructor);
     }
-} 
+}

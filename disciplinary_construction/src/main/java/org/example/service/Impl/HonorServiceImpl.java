@@ -17,6 +17,7 @@ public class HonorServiceImpl implements HonorService {
 
     @Override
     public HonorModel create(HonorModel model) {
+        model.setId(null);
         model.setAuditStatus("pending");
         model.setCreateTime(LocalDateTime.now());
         model.setUpdateTime(LocalDateTime.now());

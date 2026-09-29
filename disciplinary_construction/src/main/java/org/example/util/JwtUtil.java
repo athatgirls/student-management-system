@@ -16,6 +16,21 @@ import java.util.Map;
 @Slf4j
 @Component
 public class JwtUtil {
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.example.service.AccountTokenStateService accountTokenStateService;
+
+    @Value("${jwt.absolute-session-ms:604800000}")
+    private long absoluteSessionMs = 604800000L;
+
+    private String credentialStamp(String id, String type) {
+        String state = accountTokenStateService.state(id, type);
+        if (state == null) throw new IllegalArgumentException("Account unavailable");
+        try {
+            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+            mac.init(getKey());
+            return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(mac.doFinal(state.getBytes(StandardCharsets.UTF_8)));
+        } catch (java.security.GeneralSecurityException e) { throw new IllegalStateException(e); }
+    }
     
     @Value("${jwt.secret}")
     private String secretKey;
@@ -51,7 +66,13 @@ public class JwtUtil {
      * @return JWT Token
      */
     public String generateToken(String userId, String userType, String username) {
+        return generateToken(userId, userType, username, System.currentTimeMillis());
+    }
+
+    private String generateToken(String userId, String userType, String username, long sessionStart) {
         Map<String, Object> claims = new HashMap<>();
+        claims.put("credentialStamp", credentialStamp(userId, userType));
+        claims.put("sessionStart", sessionStart);
         claims.put("userId", userId);
         claims.put("userType", userType);
         claims.put("username", username);
@@ -60,7 +81,7 @@ public class JwtUtil {
                 .setClaims(claims)
                 .setSubject(userId)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + expirationTime))
+                .setExpiration(new Date(Math.min(System.currentTimeMillis() + expirationTime, sessionStart + absoluteSessionMs)))
                 .signWith(getKey(), SignatureAlgorithm.HS256)
                 .compact();
         
@@ -76,10 +97,15 @@ public class JwtUtil {
     public boolean validateToken(String token) {
         try {
             log.debug("开始验证token: {}", token.substring(0, Math.min(20, token.length())) + "...");
-            Jwts.parserBuilder()
+            Claims claims = Jwts.parserBuilder()
                 .setSigningKey(getKey())
                 .build()
-                .parseClaimsJws(token);
+                .parseClaimsJws(token).getBody();
+            String stamp = claims.get("credentialStamp", String.class);
+            Number started = claims.get("sessionStart", Number.class);
+            if (stamp == null || started == null || System.currentTimeMillis() - started.longValue() >= absoluteSessionMs) return false;
+            if (!java.security.MessageDigest.isEqual(stamp.getBytes(StandardCharsets.UTF_8),
+                    credentialStamp(claims.get("userId", String.class), claims.get("userType", String.class)).getBytes(StandardCharsets.UTF_8))) return false;
             log.debug("Token验证成功");
             return true;
         } catch (JwtException | IllegalArgumentException e) {
@@ -162,12 +188,13 @@ public class JwtUtil {
      * @return 新的Token
      */
     public String refreshToken(String token) {
+        if (!validateToken(token)) throw new IllegalArgumentException("Token no longer valid");
         Claims claims = getClaimsFromToken(token);
         String userId = claims.get("userId", String.class);
         String userType = claims.get("userType", String.class);
         String username = claims.get("username", String.class);
         
         log.info("刷新Token，用户ID: {}, 用户类型: {}", userId, userType);
-        return generateToken(userId, userType, username);
+        return generateToken(userId, userType, username, claims.get("sessionStart", Number.class).longValue());
     }
 }

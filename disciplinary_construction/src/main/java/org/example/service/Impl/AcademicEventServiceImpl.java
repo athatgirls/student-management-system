@@ -17,6 +17,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
     @Override
     public AcademicEventModel create(AcademicEventModel model) {
+        model.setId(null);
         model.setAuditStatus("pending");
         model.setCreateTime(LocalDateTime.now());
         model.setUpdateTime(LocalDateTime.now());

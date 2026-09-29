@@ -19,6 +19,10 @@ public class StudentModel {
     private Integer age; // 年龄
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password; // 密码（BCrypt 加密存储，禁止通过 JSON 返回）
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private Boolean passwordChangeRequired;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private Date initialPasswordExpiresAt;
     private String maritalStatus; // 婚姻状况
     private String nation; // 民族
     private Date birthDate; // 出生日期

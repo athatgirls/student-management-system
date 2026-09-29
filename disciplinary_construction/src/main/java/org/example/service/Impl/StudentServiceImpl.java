@@ -11,6 +11,7 @@ import org.example.repository.DailyTaskSubmissionRepository;
 import org.example.repository.GradeRepository;
 import org.example.service.StudentService;
 import org.example.util.StudentGradePolicy;
+import org.example.util.PasswordPolicy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -65,16 +66,16 @@ public class StudentServiceImpl implements StudentService {
             studentRepository.save(student);
         }
 
-        // 自动修复：如果数据库中密码为空，为其设置初始密码
-        if (student.getPassword() == null || student.getPassword().isEmpty()) {
-            String sid = student.getStudentId();
-            String lastSix = sid.length() > 6 ? sid.substring(sid.length() - 6) : sid;
-            String defaultRawPassword = "Hbut_" + lastSix;
-            student.setPassword(passwordEncoder.encode(defaultRawPassword));
-            studentRepository.save(student); // 保存回数据库
-        }
+        // Fixed-format initial passwords remain supported; they only allow the mandatory password-change flow.
+        if (student.getPassword() == null || student.getPassword().isEmpty()
+                || (Boolean.TRUE.equals(student.getPasswordChangeRequired())
+                    && student.getInitialPasswordExpiresAt() != null
+                    && !student.getInitialPasswordExpiresAt().after(new java.util.Date()))) return null;
 
         if (passwordEncoder.matches(password, student.getPassword())) {
+            // Do not perform business actions before initial password replacement.
+            if (Boolean.TRUE.equals(student.getPasswordChangeRequired())
+                    || PasswordPolicy.legacyPassword(student.getStudentId()).equals(password)) return student;
             // 登录成功，检查并发布个人信息完善任务
             checkAndTriggerProfileTask(student);
             return student;
@@ -157,12 +158,20 @@ public class StudentServiceImpl implements StudentService {
 
     @Override
     public StudentModel createStudent(StudentModel student) {
+        student.setId(null);
         student.setGrade(StudentGradePolicy.requireValid(student.getGrade()));
         student.setCreateTime(new java.util.Date());
         student.setUpdateTime(new java.util.Date());
-        // 加密密码
-        if (student.getPassword() != null && !student.getPassword().startsWith("$2a$")) {
+        if (student.getPassword() == null || student.getPassword().isEmpty()) {
+            student.setPassword(PasswordPolicy.legacyPassword(student.getStudentId()));
+        }
+        // 加密密码，固定格式初始密码不设24小时过期限制。
+        if (student.getPassword() != null && !student.getPassword().isEmpty()) {
+            PasswordPolicy.validate(student.getPassword());
+            boolean fixedInitial = PasswordPolicy.legacyPassword(student.getStudentId()).equals(student.getPassword());
             student.setPassword(passwordEncoder.encode(student.getPassword()));
+            student.setPasswordChangeRequired(true);
+            student.setInitialPasswordExpiresAt(fixedInitial ? null : new java.util.Date(System.currentTimeMillis() + 86400000L));
         }
         return studentRepository.save(student);
     }
@@ -213,11 +222,11 @@ public class StudentServiceImpl implements StudentService {
 
         // 如果前端传了新密码，才更新并加密密码
         if (student.getPassword() != null && !student.getPassword().isEmpty()) {
-            if (!student.getPassword().startsWith("$2a$")) {
-                existing.setPassword(passwordEncoder.encode(student.getPassword()));
-            } else {
-                existing.setPassword(student.getPassword());
-            }
+            PasswordPolicy.validate(student.getPassword());
+            boolean fixedInitial = PasswordPolicy.legacyPassword(existing.getStudentId()).equals(student.getPassword());
+            existing.setPassword(passwordEncoder.encode(student.getPassword()));
+            existing.setPasswordChangeRequired(true);
+            existing.setInitialPasswordExpiresAt(fixedInitial ? null : new java.util.Date(System.currentTimeMillis() + 86400000L));
         }
 
         existing.setUpdateTime(new java.util.Date());
@@ -355,8 +364,9 @@ public class StudentServiceImpl implements StudentService {
                 student.setCreateTime(new java.util.Date());
                 student.setUpdateTime(new java.util.Date());
                 student.setStatus("在读");
-                String lastSix = studentId.length() > 6 ? studentId.substring(studentId.length() - 6) : studentId;
-                student.setPassword(passwordEncoder.encode("Hbut_" + lastSix));
+                // 保留学校现有的初始密码发放方式，首次使用必须修改。
+                student.setPassword(passwordEncoder.encode(PasswordPolicy.legacyPassword(studentId)));
+                student.setPasswordChangeRequired(true);
                 studentRepository.save(student);
                 imported++;
             }
@@ -628,16 +638,14 @@ public class StudentServiceImpl implements StudentService {
             if (student == null) {
                 return false;
             }
-            // 如果newPassword为空，则使用初始密码格式：Hbut_学号后六位
-            String passwordToSet;
-            if (newPassword == null || newPassword.isEmpty()) {
-                String lastSix = studentId.length() > 6 ? studentId.substring(studentId.length() - 6) : studentId;
-                passwordToSet = "Hbut_" + lastSix;
-            } else {
-                passwordToSet = newPassword;
-            }
+            String passwordToSet = newPassword == null || newPassword.isEmpty()
+                    ? PasswordPolicy.legacyPassword(studentId) : newPassword;
+            PasswordPolicy.validate(passwordToSet);
             // 加密密码
             student.setPassword(passwordEncoder.encode(passwordToSet));
+            student.setPasswordChangeRequired(true);
+            student.setInitialPasswordExpiresAt(PasswordPolicy.legacyPassword(studentId).equals(passwordToSet)
+                    ? null : new java.util.Date(System.currentTimeMillis() + 86400000L));
             student.setUpdateTime(new java.util.Date());
             studentRepository.save(student);
             return true;
@@ -650,6 +658,8 @@ public class StudentServiceImpl implements StudentService {
     @Override
     public boolean changePassword(String studentId, String oldPassword, String newPassword) {
         try {
+            PasswordPolicy.validate(newPassword);
+            if (PasswordPolicy.legacyPassword(studentId).equals(newPassword)) return false;
             // 验证新密码规则：不少于8位，必须包含数字和字母
             if (newPassword == null || newPassword.length() < 8) {
                 throw new RuntimeException("密码长度不能少于8位");
@@ -665,30 +675,15 @@ public class StudentServiceImpl implements StudentService {
             if (student == null) {
                 return false;
             }
-            // 验证旧密码
-            if (student.getPassword() == null || student.getPassword().isEmpty()) {
-                // 如果密码为空，允许直接设置新密码
-                student.setPassword(passwordEncoder.encode(newPassword));
-            } else if (oldPassword == null || oldPassword.isEmpty()) {
-                // 如果旧密码为空，检查是否为初始密码修改场景
-                // 验证当前密码是否为初始密码
-                String lastSix = studentId.length() > 6 ? studentId.substring(studentId.length() - 6) : studentId;
-                String defaultPassword = "Hbut_" + lastSix;
-                if (passwordEncoder.matches(defaultPassword, student.getPassword())) {
-                    // 是初始密码，允许直接修改
-                    student.setPassword(passwordEncoder.encode(newPassword));
-                } else {
-                    // 不是初始密码，不允许修改
-                    return false;
-                }
-            } else {
-                // 验证旧密码是否正确
-                if (!passwordEncoder.matches(oldPassword, student.getPassword())) {
-                    return false; // 旧密码错误
-                }
-                // 设置新密码
-                student.setPassword(passwordEncoder.encode(newPassword));
-            }
+            if (student.getPassword() == null || student.getPassword().isEmpty()
+                    || oldPassword == null || oldPassword.isEmpty()
+                    || !passwordEncoder.matches(oldPassword, student.getPassword())) return false;
+            if (Boolean.TRUE.equals(student.getPasswordChangeRequired()) && !isDefaultPassword(studentId, oldPassword)) return false;
+            if (passwordEncoder.matches(newPassword, student.getPassword()))
+                throw new IllegalArgumentException("新密码不能与当前密码相同");
+            student.setPassword(passwordEncoder.encode(newPassword));
+            student.setPasswordChangeRequired(false);
+            student.setInitialPasswordExpiresAt(null);
             student.setUpdateTime(new java.util.Date());
             studentRepository.save(student);
             return true;
@@ -709,11 +704,10 @@ public class StudentServiceImpl implements StudentService {
                     || password == null || password.isEmpty()) {
                 return false;
             }
-            // 计算初始密码
-            String lastSix = studentId.length() > 6 ? studentId.substring(studentId.length() - 6) : studentId;
-            String defaultPassword = "Hbut_" + lastSix;
-            // 验证数据库中存储的密码是否为初始密码（通过匹配初始密码的加密值）
-            return defaultPassword.equals(password)
+            return (Boolean.TRUE.equals(student.getPasswordChangeRequired())
+                        || PasswordPolicy.legacyPassword(studentId).equals(password))
+                    && (student.getInitialPasswordExpiresAt() == null
+                        || student.getInitialPasswordExpiresAt().after(new java.util.Date()))
                     && passwordEncoder.matches(password, student.getPassword());
         } catch (Exception e) {
             e.printStackTrace();

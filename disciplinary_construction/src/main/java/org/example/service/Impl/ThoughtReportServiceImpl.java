@@ -17,6 +17,7 @@ public class ThoughtReportServiceImpl implements ThoughtReportService {
 
     @Override
     public ThoughtReportModel addThoughtReport(ThoughtReportModel thoughtReport) {
+        thoughtReport.setId(null); // Creation must never update a client-selected record.
         thoughtReport.setCreateTime(LocalDateTime.now());
         thoughtReport.setUpdateTime(LocalDateTime.now());
         thoughtReport.setAuditStatus("待审核");
@@ -89,4 +90,4 @@ public class ThoughtReportServiceImpl implements ThoughtReportService {
     public List<ThoughtReportModel> getThoughtReportsByReviewer(String reviewerId) {
         return thoughtReportRepository.findByReviewerId(reviewerId);
     }
-} 
+}

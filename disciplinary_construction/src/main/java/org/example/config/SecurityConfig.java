@@ -29,7 +29,7 @@ public class SecurityConfig {
                 .authorizeRequests()
                 .antMatchers("/msi/student/login", "/msi/admin/login").permitAll()
                 .antMatchers("/msi/student/change-initial-password").permitAll()
-                .antMatchers("/uploads/**", "/static/**").permitAll()
+                .antMatchers("/static/**", "/msi/session/logout").permitAll()
                 .antMatchers("/doc.html", "/swagger-ui/**", "/v3/api-docs/**", "/webjars/**").permitAll()
                 .antMatchers("/actuator/health", "/actuator/info").permitAll()
                 .antMatchers("/msi/admin/**").hasRole("ADMIN")

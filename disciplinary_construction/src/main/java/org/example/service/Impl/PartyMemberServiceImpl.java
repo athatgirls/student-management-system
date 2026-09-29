@@ -22,6 +22,7 @@ public class PartyMemberServiceImpl implements PartyMemberService {
 
     @Override
     public PartyMemberModel addPartyMember(PartyMemberModel partyMember) {
+        partyMember.setId(null); // Creation must never update a client-selected record.
         partyMember.setCreateTime(LocalDateTime.now());
         partyMember.setUpdateTime(LocalDateTime.now());
         partyMember.setAuditStatus("待审核");
@@ -252,4 +253,4 @@ public class PartyMemberServiceImpl implements PartyMemberService {
             partyMemberRepository.save(partyMember3);
         }
     }
-} 
+}

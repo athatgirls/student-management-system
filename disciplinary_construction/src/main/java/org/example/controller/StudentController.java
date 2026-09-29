@@ -27,9 +27,12 @@ public class StudentController {
 
     @Autowired
     private CurrentUserAccessService currentUserAccessService;
+    @Autowired
+    private org.example.service.LoginAttemptLimiter loginAttemptLimiter;
 
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> loginForm) {
+        loginAttemptLimiter.check("student", loginForm.get("account"));
         String account = loginForm.get("account");
         String password = loginForm.get("password");
         
@@ -451,15 +454,22 @@ public class StudentController {
     }
 
     // 更新个人信息
-    @PutMapping("/profile/update")
-    public ResponseEntity<Map<String, Object>> updateUserProfile(@RequestBody StudentModel student, @CurrentUser Map<String, Object> currentUser) {
+    // POST supports gateways that restrict PUT; retain PUT for older clients.
+    @RequestMapping(value = "/profile/update", method = {RequestMethod.POST, RequestMethod.PUT})
+    public ResponseEntity<Map<String, Object>> updateUserProfile(@RequestBody org.example.dto.StudentProfileUpdate profile, @CurrentUser Map<String, Object> currentUser) {
+        currentUserAccessService.requireCurrentStudent(currentUser);
         Map<String, Object> result = new HashMap<>();
         try {
             // 确保只能更新自己的信息
             String userId = (String) currentUser.get("userId");
-            student.setId(userId);
+            StudentModel student = profile.toStudent(userId);
             
             StudentModel updatedStudent = studentService.updateStudent(student);
+            if (updatedStudent == null) {
+                result.put("code", 404);
+                result.put("msg", "学生信息不存在，请重新登录后重试");
+                return ResponseEntity.ok(result);
+            }
             result.put("code", 200);
             result.put("data", updatedStudent);
             result.put("msg", "更新个人信息成功");
@@ -609,7 +619,7 @@ public class StudentController {
         return ResponseEntity.ok(result);
     }
 
-    // 管理员重置学生密码（重置为初始密码：Hbut_学号后六位）
+    // 管理员重置为固定格式初始密码，首次使用必须修改。
     @PutMapping("/reset-password")
     public ResponseEntity<Map<String, Object>> resetPassword(@RequestBody Map<String, String> requestBody) {
         Map<String, Object> result = new HashMap<>();
@@ -622,16 +632,15 @@ public class StudentController {
                 return ResponseEntity.ok(result);
             }
             
-            // 重置为初始密码（Hbut_学号后六位），传入null表示使用默认密码
+            // 密码仅在本次管理员响应中返回，须核实身份后私下交付。
             try {
-                boolean success = studentService.resetStudentPassword(studentId, null);
+                String temporaryPassword = org.example.util.PasswordPolicy.legacyPassword(studentId);
+                boolean success = studentService.resetStudentPassword(studentId, temporaryPassword);
                 if (success) {
-                    // 计算初始密码用于提示
-                    String lastSix = studentId.length() > 6 ? studentId.substring(studentId.length() - 6) : studentId;
-                    String defaultPassword = "Hbut_" + lastSix;
+                    // 返回新生成的临时密码，不返回存储的密码哈希。
                     result.put("code", 200);
-                    result.put("msg", "密码已重置为初始密码：" + defaultPassword);
-                    result.put("data", defaultPassword); // 返回初始密码，方便管理员告知学生
+                    result.put("msg", "已恢复初始密码，首次登录必须修改，请核实身份后私下交付学生");
+                    result.put("data", temporaryPassword);
                 } else {
                     result.put("code", 404);
                     result.put("msg", "学生不存在");
@@ -652,6 +661,7 @@ public class StudentController {
     // POST is the primary method; retain PUT for older clients during rollout.
     @RequestMapping(value = "/change-initial-password", method = {RequestMethod.POST, RequestMethod.PUT})
     public ResponseEntity<Map<String, Object>> changeInitialPassword(@RequestBody Map<String, String> requestBody) {
+        loginAttemptLimiter.check("student", requestBody.get("studentId"));
         Map<String, Object> result = new HashMap<>();
         try {
             String studentId = requestBody.get("studentId");
@@ -679,16 +689,16 @@ public class StudentController {
             // 验证学号是否存在
             StudentModel student = studentService.findByStudentId(studentId);
             if (student == null) {
-                result.put("code", 404);
-                result.put("msg", "学生不存在");
+                result.put("code", 400);
+                result.put("msg", "账号或临时密码无效，请联系管理员");
                 return ResponseEntity.ok(result);
             }
             
-            // 验证当前密码是否为初始密码（通过检查数据库中的密码是否为初始密码的加密值）
+            // 校验临时凭证、强制改密标记及有效期。
             boolean isDefaultPassword = studentService.isDefaultPassword(studentId, initialPassword);
             if (!isDefaultPassword) {
                 result.put("code", 400);
-                result.put("msg", "初始密码不正确，无法修改密码");
+                result.put("msg", "账号或临时密码无效，请联系管理员");
                 return ResponseEntity.ok(result);
             }
             

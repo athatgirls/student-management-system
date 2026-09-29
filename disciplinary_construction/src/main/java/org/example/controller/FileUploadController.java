@@ -26,6 +26,16 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/msi/upload")
 public class FileUploadController {
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.example.repository.UploadedFileRepository uploadedFiles;
+
+    private void recordOwner(String filename, MultipartFile file, HttpServletRequest request) {
+        Object owner = request.getAttribute("userId");
+        if (!(owner instanceof String)) throw new org.springframework.security.access.AccessDeniedException("Unauthorized");
+        org.example.model.UploadedFileModel record = new org.example.model.UploadedFileModel();
+        record.setFilename(filename); record.setOwnerId((String) owner); record.setSize(file.getSize());
+        uploadedFiles.insert(record);
+    }
 
     private static final long MAX_FILE_SIZE = 10L * 1024L * 1024L;
     private static final int MAX_FILES_PER_REQUEST = 5;
@@ -66,6 +76,7 @@ public class FileUploadController {
                     try (InputStream inputStream = file.getInputStream()) {
                         Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
                     }
+                    recordOwner(filename, file, request);
                     fileUrls.add(baseUrl + "/uploads/" + filename);
                 }
             }
@@ -100,6 +111,7 @@ public class FileUploadController {
                 Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
             }
 
+            recordOwner(filename, file, request);
             return ResponseResult.success(getBaseUrl(request) + "/uploads/" + filename);
         } catch (IOException e) {
             return new ResponseResult<>(500, "文件上传失败", null);
@@ -113,6 +125,20 @@ public class FileUploadController {
         String extension = getSafeExtension(file.getOriginalFilename());
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
             return "仅支持 JPG、PNG、PDF、DOC、DOCX 文件";
+        }
+        try (InputStream stream = file.getInputStream()) {
+            byte[] header = stream.readNBytes(8);
+            StringBuilder hex = new StringBuilder();
+            for (byte b : header) hex.append(String.format("%02x", b & 0xff));
+            String signature = hex.toString();
+            boolean valid = ((extension.equals(".jpg") || extension.equals(".jpeg")) && signature.startsWith("ffd8ff"))
+                    || (extension.equals(".png") && signature.equals("89504e470d0a1a0a"))
+                    || (extension.equals(".pdf") && signature.startsWith("255044462d"))
+                    || (extension.equals(".doc") && signature.equals("d0cf11e0a1b11ae1"))
+                    || (extension.equals(".docx") && signature.startsWith("504b0304"));
+            if (!valid) return "文件内容与扩展名不匹配";
+        } catch (IOException e) {
+            return "无法读取文件内容";
         }
         return null;
     }

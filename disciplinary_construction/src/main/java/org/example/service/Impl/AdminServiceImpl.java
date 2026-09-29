@@ -61,6 +61,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public AdminModel createAdmin(AdminModel admin) {
+        admin.setId(null);
         if (admin.getPassword() == null || admin.getPassword().length() < 8) {
             throw new IllegalArgumentException("管理员密码不能少于8位");
         }
@@ -86,6 +87,7 @@ public class AdminServiceImpl implements AdminService {
         existing.setPermissions(admin.getPermissions());
         existing.setRemark(admin.getRemark());
         existing.setUpdateBy(admin.getUpdateBy());
+        existing.setAuthVersion(java.util.UUID.randomUUID().toString());
         if (admin.getPassword() != null && !admin.getPassword().isBlank()) {
             if (admin.getPassword().length() < 8) {
                 throw new IllegalArgumentException("管理员密码不能少于8位");
@@ -137,6 +139,7 @@ public class AdminServiceImpl implements AdminService {
         if (adminOpt.isPresent()) {
             AdminModel admin = adminOpt.get();
             admin.setIsActive(isActive);
+            admin.setAuthVersion(java.util.UUID.randomUUID().toString());
             admin.setUpdateTime(new Date());
             adminRepository.save(admin);
             return true;

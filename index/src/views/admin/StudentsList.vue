@@ -889,14 +889,12 @@ const handleEdit = (row) => {
   dialogVisible.value = true
 }
 
-// 重置密码（重置为初始密码：Hbut_学号后六位）
+// 恢复学校现有固定格式初始密码，首次登录必须修改。
 const handleResetPassword = async (row) => {
   try {
-    const lastSix = row.studentId.length > 6 ? row.studentId.substring(row.studentId.length - 6) : row.studentId
-    const defaultPassword = `Hbut_${lastSix}`
     
     await ElMessageBox.confirm(
-      `确定要将学生"${row.name}"（学号：${row.studentId}）的密码重置为初始密码吗？\n初始密码：${defaultPassword}`,
+      `确定为学生"${row.name}"（学号：${row.studentId}）恢复初始密码（Hbut_加学号后六位）吗？原密码及登录凭证将失效，首次登录必须修改。`,
       '重置密码确认',
       {
         confirmButtonText: '确定重置',
@@ -907,11 +905,7 @@ const handleResetPassword = async (row) => {
     
     const res = await resetStudentPassword(row.studentId, null)
     if (res.code === 200) {
-      ElMessage.success({
-        message: `密码已重置为初始密码：${res.data || defaultPassword}`,
-        duration: 5000, // 显示5秒，让管理员有时间记录
-        showClose: true
-      })
+      await ElMessageBox.alert(`初始密码：${res.data}\n首次登录必须修改，请通过可信渠道私下交付本人。`, '初始密码已重置', { confirmButtonText: '确定' })
     } else {
       ElMessage.error(res.msg || '密码重置失败')
     }

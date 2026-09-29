@@ -42,7 +42,7 @@ public class ProjectController {
         project.setStudentName((String) currentUser.get("username"));
         try {
             resetProjectAudit(project);
-            ProjectModel saved = projectService.saveProject(project);
+            ProjectModel saved = projectService.addProject(project);
             return ResponseEntity.ok(saved);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("添加项目失败: " + e.getMessage());

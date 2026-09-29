@@ -60,11 +60,21 @@ request.interceptors.response.use(
                 case 500:
                     ElMessage.error('服务器内部错误')
                     break
+                case 502:
+                case 503:
+                case 504:
+                    ElMessage.error(`服务暂时不可用（${status}），请稍后重试；持续失败请联系管理员检查网关和后端`)
+                    break
+                case 429:
+                    ElMessage.error('操作过于频繁，请稍后重试')
+                    break
                 default:
                     ElMessage.error(data?.message || '网络错误')
             }
         } else if (error.request) {
-            ElMessage.error('网络连接失败，请检查网络')
+            ElMessage.error(error.code === 'ECONNABORTED'
+                ? '请求超时，请稍后重试'
+                : '未收到服务器响应，请检查网络或代理设置；持续失败请联系管理员')
         } else {
             ElMessage.error('请求配置错误')
         }
