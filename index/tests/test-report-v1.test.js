@@ -39,3 +39,18 @@ test('four requested party branches and volunteer navigation are available', () 
   assert.match(read('components/Layout.vue'), /\/daily\/volunteer/)
   assert.doesNotMatch(read('components/Layout.vue'), /<div class="page-shell"/)
 })
+test('party and daily volunteer views share the student volunteer-record API', () => {
+  const api = read('api/party.js')
+  assert.match(api, /getStudentVolunteerServices: \(studentId\) => request\.get\(`\/volunteer-service\/student\/\$\{studentId\}`\)/)
+  for (const file of ['views/Party.vue', 'views/Daily.vue']) {
+    const source = read(file)
+    assert.match(source, /volunteerServiceApi/)
+    assert.match(source, /volunteerServiceApi\.getStudentVolunteerServices\(/)
+  }
+})
+test('registration tasks wait for attendance confirmation before volunteer credit', () => {
+  const source = read('views/Daily.vue')
+  assert.match(source, /已报名待到场/)
+  assert.match(source, /导入到场名单后才计入志愿记录/)
+  assert.match(read('views/admin/ActivityManagement.vue'), /报名不等于完成/)
+})

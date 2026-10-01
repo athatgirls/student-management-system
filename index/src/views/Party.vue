@@ -355,6 +355,8 @@
                 <el-table-column prop="serviceType" label="类型" width="120" />
                 <el-table-column prop="serviceHours" label="时长" width="100" />
                 <el-table-column prop="serviceDate" label="日期" width="120" />
+                <el-table-column label="来源" width="120"><template #default="scope">{{ scope.row.sourceTaskId ? '任务到场确认' : '学生提交' }}</template></el-table-column>
+                <el-table-column prop="status" label="完成状态" width="100" />
                 <el-table-column prop="auditStatus" label="审核状态" width="100">
                   <template #default="scope">
                     <el-tag :type="getAuditStatusType(scope.row.auditStatus)" size="small">

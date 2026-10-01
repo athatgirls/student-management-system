@@ -161,3 +161,11 @@ export function deleteActivity(id) {
 export function importStudentsAndMatchTasks(activityId, students) {
     return request.post(`/activities/${activityId}/import-students`, { students })
 }
+
+export function syncVolunteerAttendance(activityId) {
+    return request.post(`/activities/${activityId}/sync-volunteer-attendance`)
+}
+
+export function compensateVolunteerAttendance() {
+    return request.post('/activities/compensate-volunteer-attendance')
+}

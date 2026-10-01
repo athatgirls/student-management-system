@@ -110,5 +110,29 @@ public class ActivityController {
         }
         return ResponseEntity.ok(result);
     }
-}
 
+    @PostMapping("/{activityId}/sync-volunteer-attendance")
+    public ResponseEntity<Map<String, Object>> syncVolunteerAttendance(@PathVariable String activityId) {
+        return volunteerSyncResponse(() -> activityService.syncVolunteerAttendance(activityId));
+    }
+
+    @PostMapping("/compensate-volunteer-attendance")
+    public ResponseEntity<Map<String, Object>> compensateVolunteerAttendance() {
+        return volunteerSyncResponse(activityService::compensateVolunteerAttendance);
+    }
+
+    private ResponseEntity<Map<String, Object>> volunteerSyncResponse(java.util.function.Supplier<Map<String, Object>> action) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            result.put("code", 200);
+            result.put("data", action.get());
+        } catch (IllegalArgumentException e) {
+            result.put("code", 400);
+            result.put("msg", e.getMessage());
+        } catch (Exception e) {
+            result.put("code", 500);
+            result.put("msg", "同步志愿到场记录失败: " + e.getMessage());
+        }
+        return ResponseEntity.ok(result);
+    }
+}
