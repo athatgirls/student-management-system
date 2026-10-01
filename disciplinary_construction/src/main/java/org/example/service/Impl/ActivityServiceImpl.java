@@ -236,4 +236,89 @@ public class ActivityServiceImpl implements ActivityService {
 
         return result;
     }
+
+    @Override
+    public Map<String, Object> syncVolunteerAttendance(String activityId) {
+        ActivityModel activity = activityRepository.findById(activityId)
+                .orElseThrow(() -> new IllegalArgumentException("活动不存在"));
+        DailyTaskModel task = taskRepository.findById(activity.getTaskId())
+                .orElseThrow(() -> new IllegalArgumentException("关联的任务不存在"));
+        if (!"volunteer".equals(org.example.util.TaskSubmissionValidation.category(task.getActivityCategory()))) {
+            throw new IllegalArgumentException("仅志愿活动可以同步到场记录");
+        }
+        return syncVolunteerAttendance(activity, task);
+    }
+
+    @Override
+    public Map<String, Object> compensateVolunteerAttendance() {
+        List<Map<String, Object>> syncedResults = new ArrayList<>();
+        List<Map<String, Object>> skippedResults = new ArrayList<>();
+        List<Map<String, Object>> outOfScopeResults = new ArrayList<>();
+        int activityCount = 0;
+
+        for (ActivityModel activity : activityRepository.findAll()) {
+            if (activity.getTaskId() == null || activity.getParticipantStudentIds() == null || activity.getParticipantStudentIds().isEmpty()) continue;
+            DailyTaskModel task = taskRepository.findById(activity.getTaskId()).orElse(null);
+            if (task == null || !"volunteer".equals(org.example.util.TaskSubmissionValidation.category(task.getActivityCategory()))) continue;
+            activityCount++;
+            Map<String, Object> activityResult = syncVolunteerAttendance(activity, task);
+            appendWithActivity(syncedResults, (List<Map<String, Object>>) activityResult.get("syncedResults"), activity);
+            appendWithActivity(skippedResults, (List<Map<String, Object>>) activityResult.get("skippedResults"), activity);
+            appendWithActivity(outOfScopeResults, (List<Map<String, Object>>) activityResult.get("outOfScopeResults"), activity);
+        }
+
+        return syncResult(activityCount, syncedResults, skippedResults, outOfScopeResults);
+    }
+
+    private Map<String, Object> syncVolunteerAttendance(ActivityModel activity, DailyTaskModel task) {
+        List<Map<String, Object>> syncedResults = new ArrayList<>();
+        List<Map<String, Object>> skippedResults = new ArrayList<>();
+        List<Map<String, Object>> outOfScopeResults = new ArrayList<>();
+        Set<String> participantIds = new LinkedHashSet<>(activity.getParticipantStudentIds() == null
+                ? Collections.emptyList() : activity.getParticipantStudentIds());
+
+        for (String participantId : participantIds) {
+            StudentModel student = studentRepository.findById(participantId).orElse(null);
+            if (student == null) {
+                skippedResults.add(syncStudentResult(null, participantId, "学生不存在"));
+            } else if (!dailyTaskAudienceService.matches(task, student)) {
+                outOfScopeResults.add(syncStudentResult(student, null, "不符合任务接收范围"));
+            } else if (volunteerCompletionService.sync(task, student, activity)) {
+                syncedResults.add(syncStudentResult(student, null, "已生成志愿记录"));
+            } else {
+                skippedResults.add(syncStudentResult(student, null, "志愿记录已存在"));
+            }
+        }
+        return syncResult(1, syncedResults, skippedResults, outOfScopeResults);
+    }
+
+    private Map<String, Object> syncResult(int activityCount, List<Map<String, Object>> syncedResults,
+            List<Map<String, Object>> skippedResults, List<Map<String, Object>> outOfScopeResults) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("activityCount", activityCount);
+        result.put("syncedCount", syncedResults.size());
+        result.put("skippedCount", skippedResults.size());
+        result.put("outOfScopeCount", outOfScopeResults.size());
+        result.put("syncedResults", syncedResults);
+        result.put("skippedResults", skippedResults);
+        result.put("outOfScopeResults", outOfScopeResults);
+        return result;
+    }
+
+    private Map<String, Object> syncStudentResult(StudentModel student, String participantId, String reason) {
+        Map<String, Object> item = new HashMap<>();
+        item.put("name", student == null ? "-" : student.getName());
+        item.put("studentId", student == null ? participantId : student.getStudentId());
+        item.put("reason", reason);
+        return item;
+    }
+
+    private void appendWithActivity(List<Map<String, Object>> target, List<Map<String, Object>> items, ActivityModel activity) {
+        for (Map<String, Object> item : items) {
+            item.put("activityId", activity.getId());
+            item.put("activityTitle", activity.getTitle());
+            target.add(item);
+        }
+    }
 }

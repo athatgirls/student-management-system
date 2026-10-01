@@ -5,6 +5,7 @@ import org.example.dto.StudentProfileUpdate;
 import org.example.model.*;
 import org.example.repository.*;
 import org.example.service.*;
+import org.example.service.Impl.ActivityServiceImpl;
 import org.example.util.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -126,6 +127,8 @@ class TestReportV1RegressionTest {
     }
     @Test void volunteerSyncUsesStableIdAndSchoolNumberAndDoesNotTreatSignupAsCompletion() {
         MongoTemplate mongo = mock(MongoTemplate.class); VolunteerCompletionService sync = new VolunteerCompletionService(mongo);
+        DailyTaskModel nonVolunteer = new DailyTaskModel(); nonVolunteer.setId("task-d"); nonVolunteer.setActivityCategory("daily");
+        assertFalse(sync.sync(nonVolunteer, student(), null)); verifyNoInteractions(mongo);
         DailyTaskModel task = new DailyTaskModel(); task.setId("task-a"); task.setActivityCategory("volunteer"); task.setTaskCategory("registration");
         sync.sync(task,student(),null); verifyNoInteractions(mongo);
         ActivityModel activity = new ActivityModel(); activity.setActivityTime(LocalDateTime.now());
@@ -133,5 +136,51 @@ class TestReportV1RegressionTest {
         verify(mongo,times(2)).upsert(argThat((Query q) -> "task:task-a:student:student-a".equals(q.getQueryObject().get("_id"))),
                 argThat((Update u) -> "2026001".equals(((org.bson.Document) u.getUpdateObject().get("$setOnInsert")).get("studentId"))
                         && "通过".equals(((org.bson.Document) u.getUpdateObject().get("$set")).get("auditStatus"))), eq(VolunteerServiceModel.class));
+    }
+    @Test void ordinaryVolunteerSubmissionCreatesRecordButRegistrationWaitsForAttendance() {
+        MongoTemplate mongo = mock(MongoTemplate.class); VolunteerCompletionService sync = new VolunteerCompletionService(mongo);
+        DailyTaskModel ordinary = new DailyTaskModel(); ordinary.setId("task-normal"); ordinary.setActivityCategory("volunteer"); ordinary.setTaskCategory("normal");
+        sync.sync(ordinary, student(), null);
+        verify(mongo).upsert(any(Query.class), any(Update.class), eq(VolunteerServiceModel.class));
+
+        reset(mongo);
+        DailyTaskModel registration = new DailyTaskModel(); registration.setId("task-registration"); registration.setActivityCategory("volunteer"); registration.setTaskCategory("registration");
+        sync.sync(registration, student(), null);
+        verifyNoInteractions(mongo);
+        sync.sync(registration, student(), new ActivityModel());
+        verify(mongo).upsert(any(Query.class), any(Update.class), eq(VolunteerServiceModel.class));
+    }
+    @Test void attendanceSyncAndCompensationReportCreatedSkippedAndOutOfScopeStudents() {
+        ActivityRepository activities = mock(ActivityRepository.class);
+        DailyTaskRepository tasks = mock(DailyTaskRepository.class);
+        StudentRepository students = mock(StudentRepository.class);
+        DailyTaskAudienceService audience = mock(DailyTaskAudienceService.class);
+        VolunteerCompletionService volunteer = mock(VolunteerCompletionService.class);
+        ActivityServiceImpl service = new ActivityServiceImpl();
+        ReflectionTestUtils.setField(service, "activityRepository", activities);
+        ReflectionTestUtils.setField(service, "taskRepository", tasks);
+        ReflectionTestUtils.setField(service, "studentRepository", students);
+        ReflectionTestUtils.setField(service, "dailyTaskAudienceService", audience);
+        ReflectionTestUtils.setField(service, "volunteerCompletionService", volunteer);
+        ActivityModel activity = new ActivityModel(); activity.setId("activity-a"); activity.setTitle("志愿活动"); activity.setTaskId("task-a"); activity.setParticipantStudentIds(Arrays.asList("student-a", "student-b", "student-missing"));
+        DailyTaskModel task = new DailyTaskModel(); task.setId("task-a"); task.setActivityCategory("volunteer");
+        StudentModel other = new StudentModel(); other.setId("student-b"); other.setStudentId("2026002"); other.setName("范围外学生");
+        when(activities.findById("activity-a")).thenReturn(Optional.of(activity));
+        when(tasks.findById("task-a")).thenReturn(Optional.of(task));
+        when(students.findById("student-a")).thenReturn(Optional.of(student()));
+        when(students.findById("student-b")).thenReturn(Optional.of(other));
+        when(students.findById("student-missing")).thenReturn(Optional.empty());
+        when(audience.matches(eq(task), any(StudentModel.class))).thenAnswer(invocation ->
+                "student-a".equals(((StudentModel) invocation.getArgument(1)).getId()));
+        when(volunteer.sync(eq(task), any(StudentModel.class), eq(activity))).thenReturn(true, false);
+
+        Map<String, Object> first = service.syncVolunteerAttendance("activity-a");
+        assertEquals(1, first.get("syncedCount")); assertEquals(1, first.get("skippedCount")); assertEquals(1, first.get("outOfScopeCount"));
+        Map<String, Object> repeated = service.syncVolunteerAttendance("activity-a");
+        assertEquals(0, repeated.get("syncedCount")); assertEquals(2, repeated.get("skippedCount"));
+
+        when(activities.findAll()).thenReturn(List.of(activity));
+        Map<String, Object> compensated = service.compensateVolunteerAttendance();
+        assertEquals(1, compensated.get("activityCount")); assertEquals(0, compensated.get("syncedCount"));
     }
 }

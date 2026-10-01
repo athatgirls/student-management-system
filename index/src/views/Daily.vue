@@ -227,7 +227,7 @@
         <template #header>志愿活动记录（与党员发展与管理同步）</template>
         <el-table :data="volunteerHistory">
           <el-table-column prop="serviceName" label="活动名称" /><el-table-column prop="serviceDate" label="活动日期" />
-          <el-table-column prop="serviceLocation" label="地点" /><el-table-column prop="auditStatus" label="审核状态" />
+          <el-table-column prop="serviceLocation" label="地点" /><el-table-column label="来源"><template #default="{ row }">{{ row.sourceTaskId ? '任务到场确认' : '学生提交' }}</template></el-table-column><el-table-column prop="status" label="完成状态" /><el-table-column prop="auditStatus" label="审核状态" />
         </el-table>
       </el-card>
       <!-- 日常任务列表 (学生端) -->
@@ -274,7 +274,7 @@
                       <div class="time-label">完成时间</div>
                       <div class="time-value">{{ fmtDateTime(scope.row.submissionTime) }}</div>
                     </div>
-                    <el-tag type="success" :size="isMobile ? 'small' : 'small'" effect="plain" class="status-badge">已完成</el-tag>
+                      <el-tag type="success" :size="isMobile ? 'small' : 'small'" effect="plain" class="status-badge">{{ scope.row.taskCategory === 'registration' ? '已报名待到场' : '已完成' }}</el-tag>
                   </div>
                 </div>
                 <div v-else class="time-item pending">
@@ -1096,7 +1096,7 @@ const handleSubmitTask = async () => {
   try {
     const res = await submitDailyTask(submitForm)
     if (res.code === 200) {
-      ElMessage.success(currentTask.value.taskCategory === 'registration' ? '报名成功' : '提交成功')
+      ElMessage.success(currentTask.value.taskCategory === 'registration' ? '报名成功，导入到场名单后才计入志愿记录' : '提交成功')
       submitDialogVisible.value = false
       loadActiveTasks() // 刷新列表以更新完成状态
       if (moduleKey.value === 'volunteer') loadBusinessData()

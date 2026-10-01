@@ -17,12 +17,14 @@
         <template #header>
           <div class="card-header">
             <div class="card-title">活动列表</div>
+            <el-button :icon="Refresh" @click="handleCompensateVolunteer">补偿志愿到场记录</el-button>
           </div>
         </template>
 
         <el-table :data="activities" style="width: 100%" border>
           <el-table-column prop="title" label="活动标题" min-width="200" />
           <el-table-column label="活动分类" width="110"><template #default="{ row }">{{ { academic: '学术活动', daily: '日常活动', volunteer: '志愿活动' }[row.activityCategory || 'daily'] }}</template></el-table-column>
+          <el-table-column label="任务类型" width="110"><template #default="{ row }">{{ taskCategoryLabel(row.taskId) }}</template></el-table-column>
           <el-table-column label="活动时间" min-width="180">
             <template #default="scope">
               {{ formatDateTime(scope.row.activityTime) }}
@@ -47,7 +49,12 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="250" align="center" fixed="right">
+          <el-table-column label="志愿同步" width="130" align="center">
+            <template #default="{ row }">
+              <el-tag :type="volunteerSyncMeta(row).type" effect="plain">{{ volunteerSyncMeta(row).text }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="310" align="center" fixed="right">
             <template #default="scope">
               <el-button 
                 type="primary" 
@@ -57,6 +64,16 @@
                 :disabled="scope.row.matched"
               >
                 导入学生
+              </el-button>
+              <el-button
+                v-if="row.activityCategory === 'volunteer'"
+                type="success"
+                link
+                size="small"
+                :disabled="!(row.participantStudentIds || []).length"
+                @click="handleSyncVolunteer(row)"
+              >
+                同步志愿到场
               </el-button>
               <el-button 
                 type="danger" 
@@ -194,7 +211,7 @@
               :loading="tasksLoading"
             >
               <el-option
-                v-for="task in availableTasks"
+                v-for="task in availableTasks.filter(task => task.active)"
                 :key="task.id"
                 :label="task.title"
                 :value="task.id"
@@ -202,6 +219,7 @@
                 <span>{{ task.title }}</span>
                 <span style="color: #8492a6; font-size: 13px; margin-left: 10px;">
                   ({{ task.taskCategory === 'registration' ? '报名型' : '普通任务' }})
+                  {{ { academic: '学术', daily: '日常', volunteer: '志愿' }[task.activityCategory || 'daily'] }}
                 </span>
               </el-option>
             </el-select>
@@ -216,7 +234,8 @@
           style="margin-top: 20px;"
         >
           <template #default>
-            <div>导入学生后，系统会自动将该任务标记为已完成，不影响学生的其他任务状态</div>
+            <div>导入学生后，系统会确认其到场并标记关联任务；志愿活动会同步至党员发展与管理。</div>
+            <div v-if="activityForm.taskCategory === 'registration'">报名不等于完成，只有导入到场名单后才会同步志愿记录。</div>
           </template>
         </el-alert>
       </el-form>
@@ -349,18 +368,36 @@
         <el-button type="primary" @click="resultDialogVisible = false">确定</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="syncResultDialogVisible" :title="syncResultTitle" width="900px">
+      <el-alert
+        :title="`同步成功 ${syncResult.syncedCount} 人，跳过 ${syncResult.skippedCount} 人，不符合接收范围 ${syncResult.outOfScopeCount} 人`"
+        :type="syncResult.outOfScopeCount > 0 ? 'warning' : 'success'"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 20px;"
+      />
+      <el-tabs v-model="syncResultTab">
+        <el-tab-pane :label="`同步成功 (${syncResult.syncedResults.length})`" name="synced"><el-table :data="syncResult.syncedResults" border><el-table-column prop="activityTitle" label="活动" /><el-table-column prop="name" label="姓名" /><el-table-column prop="studentId" label="学号" /><el-table-column prop="reason" label="结果" /></el-table></el-tab-pane>
+        <el-tab-pane :label="`已跳过 (${syncResult.skippedResults.length})`" name="skipped"><el-table :data="syncResult.skippedResults" border><el-table-column prop="activityTitle" label="活动" /><el-table-column prop="name" label="姓名" /><el-table-column prop="studentId" label="学号" /><el-table-column prop="reason" label="原因" /></el-table></el-tab-pane>
+        <el-tab-pane :label="`不符合接收范围 (${syncResult.outOfScopeResults.length})`" name="outOfScope"><el-table :data="syncResult.outOfScopeResults" border><el-table-column prop="activityTitle" label="活动" /><el-table-column prop="name" label="姓名" /><el-table-column prop="studentId" label="学号" /><el-table-column prop="reason" label="原因" /></el-table></el-tab-pane>
+      </el-tabs>
+      <template #footer><el-button type="primary" @click="syncResultDialogVisible = false">确定</el-button></template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, UploadFilled } from '@element-plus/icons-vue'
+import { Plus, Refresh, UploadFilled } from '@element-plus/icons-vue'
 import { 
   createActivity, 
   getAllActivities, 
   deleteActivity, 
   importStudentsAndMatchTasks,
+  syncVolunteerAttendance,
+  compensateVolunteerAttendance,
   getAllDailyTasks,
   createDailyTask
 } from '@/api/daily'
@@ -374,8 +411,11 @@ const activities = ref([])
 const createDialogVisible = ref(false)
 const importDialogVisible = ref(false)
 const resultDialogVisible = ref(false)
+const syncResultDialogVisible = ref(false)
+const syncResultTitle = ref('志愿到场同步结果')
 const importTab = ref('excel')
 const resultTab = ref('matched')
+const syncResultTab = ref('synced')
 const importLoading = ref(false)
 const currentActivityId = ref('')
 const fileList = ref([])
@@ -409,6 +449,14 @@ const importResult = reactive({
   matchedResults: [],
   unmatchedResults: []
 })
+const syncResult = reactive({
+  syncedCount: 0,
+  skippedCount: 0,
+  outOfScopeCount: 0,
+  syncedResults: [],
+  skippedResults: [],
+  outOfScopeResults: []
+})
 
 // 加载活动列表
 const loadActivities = async () => {
@@ -428,8 +476,8 @@ const loadAvailableTasks = async () => {
   try {
     const res = await getAllDailyTasks()
     if (res.code === 200) {
-      // 显示所有激活的任务（包括普通任务和报名型任务）
-      availableTasks.value = (res.data || []).filter(task => task.active)
+      // Keep historical linked tasks for table metadata; only active tasks are selectable.
+      availableTasks.value = res.data || []
     }
   } catch (e) {
     console.error('加载任务列表失败', e)
@@ -692,6 +740,53 @@ const formatDateTime = (dateTime) => {
 const getTaskTitle = (taskId) => {
   const task = availableTasks.value.find(t => t.id === taskId)
   return task ? task.title : taskId
+}
+
+const taskCategoryLabel = (taskId) => {
+  const task = availableTasks.value.find(t => t.id === taskId)
+  return task ? (task.taskCategory === 'registration' ? '报名型' : '普通任务') : '-'
+}
+
+const volunteerSyncMeta = (activity) => {
+  if (activity.activityCategory !== 'volunteer') return { text: '不适用', type: 'info' }
+  return (activity.participantStudentIds || []).length
+    ? { text: '已同步，可重试', type: 'success' }
+    : { text: '待导入到场', type: 'warning' }
+}
+
+const showSyncResult = (data, title) => {
+  syncResultTitle.value = title
+  syncResult.syncedCount = data.syncedCount || 0
+  syncResult.skippedCount = data.skippedCount || 0
+  syncResult.outOfScopeCount = data.outOfScopeCount || 0
+  syncResult.syncedResults = data.syncedResults || []
+  syncResult.skippedResults = data.skippedResults || []
+  syncResult.outOfScopeResults = data.outOfScopeResults || []
+  syncResultTab.value = 'synced'
+  syncResultDialogVisible.value = true
+}
+
+const handleSyncVolunteer = async (activity) => {
+  try {
+    const res = await syncVolunteerAttendance(activity.id)
+    if (res.code !== 200) return ElMessage.error(res.msg || '同步失败')
+    showSyncResult(res.data, '志愿到场同步结果')
+    loadActivities()
+  } catch (e) {
+    ElMessage.error('同步失败')
+  }
+}
+
+const handleCompensateVolunteer = async () => {
+  try {
+    await ElMessageBox.confirm('仅补偿已有到场名单的志愿活动，不会将报名记录视为完成。', '补偿志愿到场记录', { type: 'warning' })
+    const res = await compensateVolunteerAttendance()
+    if (res.code !== 200) return ElMessage.error(res.msg || '补偿失败')
+    showSyncResult(res.data, `志愿到场补偿结果（${res.data.activityCount || 0} 个活动）`)
+    loadActivities()
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error('补偿失败')
+  }
 }
 
 onMounted(() => {
