@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.*;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 import java.time.*;
 import java.util.*;
@@ -79,11 +80,10 @@ class TestReportV1RegressionTest {
         assertDoesNotThrow(() -> SubmissionValidation.validate(c));
         c.setDescription("描述文字"); assertThrows(IllegalArgumentException.class, () -> SubmissionValidation.validate(c));
     }
-    @Test void profileAcceptsStudentFieldsButRejectsUnknownPoliticalStatus() {
-        StudentProfileUpdate dto = new StudentProfileUpdate(); dto.setMajor("计算机"); dto.setClassName("一班"); dto.setSupervisor("导师"); dto.setPoliticalStatus("发展对象");
+    @Test void profileAcceptsStudentFieldsButExcludesPoliticalStatus() {
+        StudentProfileUpdate dto = new StudentProfileUpdate(); dto.setMajor("计算机"); dto.setClassName("一班"); dto.setSupervisor("导师"); dto.setWorkStatus("班委");
         StudentModel result = dto.toStudent("student-a"); assertEquals("计算机",result.getMajor()); assertEquals("一班",result.getClassName());
-        assertEquals("导师",result.getSupervisor()); assertEquals("发展对象",result.getPoliticalStatus());
-        dto.setPoliticalStatus("invalid"); assertThrows(IllegalArgumentException.class, () -> dto.toStudent("student-a"));
+        assertEquals("导师",result.getSupervisor()); assertEquals("班委",result.getWorkStatus()); assertNull(result.getPoliticalStatus());
     }
     private StudyRecordModel study() {
         StudyRecordModel r = new StudyRecordModel(); r.setCourse("课程"); r.setSemester("2026秋"); r.setScore(85); r.setCredit(2.0); r.setAttachments(FILES); return r;
@@ -109,6 +109,20 @@ class TestReportV1RegressionTest {
         input.setId("victim"); input.setStudentName("伪造"); input.setIntentionType("就业"); input.setTargetCity("武汉");
         EmploymentIntentionModel saved = c.save(input,user); assertEquals("student-a",saved.getId()); assertEquals("2026001",saved.getStudentId()); assertEquals("测试学生",saved.getStudentName());
         verify(repository).save(input);
+    }
+    @Test void leaveAuditUsesAuthenticatedAdministratorIdentity() {
+        LeaveRequestService service = mock(LeaveRequestService.class);
+        LeaveRequestController controller = new LeaveRequestController();
+        ReflectionTestUtils.setField(controller, "leaveRequestService", service);
+        ReflectionTestUtils.setField(controller, "currentUserAccessService", access());
+        Map<String, Object> admin = Map.of("userId", "admin-a", "userType", "admin", "username", "可信管理员");
+        Map<String, Object> body = new HashMap<>(); body.put("auditStatus", "approved"); body.put("auditComment", "通过");
+        body.put("auditorId", "forged"); body.put("auditorName", "伪造管理员");
+        LeaveRequestModel saved = new LeaveRequestModel(); saved.setId("leave-a");
+        when(service.auditLeaveRequest("leave-a", "approved", "通过", "admin-a", "可信管理员")).thenReturn(saved);
+        assertEquals(200, controller.auditLeaveRequest("leave-a", body, admin).getBody().get("code"));
+        verify(service).auditLeaveRequest("leave-a", "approved", "通过", "admin-a", "可信管理员");
+        assertThrows(AccessDeniedException.class, () -> controller.auditLeaveRequest("leave-a", body, user));
     }
     @Test void volunteerSyncUsesStableIdAndSchoolNumberAndDoesNotTreatSignupAsCompletion() {
         MongoTemplate mongo = mock(MongoTemplate.class); VolunteerCompletionService sync = new VolunteerCompletionService(mongo);

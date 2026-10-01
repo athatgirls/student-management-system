@@ -1108,15 +1108,11 @@ const submitReview = async () => {
   try {
     if (moduleKey.value === 'leave') {
       // 请假审核和状态修改
-      const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
-      
       // 先更新审核状态
       const auditRes = await auditLeaveRequest(
         reviewForm.id,
         reviewForm.auditStatus,
-        reviewForm.auditComment,
-        userInfo.id || '',
-        userInfo.name || '管理员'
+        reviewForm.auditComment
       )
       
       if (auditRes.code !== 200) {

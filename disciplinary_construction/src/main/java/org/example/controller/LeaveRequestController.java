@@ -102,16 +102,21 @@ public class LeaveRequestController {
     }
     
     // 管理员审核请假
-    @PutMapping("/audit/{id}")
+    @RequestMapping(value = "/audit/{id}", method = {RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<Map<String, Object>> auditLeaveRequest(
             @PathVariable String id,
-            @RequestBody Map<String, Object> requestBody) {
+            @RequestBody Map<String, Object> requestBody,
+            @CurrentUser Map<String, Object> currentUser) {
+        if (!currentUserAccessService.isAdmin(currentUser)) {
+            throw new org.springframework.security.access.AccessDeniedException("当前操作仅限管理员账号");
+        }
         Map<String, Object> result = new HashMap<>();
         try {
             String auditStatus = (String) requestBody.get("auditStatus");
             String auditComment = (String) requestBody.get("auditComment");
-            String auditorId = (String) requestBody.get("auditorId");
-            String auditorName = (String) requestBody.get("auditorName");
+            String auditorId = currentUserAccessService.requireUserId(currentUser);
+            String auditorName = currentUser.get("username") instanceof String
+                    ? (String) currentUser.get("username") : auditorId;
             
             LeaveRequestModel updated = leaveRequestService.auditLeaveRequest(id, auditStatus, auditComment, auditorId, auditorName);
             if (updated != null) {

@@ -79,11 +79,11 @@ class SecurityRegressionTest {
         assertEquals(200, controller.addProject(input, user).getStatusCodeValue());
         verify(repository).save(argThat(p -> p.getId() == null && "student-a".equals(p.getStudentId())));
     }
-    @Test void profileDtoCannotCarryCredentialOrInstitutionFields() throws Exception {
-        StudentProfileUpdate profile = new ObjectMapper().readValue("{\"id\":\"victim\",\"password\":\"x\",\"status\":\"在读\",\"politicalStatus\":\"中共党员\",\"grade\":\"2026\",\"name\":\"spoof\",\"phone\":\"fixture\"}", StudentProfileUpdate.class);
+    @Test void profileDtoCannotCarryCredentialOrInstitutionControlledFields() throws Exception {
+        StudentProfileUpdate profile = new ObjectMapper().readValue("{\"id\":\"victim\",\"password\":\"x\",\"status\":\"在读\",\"politicalStatus\":\"中共党员\",\"grade\":\"2026\",\"name\":\"spoof\",\"phone\":\"fixture\",\"workStatus\":\"班委\"}", StudentProfileUpdate.class);
         StudentModel update = profile.toStudent("a");
-        assertEquals("a", update.getId()); assertEquals("fixture", update.getPhone());
-        assertNull(update.getPassword()); assertNull(update.getStatus()); assertEquals("中共党员", update.getPoliticalStatus());
+        assertEquals("a", update.getId()); assertEquals("fixture", update.getPhone()); assertEquals("班委", update.getWorkStatus());
+        assertNull(update.getPassword()); assertNull(update.getStatus()); assertNull(update.getPoliticalStatus());
         assertNull(update.getGrade()); assertNull(update.getName());
     }
     @Test void privateFileRequiresOwnerAndLegacyFilesAreAdminOnly() throws Exception {
@@ -228,7 +228,8 @@ class SecurityRegressionTest {
         FilterChainProxy security = securityFilterChain();
         for (String url : List.of("/msi/activities/delete/fixture", "/msi/daily-tasks/delete/fixture",
                 "/msi/competitions/admin/fixture/audit", "/msi/papers/admin/fixture/audit",
-                "/msi/patents/admin/fixture/audit", "/msi/projects/admin/fixture/audit", "/msi/thought-report/audit/fixture")) {
+                "/msi/patents/admin/fixture/audit", "/msi/projects/admin/fixture/audit", "/msi/thought-report/audit/fixture",
+                "/msi/leave/audit/fixture")) {
             assertEquals(401, status(security,null,"POST",url));
             assertEquals(403, status(security,"student-token","POST",url));
             assertEquals(204, status(security,"admin-token","POST",url));

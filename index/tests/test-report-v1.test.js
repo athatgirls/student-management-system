@@ -21,12 +21,15 @@ test('date order validation catches the report example and custom relationships'
 test('gateway-sensitive mutations use explicit POST routes', () => {
   for (const file of ['api/party.js','api/competition.js','api/internship.js','api/daily.js']) assert.doesNotMatch(read(file), /method: '(put|delete)'|request\.(put|delete)\(/)
   assert.match(read('api/competition.js'), /competitions\/\$\{id\}\/delete/)
+  assert.match(read('api/leave.js'), /leave\/audit\/\$\{id\}[\s\S]*method: 'post'/)
+  assert.doesNotMatch(read('views/admin/DailyControl.vue'), /localStorage\.getItem\('userInfo'/)
 })
-test('profile and study are separated and requested student fields are editable', () => {
+test('profile and study are separated while political status remains administrator-controlled', () => {
   const source = read('views/Profile.vue')
   assert.match(source, /<el-card v-if="!isStudyPage"/)
   assert.match(source, /<el-card v-if="isStudyPage"/)
-  for (const field of ['major','className','politicalStatus','supervisor','researchDirection']) assert.doesNotMatch(source, new RegExp(`v-model="profileForm.${field}"[^>]*disabled`))
+  for (const field of ['major','className','supervisor','researchDirection','workStatus']) assert.doesNotMatch(source, new RegExp(`v-model="profileForm.${field}"[^>]*disabled`))
+  assert.match(source, /v-model="profileForm.politicalStatus"[^>]*disabled/)
   assert.match(source, /row.source === 'student'/)
 })
 test('employment intention no longer uses cross-account browser-local storage', () => {
