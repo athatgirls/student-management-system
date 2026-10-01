@@ -1,7 +1,7 @@
 
 import request from './request'
 
-// 三个模块对应的后端路径
+// 三个对应的后端路径
 const URL = {
     academic: 'academic-events',
     daily: 'daily-activities',
@@ -18,7 +18,7 @@ function d2str(d) {
     return `${y}-${m}-${day}`
 }
 
-// 工具：不同模块的 payload 规范化（后端是 LocalDate / List<String>）
+// 工具：不同的 payload 规范化（后端是 LocalDate / List<String>）
 function normalize(moduleKey, form) {
     const p = { ...form }
     if (p.startDate) p.startDate = d2str(p.startDate)
@@ -86,7 +86,7 @@ export function createDailyTask(data) {
 
 // 删除任务 (Admin)
 export function deleteDailyTask(id) {
-    return request.delete(`/daily-tasks/delete/${id}`)
+    return request.post(`/daily-tasks/delete/${id}`)
 }
 
 // 提交任务 (Student)
@@ -154,7 +154,7 @@ export function getActivityById(id) {
 
 // 删除活动
 export function deleteActivity(id) {
-    return request.delete(`/activities/delete/${id}`)
+    return request.post(`/activities/delete/${id}`)
 }
 
 // 导入学生并自动匹配任务

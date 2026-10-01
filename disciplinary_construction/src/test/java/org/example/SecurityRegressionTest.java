@@ -75,6 +75,7 @@ class SecurityRegressionTest {
         ReflectionTestUtils.setField(controller, "projectService", service);
         ReflectionTestUtils.setField(controller, "currentUserAccessService", access);
         ProjectModel input = new ProjectModel(); input.setId("victim-id"); input.setStudentId("victim");
+        input.setAttachments("[{\"url\":\"/uploads/fixture.pdf\"}]"); input.setTeamMembers("本人"); input.setInstructorName("导师");
         assertEquals(200, controller.addProject(input, user).getStatusCodeValue());
         verify(repository).save(argThat(p -> p.getId() == null && "student-a".equals(p.getStudentId())));
     }
@@ -82,7 +83,7 @@ class SecurityRegressionTest {
         StudentProfileUpdate profile = new ObjectMapper().readValue("{\"id\":\"victim\",\"password\":\"x\",\"status\":\"在读\",\"politicalStatus\":\"中共党员\",\"grade\":\"2026\",\"name\":\"spoof\",\"phone\":\"fixture\"}", StudentProfileUpdate.class);
         StudentModel update = profile.toStudent("a");
         assertEquals("a", update.getId()); assertEquals("fixture", update.getPhone());
-        assertNull(update.getPassword()); assertNull(update.getStatus()); assertNull(update.getPoliticalStatus());
+        assertNull(update.getPassword()); assertNull(update.getStatus()); assertEquals("中共党员", update.getPoliticalStatus());
         assertNull(update.getGrade()); assertNull(update.getName());
     }
     @Test void privateFileRequiresOwnerAndLegacyFilesAreAdminOnly() throws Exception {
@@ -221,6 +222,21 @@ class SecurityRegressionTest {
 
         assertEquals(401, status(security, null, "GET", "/msi/major/list"));
         assertEquals(204, status(security, "student-token", "GET", "/msi/major/list"));
+    }
+
+    @Test void reportFixesPreserveAdministratorAuthorizationOnPostAliases() throws Exception {
+        FilterChainProxy security = securityFilterChain();
+        for (String url : List.of("/msi/activities/delete/fixture", "/msi/daily-tasks/delete/fixture",
+                "/msi/competitions/admin/fixture/audit", "/msi/papers/admin/fixture/audit",
+                "/msi/patents/admin/fixture/audit", "/msi/projects/admin/fixture/audit", "/msi/thought-report/audit/fixture")) {
+            assertEquals(401, status(security,null,"POST",url));
+            assertEquals(403, status(security,"student-token","POST",url));
+            assertEquals(204, status(security,"admin-token","POST",url));
+        }
+        assertEquals(403,status(security,"student-token","GET","/msi/employment-intentions/admin/list"));
+        assertEquals(204,status(security,"admin-token","GET","/msi/employment-intentions/admin/list"));
+        assertEquals(204,status(security,"student-token","POST","/msi/honors/create"));
+        assertEquals(403,status(security,"student-token","POST","/msi/honors/audit"));
     }
 
     private FilterChainProxy securityFilterChain() throws Exception {

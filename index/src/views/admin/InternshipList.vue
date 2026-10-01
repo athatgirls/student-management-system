@@ -1,5 +1,6 @@
 <template>
   <div class="internship-admin-page">
+    <EmploymentIntentions style="margin-bottom:20px" />
     <!-- 统计卡片 -->
     <el-row :gutter="20" class="statistics-cards">
       <el-col :xs="12" :sm="12" :md="6" :lg="6">
@@ -181,7 +182,6 @@
                   :icon="Edit"
                   circle
                   @click="handleEdit(scope.row)"
-                  :disabled="scope.row.approvalStatus === '已通过'"
                 />
               </el-tooltip>
               
@@ -204,7 +204,6 @@
                   :icon="Delete"
                   circle
                   @click="handleDelete(scope.row)"
-                  :disabled="scope.row.approvalStatus === '已通过'"
                 />
               </el-tooltip>
             </div>
@@ -765,6 +764,7 @@
 </template>
 
 <script setup>
+import EmploymentIntentions from '@/components/EmploymentIntentions.vue'
 /* eslint-disable no-undef */
 import { ref, reactive, onMounted, computed, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'

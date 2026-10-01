@@ -25,7 +25,7 @@
       <article class="preview-card student">
         <span>Student</span>
         <h2>学生端页面</h2>
-        <p>首页、个人信息、日常管理、实习就业、科创竞赛、校友、党员模块都可以直接浏览。</p>
+        <p>首页、个人信息、日常管理、实习就业、科创竞赛、校友、党员都可以直接浏览。</p>
         <el-button link type="primary" @click="startPreview('student', '/home')">查看学生首页</el-button>
       </article>
 

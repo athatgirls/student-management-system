@@ -520,6 +520,7 @@
 </template>
 
 <script setup>
+import request from '@/api/request'
 import { ref, reactive, onMounted, computed, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useStore } from 'vuex'
@@ -552,13 +553,7 @@ const formRef = ref()
 const viewData = ref({})
 const selectedCategory = ref('all')
 
-const intentForm = reactive({
-  intentionType: localStorage.getItem('employment_intention_type') === '考研' ? '升学' : (localStorage.getItem('employment_intention_type') || '就业'),
-  targetCity: localStorage.getItem('employment_target_city') || '',
-  targetIndustry: localStorage.getItem('employment_target_industry') || '',
-  expectedSalary: localStorage.getItem('employment_expected_salary') || '',
-  targetPosition: localStorage.getItem('employment_target_position') || ''
-})
+const intentForm = reactive({ intentionType: '就业', targetCity: '', targetIndustry: '', expectedSalary: '', targetPosition: '' })
 
 // 检测是否为移动端
 const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1920)
@@ -605,13 +600,8 @@ const displayInternshipList = computed(() => {
   return list
 })
 
-const saveIntent = () => {
-  localStorage.setItem('employment_intention_type', intentForm.intentionType)
-  localStorage.setItem('employment_target_city', intentForm.targetCity)
-  localStorage.setItem('employment_target_industry', intentForm.targetIndustry)
-  localStorage.setItem('employment_expected_salary', intentForm.expectedSalary)
-  localStorage.setItem('employment_target_position', intentForm.targetPosition)
-  ElMessage.success('就业意向已保存')
+const saveIntent = async () => {
+  try { Object.assign(intentForm, await request.post('/employment-intentions/me', intentForm)); ElMessage.success('就业意向已保存') } catch { /* shared interceptor */ }
 }
 
 const handleSecondaryTabChange = (tabName) => {
@@ -972,6 +962,7 @@ const getApprovalStatusType = (approvalStatus) => {
 }
 
 onMounted(() => {
+  request.get('/employment-intentions/me').then(data => Object.assign(intentForm, Object.fromEntries(Object.entries(data).filter(([,v]) => v != null)))).catch(() => {})
   loadInternshipList()
   // 初始化窗口宽度并监听变化
   if (typeof window !== 'undefined') {

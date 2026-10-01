@@ -41,6 +41,7 @@ public class PatentController {
         patent.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
         patent.setStudentName((String) currentUser.get("username"));
         try {
+            org.example.util.SubmissionValidation.validate(patent);
             resetPatentAudit(patent);
             PatentModel saved = patentService.addPatent(patent);
             return ResponseEntity.ok(saved);
@@ -49,7 +50,7 @@ public class PatentController {
         }
     }
 
-    @PutMapping("/{id}")
+    @RequestMapping(value = "/{id}", method = {RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<?> updatePatent(@PathVariable String id, @RequestBody PatentModel patent,
                                           @CurrentUser Map<String, Object> currentUser) {
         PatentModel existing = patentService.getPatentById(id);
@@ -61,12 +62,19 @@ public class PatentController {
             patent.setId(id);
             patent.setStudentId(existing.getStudentId());
             patent.setStudentName(existing.getStudentName());
+            org.example.util.SubmissionValidation.validate(patent);
             resetPatentAudit(patent);
             PatentModel updated = patentService.savePatent(patent);
             return ResponseEntity.ok(updated);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("更新专利失败: " + e.getMessage());
         }
+    }
+
+    @PostMapping("/{id}/delete")
+    public ResponseEntity<?> deletePatentViaPost(@PathVariable String id,
+            @CurrentUser Map<String, Object> currentUser) {
+        return deletePatent(id, currentUser);
     }
 
     @DeleteMapping("/{id}")
@@ -124,7 +132,7 @@ public class PatentController {
         }
     }
 
-    @PutMapping("/admin/{id}/audit")
+    @RequestMapping(value = "/admin/{id}/audit", method = {RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<?> auditPatent(@PathVariable String id, @RequestBody Map<String, String> auditData,
                                          @CurrentUser Map<String, Object> currentUser) {
         try {

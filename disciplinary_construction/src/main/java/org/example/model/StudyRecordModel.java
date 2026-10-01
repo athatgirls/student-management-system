@@ -16,5 +16,7 @@ public class StudyRecordModel {
     private Integer score;      // 成绩
     private Double credit;      // 学分
     private String status;      // 状态 (已通过/未通过)
+    private String source;      // student: 学生自填；空值为历史教务导入
+    private String attachments; // JSON 文件列表
 }
 

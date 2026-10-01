@@ -38,7 +38,7 @@ public class PartyMemberController {
     }
 
     @Operation(summary = "更新党员信息")
-    @PutMapping("/update")
+    @RequestMapping(value = "/update", method = {RequestMethod.PUT, RequestMethod.POST})
     public ResponseResult<PartyMemberModel> updatePartyMember(@RequestBody PartyMemberModel partyMember, @CurrentUser Map<String, Object> currentUser) {
         PartyMemberModel existing = partyMemberService.getPartyMemberById(partyMember.getId());
         if (existing != null) {
@@ -54,7 +54,7 @@ public class PartyMemberController {
     }
 
     @Operation(summary = "删除党员信息")
-    @DeleteMapping("/delete/{id}")
+    @RequestMapping(value = "/delete/{id}", method = {RequestMethod.DELETE, RequestMethod.POST})
     public ResponseResult<String> deletePartyMember(@PathVariable String id,
                                                     @CurrentUser Map<String, Object> currentUser) {
         PartyMemberModel existing = partyMemberService.getPartyMemberById(id);

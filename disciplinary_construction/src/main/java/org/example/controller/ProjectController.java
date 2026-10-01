@@ -41,6 +41,7 @@ public class ProjectController {
         project.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
         project.setStudentName((String) currentUser.get("username"));
         try {
+            org.example.util.SubmissionValidation.validate(project);
             resetProjectAudit(project);
             ProjectModel saved = projectService.addProject(project);
             return ResponseEntity.ok(saved);
@@ -49,7 +50,7 @@ public class ProjectController {
         }
     }
 
-    @PutMapping("/{id}")
+    @RequestMapping(value = "/{id}", method = {RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<?> updateProject(@PathVariable String id, @RequestBody ProjectModel project,
                                            @CurrentUser Map<String, Object> currentUser) {
         ProjectModel existing = projectService.getProjectById(id);
@@ -61,12 +62,19 @@ public class ProjectController {
             project.setId(id);
             project.setStudentId(existing.getStudentId());
             project.setStudentName(existing.getStudentName());
+            org.example.util.SubmissionValidation.validate(project);
             resetProjectAudit(project);
             ProjectModel updated = projectService.saveProject(project);
             return ResponseEntity.ok(updated);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("更新项目失败: " + e.getMessage());
         }
+    }
+
+    @PostMapping("/{id}/delete")
+    public ResponseEntity<?> deleteProjectViaPost(@PathVariable String id,
+            @CurrentUser Map<String, Object> currentUser) {
+        return deleteProject(id, currentUser);
     }
 
     @DeleteMapping("/{id}")
@@ -125,7 +133,7 @@ public class ProjectController {
         }
     }
 
-    @PutMapping("/admin/{id}/audit")
+    @RequestMapping(value = "/admin/{id}/audit", method = {RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<?> auditProject(@PathVariable String id, @RequestBody Map<String, String> auditData,
                                           @CurrentUser Map<String, Object> currentUser) {
         try {

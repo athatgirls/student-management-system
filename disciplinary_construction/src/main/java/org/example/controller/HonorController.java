@@ -30,7 +30,9 @@ public class HonorController {
 
     @PostMapping("/create")
     public ResponseEntity<Map<String, Object>> create(@RequestBody HonorModel model, @CurrentUser Map<String, Object> currentUser) {
-        String userId = (String) currentUser.get("userId");
+        String userId = currentUserAccessService.requireCurrentStudent(currentUser).getId();
+        if (model.getEvidenceUrl() == null || model.getEvidenceUrl().isBlank())
+            return ResponseEntity.badRequest().body(Map.of("code", 400, "msg", "请上传荣誉证明材料"));
         model.setUserId(userId);
         Map<String, Object> result = new HashMap<>();
         result.put("code", 200);

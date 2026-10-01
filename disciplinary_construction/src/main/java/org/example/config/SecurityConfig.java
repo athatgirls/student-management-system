@@ -43,7 +43,7 @@ public class SecurityConfig {
                 .antMatchers(HttpMethod.POST,
                         "/msi/academic-events/create", "/msi/academic-events/audit",
                         "/msi/daily-activities/create", "/msi/daily-activities/audit",
-                        "/msi/honors/create", "/msi/honors/audit",
+                        "/msi/honors/audit",
                         "/msi/daily-tasks/create").hasRole("ADMIN")
                 .antMatchers("/msi/daily-tasks/all", "/msi/daily-tasks/stats/**",
                         "/msi/daily-tasks/export/**", "/msi/daily-tasks/delete/**",

@@ -41,11 +41,14 @@ public class DailyTaskServiceImpl implements DailyTaskService {
     
     @Autowired
     private DailyTaskAudienceService dailyTaskAudienceService;
+    @Autowired
+    private org.example.service.VolunteerCompletionService volunteerCompletionService;
 
     @Override
     public DailyTaskModel createTask(DailyTaskModel task) {
         task.setId(null);
         dailyTaskAudienceService.validateAndNormalize(task);
+        task.setActivityCategory(org.example.util.TaskSubmissionValidation.category(task.getActivityCategory()));
         task.setCreateTime(LocalDateTime.now());
         task.setUpdateTime(LocalDateTime.now());
         // 如果是报名型任务，初始化当前报名人数为0
@@ -88,6 +91,7 @@ public class DailyTaskServiceImpl implements DailyTaskService {
         if (!dailyTaskAudienceService.matches(task, student)) {
             throw new AccessDeniedException("您不在该任务的接收范围内");
         }
+        org.example.util.TaskSubmissionValidation.validate(task, submission.getContent());
         
         // 检查是否已经提交过
         Optional<DailyTaskSubmissionModel> existing = submissionRepository.findByTaskIdAndStudentId(
@@ -138,6 +142,7 @@ public class DailyTaskServiceImpl implements DailyTaskService {
         }
         
         DailyTaskSubmissionModel savedSubmission = submissionRepository.save(submission);
+        volunteerCompletionService.sync(task, student, null);
         
         return savedSubmission;
     }

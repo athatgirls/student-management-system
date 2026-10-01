@@ -69,7 +69,7 @@ request.interceptors.response.use(
                     ElMessage.error('操作过于频繁，请稍后重试')
                     break
                 default:
-                    ElMessage.error(data?.message || '网络错误')
+                    ElMessage.error((typeof data === 'string' ? data : data?.message || data?.msg) || '请求失败')
             }
         } else if (error.request) {
             ElMessage.error(error.code === 'ECONNABORTED'

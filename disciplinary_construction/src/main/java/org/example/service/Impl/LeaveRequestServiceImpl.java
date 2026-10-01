@@ -25,6 +25,7 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
     
     @Override
     public LeaveRequestModel createLeaveRequest(LeaveRequestModel leaveRequest) {
+        org.example.util.SubmissionValidation.dates(leaveRequest.getStartDate(), leaveRequest.getEndDate());
         leaveRequest.setId(null);
         // 必须提供studentId（学号），自动从学生表获取所有信息
         if (leaveRequest.getStudentId() == null || leaveRequest.getStudentId().isEmpty()) {
@@ -224,6 +225,7 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
     
     @Override
     public LeaveRequestModel updateLeaveRequest(LeaveRequestModel leaveRequest) {
+        org.example.util.SubmissionValidation.dates(leaveRequest.getStartDate(), leaveRequest.getEndDate());
         leaveRequest.setUpdateTime(LocalDateTime.now());
         return leaveRequestRepository.save(leaveRequest);
     }

@@ -1,7 +1,7 @@
 <template>
   <div class="party-member-list">
     <div class="page-header">
-      <h2>党员管理</h2>
+      <h2>党员发展与管理</h2>
       <div>
         <el-button type="success" @click="showBatchImportDialog = true" style="margin-right: 10px">
           <el-icon><Upload /></el-icon>
@@ -33,9 +33,7 @@
         </el-col>
         <el-col :xs="12" :sm="8" :md="4" :lg="4">
           <el-select v-model="filterBranch" placeholder="选择党支部" clearable style="width: 100%">
-            <el-option label="计算机学院党支部" value="计算机学院党支部" />
-            <el-option label="软件学院党支部" value="软件学院党支部" />
-            <el-option label="信息学院党支部" value="信息学院党支部" />
+            <el-option v-for="branch in PARTY_BRANCHES" :key="branch" :label="branch" :value="branch" />
           </el-select>
         </el-col>
         <el-col :xs="12" :sm="8" :md="4" :lg="4">
@@ -190,9 +188,7 @@
           <el-col :span="12">
             <el-form-item label="党支部" prop="branch">
               <el-select v-model="editingMember.branch" placeholder="请选择党支部" style="width: 100%">
-                <el-option label="计算机学院党支部" value="计算机学院党支部" />
-                <el-option label="软件学院党支部" value="软件学院党支部" />
-                <el-option label="信息学院党支部" value="信息学院党支部" />
+                <el-option v-for="branch in PARTY_BRANCHES" :key="branch" :label="branch" :value="branch" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -422,6 +418,7 @@
 </template>
 
 <script setup>
+import { PARTY_BRANCHES } from '@/constants/partyBranches'
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Upload, UploadFilled } from '@element-plus/icons-vue'

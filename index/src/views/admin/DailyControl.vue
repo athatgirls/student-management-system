@@ -4,10 +4,6 @@
     <!-- Hero -->
     <section class="hero">
       <div class="hero-inner container">
-        <div>
-          <div class="hero-title">管理员端 · 审核中心</div>
-          <div class="hero-sub">对学生提交的学术/日常/荣誉进行统一审批</div>
-        </div>
         <div class="hero-stats">
           <el-card class="stat-card" shadow="never">
             <div class="stat-title">待审核</div>
@@ -26,7 +22,7 @@
     </section>
 
     <div class="container">
-      <!-- 模块 + 状态筛选 + 搜索 -->
+      <!--  + 状态筛选 + 搜索 -->
       <div class="toolbar">
         <el-tabs v-model="moduleKey" type="card" @tab-change="onTabChange">
           <el-tab-pane label="学术活动" name="academic" />
@@ -71,7 +67,7 @@
             @selection-change="onSelectionChange"
         >
           <el-table-column type="selection" width="48" />
-          <!-- 请假模块特殊显示 -->
+          <!-- 请假特殊显示 -->
           <template v-if="moduleKey === 'leave'">
             <el-table-column prop="reason" label="请假原因" min-width="240" show-overflow-tooltip />
             <el-table-column prop="studentName" label="学生姓名" min-width="120" />
@@ -108,7 +104,7 @@
               </template>
             </el-table-column>
           </template>
-          <!-- 其他模块显示 -->
+          <!-- 其他显示 -->
           <template v-else>
             <el-table-column prop="title" :label="moduleTitle + '标题'" min-width="240" show-overflow-tooltip />
             <el-table-column label="时间" min-width="220">
@@ -373,6 +369,11 @@
     <!-- 发布任务弹窗 -->
     <el-dialog v-model="taskDialogVisible" title="发布新日常任务" width="800px" destroy-on-close>
       <el-form :model="taskForm" label-width="100px">
+        <el-form-item label="活动分类" required>
+          <el-select v-model="taskForm.activityCategory">
+            <el-option label="学术活动" value="academic" /><el-option label="日常活动" value="daily" /><el-option label="志愿活动" value="volunteer" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="任务标题" required>
           <el-input v-model="taskForm.title" placeholder="请输入任务标题" />
         </el-form-item>
@@ -499,6 +500,9 @@
                 </el-col>
               </el-row>
               <!-- 条件显示配置 -->
+              <el-select v-if="field.fieldType === 'date'" v-model="field.notBeforeField" clearable placeholder="日期不能早于哪个字段（可选）" style="margin-top:10px;width:100%">
+                <el-option v-for="other in taskForm.fields.filter(f => f !== field && f.fieldType === 'date' && f.fieldName)" :key="other.fieldName" :label="other.fieldName" :value="other.fieldName" />
+              </el-select>
               <el-row :gutter="10" align="middle" style="margin-top: 10px;">
                 <el-col :span="12">
                   <el-select 
@@ -713,7 +717,7 @@ const dict = {
   }
 }
 
-/** ========= 模块 ========= */
+/** =========  ========= */
 const moduleKey = ref('honor') // 默认演示“荣誉”，可改：'academic' | 'daily' | 'honor'
 const moduleTitle = computed(() => {
     if (moduleKey.value === 'academic') return '学术活动'
@@ -799,6 +803,7 @@ const getFieldName = (fieldName) => {
   return field ? field.fieldName : fieldName
 }
 const taskForm = reactive({
+  activityCategory: 'daily',
   title: '',
   description: '',
   deadline: '',
@@ -872,7 +877,8 @@ const handleCreateTask = async () => {
       fieldName: field.fieldName,
       fieldType: field.fieldType,
       required: field.required,
-      placeholder: field.placeholder || ''
+      placeholder: field.placeholder || '',
+      notBeforeField: field.fieldType === 'date' ? field.notBeforeField || '' : ''
     }
     // 如果是下拉选择类型，处理选项（使用空格分隔）
     if (field.fieldType === 'select' && field.optionsText) {
@@ -899,6 +905,7 @@ const handleCreateTask = async () => {
       loadTasks()
       // 重置表单
       Object.assign(taskForm, { 
+        activityCategory: 'daily',
         title: '', 
         description: '', 
         deadline: '', 
@@ -984,7 +991,7 @@ const loadBusinessData = async () => {
   }
   try {
     if (moduleKey.value === 'leave') {
-      // 请假模块，使用专门的API
+      // 请假，使用专门的API
       const res = await getAllLeaveRequests()
       if (res.code === 200) {
         allRows.leave = res.data || []
@@ -1005,7 +1012,7 @@ const rows = computed(() => {
   if (!searchKey.value) return list
   const key = searchKey.value.trim().toLowerCase()
   if (moduleKey.value === 'leave') {
-    // 请假模块：支持搜索请假原因、学生姓名、学号
+    // 请假：支持搜索请假原因、学生姓名、学号
     return list.filter(r =>
       (r.reason && r.reason.toLowerCase().includes(key)) ||
       (r.studentName && r.studentName.toLowerCase().includes(key)) ||
@@ -1067,7 +1074,7 @@ const reviewForm = reactive({
   title: '',
   studentName: '',
   userId: '',
-  status: '', // 请假状态（仅用于请假模块）
+  status: '', // 请假状态（仅用于请假）
   auditStatus: 'pending',
   auditComment: '',
   auditorId: '',

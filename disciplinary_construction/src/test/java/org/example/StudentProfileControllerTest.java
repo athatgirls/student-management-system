@@ -50,7 +50,7 @@ class StudentProfileControllerTest {
     @Test void postAndLegacyPutSaveOnlyAllowedFieldsForAuthenticatedStudent() throws Exception {
         when(students.updateStudent(any())).thenAnswer(i -> i.getArgument(0));
         String body = "{\"id\":\"victim\",\"phone\":\"fixture-phone\",\"birthDate\":\"2001-01-02T00:00:00.000Z\","
-                + "\"password\":\"injected-password\",\"politicalStatus\":\"injected-stage\"}";
+                + "\"password\":\"injected-password\",\"politicalStatus\":\"发展对象\",\"major\":\"计算机\",\"className\":\"一班\",\"supervisor\":\"导师\"}";
         for (HttpMethod method : new HttpMethod[]{HttpMethod.POST, HttpMethod.PUT}) {
             mvc.perform(request(method, URL).header("Authorization", "Bearer fixture-token")
                     .contentType(MediaType.APPLICATION_JSON).content(body))
@@ -59,7 +59,8 @@ class StudentProfileControllerTest {
                     .andExpect(jsonPath("$.data.phone").value("fixture-phone"));
         }
         verify(students, times(2)).updateStudent(argThat(s -> "student-a".equals(s.getId())
-                && s.getPassword() == null && s.getPoliticalStatus() == null && s.getBirthDate() != null));
+                && s.getPassword() == null && "发展对象".equals(s.getPoliticalStatus()) && "计算机".equals(s.getMajor())
+                && "一班".equals(s.getClassName()) && "导师".equals(s.getSupervisor()) && s.getBirthDate() != null));
     }
 
     @Test void getCannotSaveProfile() throws Exception {

@@ -1,7 +1,7 @@
 // 写api接口时取消该行注释
 // import request from './request'
 
-// 校友管理模块
+// 校友管理
 import request from "@/api/request";
 
 export function searchAlumniList(searchValue, searchYear, currentPage, pageSize) {

@@ -37,7 +37,7 @@ public class VolunteerServiceController {
     }
 
     @Operation(summary = "更新志愿服务记录")
-    @PutMapping("/update")
+    @RequestMapping(value = "/update", method = {RequestMethod.PUT, RequestMethod.POST})
     public ResponseResult<VolunteerServiceModel> updateVolunteerService(@RequestBody VolunteerServiceModel volunteerService, @CurrentUser Map<String, Object> currentUser) {
         VolunteerServiceModel existing = volunteerServiceService.getVolunteerServiceById(volunteerService.getId());
         if (existing != null) {
@@ -53,7 +53,7 @@ public class VolunteerServiceController {
     }
 
     @Operation(summary = "删除志愿服务记录")
-    @DeleteMapping("/delete/{id}")
+    @RequestMapping(value = "/delete/{id}", method = {RequestMethod.DELETE, RequestMethod.POST})
     public ResponseResult<String> deleteVolunteerService(@PathVariable String id,
                                                          @CurrentUser Map<String, Object> currentUser) {
         VolunteerServiceModel existing = volunteerServiceService.getVolunteerServiceById(id);

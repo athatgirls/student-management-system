@@ -59,7 +59,7 @@
             <el-menu-item index="/admin/internship/analysis">数据分析</el-menu-item>
           </el-sub-menu>
             
-          <!-- 科创竞赛模块 -->
+          <!-- 科创竞赛 -->
           <el-sub-menu index="/admin/innovation">
             <template #title>
               <el-icon><Trophy /></el-icon>
@@ -138,7 +138,7 @@
           <el-sub-menu index="/admin/party">
             <template #title>
               <el-icon><Flag /></el-icon>
-              <span>党员管理</span>
+              <span>党员发展与管理</span>
             </template>
             <el-menu-item index="/admin/party/management">综合管理</el-menu-item>
             <el-menu-item index="/admin/party/list">党员列表</el-menu-item>

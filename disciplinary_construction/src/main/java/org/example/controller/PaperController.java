@@ -41,6 +41,7 @@ public class PaperController {
         paper.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
         paper.setStudentName((String) currentUser.get("username"));
         try {
+            org.example.util.SubmissionValidation.validate(paper);
             resetPaperAudit(paper);
             PaperModel saved = paperService.addPaper(paper);
             return ResponseEntity.ok(saved);
@@ -49,7 +50,7 @@ public class PaperController {
         }
     }
 
-    @PutMapping("/{id}")
+    @RequestMapping(value = "/{id}", method = {RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<?> updatePaper(
             @PathVariable String id,
             @RequestBody PaperModel paper,
@@ -63,12 +64,19 @@ public class PaperController {
             paper.setId(id);
             paper.setStudentId(existing.getStudentId());
             paper.setStudentName(existing.getStudentName());
+            org.example.util.SubmissionValidation.validate(paper);
             resetPaperAudit(paper);
             PaperModel updated = paperService.savePaper(paper);
             return ResponseEntity.ok(updated);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("更新论文失败: " + e.getMessage());
         }
+    }
+
+    @PostMapping("/{id}/delete")
+    public ResponseEntity<?> deletePaperViaPost(@PathVariable String id,
+            @CurrentUser Map<String, Object> currentUser) {
+        return deletePaper(id, currentUser);
     }
 
     @DeleteMapping("/{id}")
@@ -128,7 +136,7 @@ public class PaperController {
         }
     }
 
-    @PutMapping("/admin/{id}/audit")
+    @RequestMapping(value = "/admin/{id}/audit", method = {RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<?> auditPaper(
             @PathVariable String id, 
             @RequestBody Map<String, String> auditData,

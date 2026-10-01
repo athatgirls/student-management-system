@@ -21,6 +21,7 @@ public class InternshipEmploymentServiceImpl implements InternshipEmploymentServ
 
     @Override
     public InternshipEmploymentModel add(InternshipEmploymentModel model) {
+        org.example.util.SubmissionValidation.dates(model.getStartDate(), model.getEndDate());
         // 设置创建时间和更新时间
         model.setCreateTime(new Date());
         model.setUpdateTime(new Date());
@@ -42,6 +43,7 @@ public class InternshipEmploymentServiceImpl implements InternshipEmploymentServ
 
     @Override
     public InternshipEmploymentModel update(InternshipEmploymentModel model) {
+        org.example.util.SubmissionValidation.dates(model.getStartDate(), model.getEndDate());
         model.setUpdateTime(new Date());
         
         // 重新计算持续时间

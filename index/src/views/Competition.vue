@@ -262,7 +262,7 @@
           />
         </el-form-item>
 
-        <el-form-item label="团队成员">
+        <el-form-item label="团队成员" prop="teamMembers">
           <el-input
               v-model="competitionForm.teamMembers"
               placeholder="多个成员用逗号分隔，如：张三,李四,王五"
@@ -275,7 +275,7 @@
           <el-input v-model="competitionForm.instructorName" placeholder="请输入指导老师姓名" />
         </el-form-item>
 
-        <el-form-item label="证明材料">
+        <el-form-item label="证明材料" prop="attachments">
           <el-upload
               class="upload-demo"
               :http-request="(options) => handleCustomUpload(options, 'competition')"
@@ -368,7 +368,7 @@
           <el-input v-model="paperForm.doi" placeholder="请输入DOI号（可选）" />
         </el-form-item>
 
-        <el-form-item label="证明材料">
+        <el-form-item label="证明材料" prop="attachments">
           <el-upload
               class="upload-demo"
               :http-request="(options) => handleCustomUpload(options, 'paper')"
@@ -455,7 +455,7 @@
           <el-input v-model="patentForm.coInventors" placeholder="多个发明人用逗号分隔" />
         </el-form-item>
 
-        <el-form-item label="证明材料">
+        <el-form-item label="证明材料" prop="attachments">
           <el-upload
               class="upload-demo"
               :http-request="(options) => handleCustomUpload(options, 'patent')"
@@ -543,7 +543,7 @@
           <el-input v-model="projectForm.instructorName" placeholder="请输入指导老师姓名" />
         </el-form-item>
 
-        <el-form-item label="证明材料">
+        <el-form-item label="证明材料" prop="attachments">
           <el-upload
               class="upload-demo"
               :http-request="(options) => handleCustomUpload(options, 'project')"
@@ -661,6 +661,7 @@
 </template>
 
 <script setup>
+import { hasAttachments, orderedDates } from '@/utils/submissionValidation'
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Trophy, Document, Operation, Files, Plus } from '@element-plus/icons-vue'
@@ -824,6 +825,9 @@ const projectForm = reactive({
 
 // 表单验证规则
 const competitionRules = {
+  teamMembers: [{ required: true, whitespace: true, message: '请填写团队成员', trigger: 'blur' }],
+  instructorName: [{ required: true, whitespace: true, message: '请填写指导老师', trigger: 'blur' }],
+  attachments: [{ validator: (_, value, done) => done(hasAttachments(value) ? undefined : new Error('请上传证明材料')), trigger: 'change' }],
   competitionName: [{ required: true, message: '请输入竞赛名称', trigger: 'blur' }],
   competitionLevel: [{ required: true, message: '请选择竞赛级别', trigger: 'change' }],
   awardLevel: [{ required: true, message: '请选择获奖等级', trigger: 'change' }],
@@ -832,6 +836,7 @@ const competitionRules = {
 }
 
 const paperRules = {
+  attachments: [{ validator: (_, value, done) => done(hasAttachments(value) ? undefined : new Error('请上传证明材料')), trigger: 'change' }],
   paperTitle: [{ required: true, message: '请输入论文题目', trigger: 'blur' }],
   journalName: [{ required: true, message: '请输入会议/期刊名称', trigger: 'blur' }],
   journalLevel: [{ required: true, message: '请选择会议/期刊级别', trigger: 'change' }],
@@ -840,6 +845,7 @@ const paperRules = {
 }
 
 const patentRules = {
+  attachments: [{ validator: (_, value, done) => done(hasAttachments(value) ? undefined : new Error('请上传证明材料')), trigger: 'change' }],
   patentTitle: [{ required: true, message: '请输入专利名称', trigger: 'blur' }],
   patentType: [{ required: true, message: '请选择专利类型', trigger: 'change' }],
   patentStatus: [{ required: true, message: '请选择专利状态', trigger: 'change' }],
@@ -847,6 +853,9 @@ const patentRules = {
 }
 
 const projectRules = {
+  teamMembers: [{ required: true, whitespace: true, message: '请填写团队成员', trigger: 'blur' }],
+  instructorName: [{ required: true, whitespace: true, message: '请填写指导老师', trigger: 'blur' }],
+  attachments: [{ validator: (_, value, done) => done(hasAttachments(value) ? undefined : new Error('请上传证明材料')), trigger: 'change' }],
   projectName: [{ required: true, message: '请输入项目名称', trigger: 'blur' }],
   projectLevel: [{ required: true, message: '请选择项目级别', trigger: 'change' }],
   ranking: [{ required: true, message: '请输入排名', trigger: 'blur' }],
@@ -1259,6 +1268,7 @@ const submitPaper = async () => {
 }
 
 const submitPatent = async () => {
+  if (!orderedDates(patentForm.applicationDate, patentForm.authorizationDate)) { ElMessage.warning('授权时间不能早于申请时间'); return }
   try {
     await patentFormRef.value.validate()
 
@@ -1285,6 +1295,7 @@ const submitPatent = async () => {
 }
 
 const submitProject = async () => {
+  if (!orderedDates(projectForm.startDate, projectForm.endDate)) { ElMessage.warning('结束时间不能早于开始时间'); return }
   try {
     await projectFormRef.value.validate()
 

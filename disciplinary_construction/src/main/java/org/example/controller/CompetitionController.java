@@ -49,6 +49,7 @@ public class CompetitionController {
         competition.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
         competition.setStudentName((String) currentUser.get("username"));
         try {
+            org.example.util.SubmissionValidation.validate(competition);
             resetCompetitionAudit(competition);
             CompetitionModel saved = competitionService.addCompetition(competition);
             return ResponseEntity.ok(saved);
@@ -60,7 +61,7 @@ public class CompetitionController {
     /**
      * 更新竞赛
      */
-    @PutMapping("/{id}")
+    @RequestMapping(value = "/{id}", method = {RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<?> updateCompetition(@PathVariable String id, @RequestBody CompetitionModel competition,
                                                @CurrentUser Map<String, Object> currentUser) {
         CompetitionModel existing = competitionService.getCompetitionById(id);
@@ -72,6 +73,7 @@ public class CompetitionController {
             competition.setId(id);
             competition.setStudentId(existing.getStudentId());
             competition.setStudentName(existing.getStudentName());
+            org.example.util.SubmissionValidation.validate(competition);
             resetCompetitionAudit(competition);
             CompetitionModel updated = competitionService.updateCompetition(competition);
             return ResponseEntity.ok(updated);
@@ -83,6 +85,12 @@ public class CompetitionController {
     /**
      * 删除竞赛
      */
+    @PostMapping("/{id}/delete")
+    public ResponseEntity<?> deleteCompetitionViaPost(@PathVariable String id,
+            @CurrentUser Map<String, Object> currentUser) {
+        return deleteCompetition(id, currentUser);
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteCompetition(@PathVariable String id,
                                                @CurrentUser Map<String, Object> currentUser) {
@@ -158,7 +166,7 @@ public class CompetitionController {
     /**
      * 审核竞赛
      */
-    @PutMapping("/admin/{id}/audit")
+    @RequestMapping(value = "/admin/{id}/audit", method = {RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<?> auditCompetition(@PathVariable String id, @RequestBody Map<String, String> auditData,
                                               @CurrentUser Map<String, Object> currentUser) {
         try {

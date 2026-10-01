@@ -2,7 +2,7 @@ import request from './request'
 
 /**
  * 实习就业相关API接口
- * 提供实习就业模块的所有前端接口调用
+ * 提供实习就业的所有前端接口调用
  */
 
 // 基础CRUD操作
@@ -59,7 +59,7 @@ export function addInternship(data) {
 export function updateInternship(data) {
   return request({
     url: '/internship-employment/update',
-    method: 'put',
+    method: 'post',
     data
   })
 }
@@ -68,7 +68,7 @@ export function updateInternship(data) {
 export function deleteInternship(id) {
   return request({
     url: `/internship-employment/delete/${id}`,
-    method: 'delete'
+    method: 'post'
   })
 }
 

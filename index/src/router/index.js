@@ -29,133 +29,139 @@ const routes = [
         path: '/profile',
         name: 'profile',
         component: () => import('../views/Profile.vue'),
-        meta: { title: '个人信息模块' }
+        meta: { title: '个人信息' }
       },
       {
         path: '/profile/study',
         name: 'profileStudy',
         component: () => import('../views/Profile.vue'),
-        meta: { title: '学习记录', parentTitle: '个人信息模块', parentPath: '/profile' }
+        meta: { title: '学习记录', parentTitle: '个人信息', parentPath: '/profile' }
       },
       {
         path: '/daily',
         name: 'daily',
         component: () => import('../views/Daily.vue'),
-        meta: { title: '日常管理模块' }
+        meta: { title: '日常管理' }
       },
       {
         path: '/daily/academic',
         name: 'dailyAcademic',
         component: () => import('../views/Daily.vue'),
-        meta: { title: '学术活动', parentTitle: '日常管理模块', parentPath: '/daily/academic' }
+        meta: { title: '学术活动', parentTitle: '日常管理', parentPath: '/daily/academic' }
       },
       {
         path: '/daily/daily',
         name: 'dailyActivity',
         component: () => import('../views/Daily.vue'),
-        meta: { title: '日常活动', parentTitle: '日常管理模块', parentPath: '/daily/academic' }
+        meta: { title: '日常活动', parentTitle: '日常管理', parentPath: '/daily/academic' }
       },
       {
         path: '/daily/leave',
         name: 'dailyLeave',
         component: () => import('../views/Daily.vue'),
-        meta: { title: '请假管理', parentTitle: '日常管理模块', parentPath: '/daily/academic' }
+        meta: { title: '请假管理', parentTitle: '日常管理', parentPath: '/daily/academic' }
       },
       {
         path: '/daily/honor',
         name: 'dailyHonor',
         component: () => import('../views/Daily.vue'),
-        meta: { title: '荣誉', parentTitle: '日常管理模块', parentPath: '/daily/academic' }
+        meta: { title: '荣誉', parentTitle: '日常管理', parentPath: '/daily/academic' }
       },
       {
         path: '/daily/tasks',
         name: 'dailyTasks',
         component: () => import('../views/Daily.vue'),
-        meta: { title: '日常任务', parentTitle: '日常管理模块', parentPath: '/daily/academic' }
+        meta: { title: '日常任务', parentTitle: '日常管理', parentPath: '/daily/academic' }
+      },
+      {
+        path: '/daily/volunteer',
+        name: 'dailyVolunteer',
+        component: () => import('../views/Daily.vue'),
+        meta: { title: '志愿活动', parentTitle: '日常管理', parentPath: '/daily/academic' }
       },
       {
         path: '/internship',
         name: 'internship',
         component: () => import('../views/Internship.vue'),
-        meta: { title: '实习就业模块' }
+        meta: { title: '实习就业' }
       },
       {
         path: '/internship/intent',
         name: 'internshipIntent',
         component: () => import('../views/Internship.vue'),
-        meta: { title: '就业意向采集', parentTitle: '实习就业模块', parentPath: '/internship/intent' }
+        meta: { title: '就业意向采集', parentTitle: '实习就业', parentPath: '/internship/intent' }
       },
       {
         path: '/internship/records',
         name: 'internshipRecords',
         component: () => import('../views/Internship.vue'),
-        meta: { title: '分类展示与记录', parentTitle: '实习就业模块', parentPath: '/internship/intent' }
+        meta: { title: '分类展示与记录', parentTitle: '实习就业', parentPath: '/internship/intent' }
       },
       {
         path: '/competition',
         name: 'competition',
         component: () => import('../views/Competition.vue'),
-        meta: { title: '科创竞赛模块' }
+        meta: { title: '科创竞赛' }
       },
       {
         path: '/competition/competition',
         name: 'competitionCompetition',
         component: () => import('../views/Competition.vue'),
-        meta: { title: '学科竞赛', parentTitle: '科创竞赛模块', parentPath: '/competition/competition' }
+        meta: { title: '学科竞赛', parentTitle: '科创竞赛', parentPath: '/competition/competition' }
       },
       {
         path: '/competition/paper',
         name: 'competitionPaper',
         component: () => import('../views/Competition.vue'),
-        meta: { title: '发表文章', parentTitle: '科创竞赛模块', parentPath: '/competition/competition' }
+        meta: { title: '发表文章', parentTitle: '科创竞赛', parentPath: '/competition/competition' }
       },
       {
         path: '/competition/patent',
         name: 'competitionPatent',
         component: () => import('../views/Competition.vue'),
-        meta: { title: '专利', parentTitle: '科创竞赛模块', parentPath: '/competition/competition' }
+        meta: { title: '专利', parentTitle: '科创竞赛', parentPath: '/competition/competition' }
       },
       {
         path: '/competition/project',
         name: 'competitionProject',
         component: () => import('../views/Competition.vue'),
-        meta: { title: '项目', parentTitle: '科创竞赛模块', parentPath: '/competition/competition' }
+        meta: { title: '项目', parentTitle: '科创竞赛', parentPath: '/competition/competition' }
       },
       {
         path: '/alumni',
         name: 'alumni',
         component: () => import('../views/Alumni.vue'),
-        meta: { title: '校友管理模块' }
+        meta: { title: '校友管理' }
       },
       {
         path: '/party',
         name: 'party',
         component: () => import('../views/Party.vue'),
-        meta: { title: '党员管理模块' }
+        meta: { title: '党员发展与管理' }
       },
       {
         path: '/party/member',
         name: 'partyMember',
         component: () => import('../views/Party.vue'),
-        meta: { title: '党员信息/申请入党', parentTitle: '党员管理模块', parentPath: '/party/member' }
+        meta: { title: '党员信息/申请入党', parentTitle: '党员发展与管理', parentPath: '/party/member' }
       },
       {
         path: '/party/report',
         name: 'partyReport',
         component: () => import('../views/Party.vue'),
-        meta: { title: '思想汇报', parentTitle: '党员管理模块', parentPath: '/party/member' }
+        meta: { title: '思想汇报', parentTitle: '党员发展与管理', parentPath: '/party/member' }
       },
       {
         path: '/party/course',
         name: 'partyCourse',
         component: () => import('../views/Party.vue'),
-        meta: { title: '微党课', parentTitle: '党员管理模块', parentPath: '/party/member' }
+        meta: { title: '微党课', parentTitle: '党员发展与管理', parentPath: '/party/member' }
       },
       {
         path: '/party/service',
         name: 'partyService',
         component: () => import('../views/Party.vue'),
-        meta: { title: '志愿服务', parentTitle: '党员管理模块', parentPath: '/party/member' }
+        meta: { title: '志愿活动', parentTitle: '党员发展与管理', parentPath: '/party/member' }
       }
     ]
   },
@@ -270,12 +276,12 @@ const routes = [
         component: () => import('../views/admin/innovation/Statistics.vue'),
         meta: { title: '科创数据统计' }
       },
-      // ==================== 党员管理 ====================
+      // ==================== 党员发展与管理 ====================
       {
         path: '/admin/party/management',
         name: 'PartyManagement',
         component: () => import('../views/admin/PartyManagement.vue'),
-        meta: { title: '党员管理', requiresAuth: true, requiresAdmin: true }
+        meta: { title: '党员发展与管理', requiresAuth: true, requiresAdmin: true }
       },
       {
         path: '/admin/party/list',

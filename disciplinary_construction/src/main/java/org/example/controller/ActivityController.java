@@ -72,7 +72,7 @@ public class ActivityController {
     }
 
     // 删除活动
-    @DeleteMapping("/delete/{id}")
+    @RequestMapping(value = "/delete/{id}", method = {RequestMethod.DELETE, RequestMethod.POST})
     public ResponseEntity<Map<String, Object>> deleteActivity(@PathVariable String id) {
         Map<String, Object> result = new HashMap<>();
         try {

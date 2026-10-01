@@ -19,6 +19,7 @@ public class HonorServiceImpl implements HonorService {
     public HonorModel create(HonorModel model) {
         model.setId(null);
         model.setAuditStatus("pending");
+        model.setAuditComment(null); model.setAuditorId(null); model.setAuditTime(null);
         model.setCreateTime(LocalDateTime.now());
         model.setUpdateTime(LocalDateTime.now());
         return repository.save(model);

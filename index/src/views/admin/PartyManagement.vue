@@ -1,11 +1,5 @@
 <template>
   <div class="party-management">
-    <el-card class="page-header-card" shadow="never">
-      <div class="page-header">
-        <h2>党员管理</h2>
-        <p>管理党员信息、入党申请、思想汇报、党课学习和志愿服务记录</p>
-      </div>
-    </el-card>
 
     <el-tabs v-model="activeTab" class="management-tabs" @tab-change="handleTabChange">
       <!-- 入党申请管理 -->
@@ -205,10 +199,8 @@
 
           <el-table :data="courseList" v-loading="courseLoading" stripe>
             <el-table-column prop="studentId" label="学号" width="120" />
-            <el-table-column prop="title" label="课程标题" min-width="200" />
-            <el-table-column prop="courseType" label="类型" width="100" />
-            <el-table-column prop="instructor" label="授课教师" width="120" />
-            <el-table-column prop="courseDate" label="课程日期" width="120" />
+            <el-table-column prop="title" label="微党课/推文题目" min-width="200" />
+            <el-table-column prop="courseDate" label="发布日期" width="120" />
             <el-table-column prop="auditStatus" label="审核状态" width="100">
               <template #default="scope">
                 <el-tag :type="getAuditStatusType(scope.row.auditStatus)" size="small">
@@ -239,12 +231,12 @@
         </el-card>
       </el-tab-pane>
 
-      <!-- 志愿服务管理 -->
-      <el-tab-pane label="志愿服务" name="service">
+      <!-- 志愿活动管理 -->
+      <el-tab-pane label="志愿活动" name="service">
         <el-card>
           <template #header>
             <div class="card-header">
-              <span>志愿服务管理</span>
+              <span>志愿活动管理</span>
               <div class="header-actions">
                 <el-input
                   v-model="serviceSearchKeyword"
@@ -339,7 +331,7 @@
     <el-dialog v-model="showViewDialog" :title="viewDialogTitle" width="700px">
       <el-descriptions :column="2" border v-if="viewingItem">
         <el-descriptions-item
-          v-for="(value, key) in viewingItem"
+          v-for="(value, key) in visibleDetail(viewingItem)"
           :key="key"
           :label="getFieldLabel(key)"
           :span="key === 'content' || key === 'description' || key === 'serviceDescription' ? 2 : 1"
@@ -369,7 +361,7 @@
             </el-table>
           </template>
           <template v-else>
-            {{ value || '-' }}
+            {{ displayDetailValue(value) }}
           </template>
         </el-descriptions-item>
       </el-descriptions>
@@ -650,7 +642,7 @@ const loadCourses = async () => {
   }
 }
 
-// 加载志愿服务
+// 加载志愿活动
 const loadServices = async () => {
   serviceLoading.value = true
   try {
@@ -670,8 +662,8 @@ const loadServices = async () => {
     
     serviceList.value = data
   } catch (error) {
-    console.error('加载志愿服务失败:', error)
-    ElMessage.error('加载志愿服务失败')
+    console.error('加载志愿活动失败:', error)
+    ElMessage.error('加载志愿活动失败')
   } finally {
     serviceLoading.value = false
   }
@@ -698,7 +690,7 @@ const viewCourse = (row) => {
 
 const viewService = (row) => {
   viewingItem.value = row
-  viewDialogTitle.value = '志愿服务详情'
+  viewDialogTitle.value = '志愿活动详情'
   showViewDialog.value = true
 }
 
@@ -733,7 +725,7 @@ const auditCourse = (row) => {
 const auditService = (row) => {
   currentAuditItem.value = row
   currentAuditType.value = 'service'
-  auditDialogTitle.value = '审核志愿服务'
+  auditDialogTitle.value = '审核志愿活动'
   auditForm.auditStatus = ''
   auditForm.auditComment = ''
   showAuditDialog.value = true
@@ -840,7 +832,7 @@ const deleteCourse = async (row) => {
 
 const deleteService = async (row) => {
   try {
-    await ElMessageBox.confirm('确定要删除该志愿服务记录吗？', '提示', {
+    await ElMessageBox.confirm('确定要删除该志愿活动记录吗？', '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
@@ -901,17 +893,23 @@ const formatDateTime = (date) => {
   return new Date(date).toLocaleString('zh-CN')
 }
 
+const displayDetailValue = value => ({ pending: '待审核', approved: '已通过', rejected: '已驳回', submitted: '已提交', completed: '已完成' }[value] || value || '-')
+const visibleDetail = row => Object.fromEntries(Object.entries(row || {}).filter(([key, value]) => getFieldLabel(key) !== key && value != null && value !== '' && !['studentId', 'courseType', 'instructor', 'location'].includes(key)))
+
 const getFieldLabel = (key) => {
   const labelMap = {
     studentId: '学号',
     name: '姓名',
+    studentName: '学生姓名',
+    status: '状态',
+    auditTime: '审核时间',
     title: '标题',
     content: '内容',
-    description: '描述',
+    description: '推文发布链接',
     reportType: '汇报类型',
     reportDate: '汇报日期',
     courseType: '课程类型',
-    courseDate: '课程日期',
+    courseDate: '发布日期',
     instructor: '授课教师',
     location: '上课地点',
     serviceName: '服务名称',

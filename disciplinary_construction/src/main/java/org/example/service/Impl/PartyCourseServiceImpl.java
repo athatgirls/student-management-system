@@ -17,6 +17,7 @@ public class PartyCourseServiceImpl implements PartyCourseService {
 
     @Override
     public PartyCourseModel addPartyCourse(PartyCourseModel partyCourse) {
+        org.example.util.SubmissionValidation.validate(partyCourse);
         partyCourse.setId(null); // Creation must never update a client-selected record.
         partyCourse.setCreateTime(LocalDateTime.now());
         partyCourse.setUpdateTime(LocalDateTime.now());
@@ -26,6 +27,7 @@ public class PartyCourseServiceImpl implements PartyCourseService {
 
     @Override
     public PartyCourseModel updatePartyCourse(PartyCourseModel partyCourse) {
+        org.example.util.SubmissionValidation.validate(partyCourse);
         partyCourse.setUpdateTime(LocalDateTime.now());
         return partyCourseRepository.save(partyCourse);
     }

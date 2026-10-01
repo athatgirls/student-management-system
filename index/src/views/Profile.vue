@@ -1,7 +1,7 @@
 /* eslint-disable vue/multi-word-component-names */
 <template>
   <div class="profile">
-    <el-card>
+    <el-card v-if="!isStudyPage">
       <template #header>
         <div class="card-header">
           <span>个人信息</span>
@@ -79,7 +79,7 @@
         <el-row :gutter="20">
           <el-col :xs="24" :sm="24" :md="12" :lg="12">
             <el-form-item label="专业" prop="major">
-              <el-input v-model="profileForm.major" disabled title="请联系管理员修改" />
+              <el-input v-model="profileForm.major" placeholder="请输入专业" />
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="24" :md="12" :lg="12">
@@ -92,7 +92,7 @@
         <el-row :gutter="20">
           <el-col :xs="24" :sm="24" :md="12" :lg="12">
             <el-form-item label="班级" prop="className">
-              <el-input v-model="profileForm.className" disabled title="请联系管理员修改" />
+              <el-input v-model="profileForm.className" placeholder="请输入班级" />
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="24" :md="12" :lg="12">
@@ -134,7 +134,7 @@
         <el-row :gutter="20">
           <el-col :xs="24" :sm="24" :md="12" :lg="12">
             <el-form-item label="政治面貌" prop="politicalStatus">
-              <el-select v-model="profileForm.politicalStatus" disabled placeholder="请联系管理员审核设置" style="width: 100%">
+              <el-select v-model="profileForm.politicalStatus" placeholder="请选择政治面貌" style="width: 100%">
                 <el-option
                   v-for="status in POLITICAL_STATUS_OPTIONS"
                   :key="status"
@@ -158,7 +158,7 @@
         <el-row :gutter="20">
           <el-col :xs="24" :sm="24" :md="8" :lg="8">
             <el-form-item label="导师" prop="supervisor">
-              <el-input v-model="profileForm.supervisor" disabled title="请联系管理员修改" />
+              <el-input v-model="profileForm.supervisor" placeholder="请输入导师" />
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="24" :md="8" :lg="8">
@@ -184,10 +184,11 @@
       </el-form>
     </el-card>
 
-    <el-card ref="studyCardRef" style="margin-top: 20px;">
+    <el-card v-if="isStudyPage">
       <template #header>
         <div class="card-header">
           <span>学习记录</span>
+          <el-button type="primary" @click="editStudy()">新增学习记录</el-button>
         </div>
       </template>
       
@@ -200,6 +201,11 @@
         </el-table-column>
         <el-table-column prop="score" label="成绩" width="100" />
         <el-table-column prop="credit" label="学分" width="100" />
+        <el-table-column label="材料"><template #default="{ row }"><RecordAttachments :model-value="row.attachments || ''" /></template></el-table-column>
+        <el-table-column label="操作" width="160"><template #default="{ row }">
+          <el-button v-if="row.source === 'student'" link type="primary" @click="editStudy(row)">编辑</el-button>
+          <span v-else>教务导入（只读）</span>
+        </template></el-table-column>
         <el-table-column prop="status" label="状态" width="100">
           <template #default="scope">
             <el-tag :type="scope.row.status === '已通过' ? 'success' : 'warning'">
@@ -210,6 +216,16 @@
       </el-table>
     </el-card>
     
+    <el-dialog v-model="studyDialog" title="填写学习记录" width="min(560px, 95vw)">
+      <el-form label-width="90px">
+        <el-form-item label="学期" required><el-input v-model="studyForm.semester" placeholder="例如：2026-2027 第一学期" /></el-form-item>
+        <el-form-item label="课程名称" required><el-input v-model="studyForm.course" /></el-form-item>
+        <el-form-item label="成绩" required><el-input-number v-model="studyForm.score" :min="0" :max="100" /></el-form-item>
+        <el-form-item label="学分" required><el-input-number v-model="studyForm.credit" :min="0" :precision="1" /></el-form-item>
+        <el-form-item label="证明材料" required><RecordAttachments v-model="studyForm.attachments" editable /></el-form-item>
+      </el-form>
+      <template #footer><el-button @click="studyDialog = false">取消</el-button><el-button type="primary" :loading="studySaving" @click="saveStudy">保存</el-button></template>
+    </el-dialog>
     <!-- 修改密码对话框 -->
     <el-dialog
       v-model="showChangePasswordDialog"
@@ -264,18 +280,20 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed, watch, nextTick } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useStore } from 'vuex'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getProfile, updateProfile, getStudyRecords, changePassword } from '@/api/student'
 import { POLITICAL_STATUS_OPTIONS } from '@/constants/politicalStatus'
+import RecordAttachments from '@/components/RecordAttachments.vue'
+import request from '@/api/request'
 
 const store = useStore()
 const route = useRoute()
 const formRef = ref()
 const passwordFormRef = ref()
-const studyCardRef = ref()
+const isStudyPage = computed(() => route.path === '/profile/study' || route.query.tab === 'study')
 const editMode = ref(false)
 const showChangePasswordDialog = ref(false)
 const passwordLoading = ref(false)
@@ -417,17 +435,26 @@ watch(() => profileForm.birthDate, (newVal) => {
 }, { immediate: true })
 
 const studyRecords = ref([])
-
-const scrollToStudyRecords = async () => {
-  await nextTick()
-  studyCardRef.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+const studyDialog = ref(false)
+const studySaving = ref(false)
+const studyForm = reactive({})
+const editStudy = row => {
+  Object.keys(studyForm).forEach(k => delete studyForm[k])
+  Object.assign(studyForm, row || { semester: '', course: '', score: 0, credit: 0, attachments: '' })
+  studyDialog.value = true
 }
-
-watch(() => [route.path, route.query.tab], () => {
-  if (route.path === '/profile/study' || route.query.tab === 'study') {
-    scrollToStudyRecords()
+const saveStudy = async () => {
+  if (!studyForm.semester?.trim() || !studyForm.course?.trim() || !JSON.parse(studyForm.attachments || '[]').length) {
+    ElMessage.warning('请填写学期、课程名称并上传证明材料'); return
   }
-}, { immediate: true })
+  studySaving.value = true
+  try {
+    await request.post('/study-records', studyForm)
+    studyRecords.value = (await getStudyRecords()).data || []
+    studyDialog.value = false; ElMessage.success('保存成功')
+  } catch { /* shared interceptor displays errors */ }
+  finally { studySaving.value = false }
+}
 
 const loadProfile = async () => {
   try {

@@ -37,7 +37,7 @@ public class PartyCourseController {
     }
 
     @Operation(summary = "更新党课记录")
-    @PutMapping("/update")
+    @RequestMapping(value = "/update", method = {RequestMethod.PUT, RequestMethod.POST})
     public ResponseResult<PartyCourseModel> updatePartyCourse(@RequestBody PartyCourseModel partyCourse, @CurrentUser Map<String, Object> currentUser) {
         PartyCourseModel existing = partyCourseService.getPartyCourseById(partyCourse.getId());
         if (existing != null) {
@@ -53,7 +53,7 @@ public class PartyCourseController {
     }
 
     @Operation(summary = "删除党课记录")
-    @DeleteMapping("/delete/{id}")
+    @RequestMapping(value = "/delete/{id}", method = {RequestMethod.DELETE, RequestMethod.POST})
     public ResponseResult<String> deletePartyCourse(@PathVariable String id,
                                                     @CurrentUser Map<String, Object> currentUser) {
         PartyCourseModel existing = partyCourseService.getPartyCourseById(id);

@@ -41,9 +41,13 @@ public class ActivityServiceImpl implements ActivityService {
 
     @Autowired
     private MongoTemplate mongoTemplate;
+    @Autowired
+    private org.example.service.VolunteerCompletionService volunteerCompletionService;
 
     @Override
     public ActivityModel createActivity(ActivityModel activity) {
+        DailyTaskModel task = taskRepository.findById(activity.getTaskId()).orElseThrow(() -> new IllegalArgumentException("关联任务不存在"));
+        activity.setActivityCategory(org.example.util.TaskSubmissionValidation.category(task.getActivityCategory()));
         activity.setId(null);
         activity.setCreateTime(LocalDateTime.now());
         activity.setUpdateTime(LocalDateTime.now());
@@ -103,20 +107,8 @@ public class ActivityServiceImpl implements ActivityService {
             return result;
         }
 
-        // 如果是报名型任务，需要检查报名人数限制
-        if ("registration".equals(associatedTask.getTaskCategory())) {
-            int maxParticipants = associatedTask.getMaxParticipants() != null ? associatedTask.getMaxParticipants() : 0;
-            int currentParticipants = associatedTask.getCurrentParticipants() != null ? associatedTask.getCurrentParticipants() : 0;
-            int remainingSlots = maxParticipants - currentParticipants;
-            
-            if (remainingSlots <= 0) {
-                result.put("success", false);
-                result.put("message", "报名型任务已满员，无法继续导入学生");
-                return result;
-            }
-        }
-
-        List<String> participantIds = new ArrayList<>();
+        // 已报名者即使满员也必须允许导入到场名单；只为新增报名占用名额。
+        Set<String> participantIds = new LinkedHashSet<>(activity.getParticipantStudentIds() == null ? Collections.emptyList() : activity.getParticipantStudentIds());
 
         for (Map<String, String> studentInfo : students) {
             String name = studentInfo.get("name");
@@ -129,18 +121,10 @@ public class ActivityServiceImpl implements ActivityService {
             }
             
             // 如果通过学号找不到，尝试通过姓名查找
-            if (foundStudent == null && name != null && !name.trim().isEmpty()) {
+            if (foundStudent == null && (studentId == null || studentId.trim().isEmpty()) && name != null && !name.trim().isEmpty()) {
                 List<StudentModel> studentsByName = studentRepository.findByName(name.trim());
-                if (studentsByName != null && !studentsByName.isEmpty()) {
-                    // 如果找到多个同名学生，优先选择学号匹配的
-                    if (studentId != null && !studentId.trim().isEmpty()) {
-                        foundStudent = studentsByName.stream()
-                                .filter(s -> studentId.trim().equals(s.getStudentId()))
-                                .findFirst()
-                                .orElse(studentsByName.get(0));
-                    } else {
-                        foundStudent = studentsByName.get(0);
-                    }
+                if (studentsByName != null && studentsByName.size() == 1) {
+                    foundStudent = studentsByName.get(0);
                 }
             }
 
@@ -167,7 +151,7 @@ public class ActivityServiceImpl implements ActivityService {
 
                 if (!existing.isPresent()) {
                     // 如果是报名型任务，需要检查报名人数限制
-                    if ("registration".equals(associatedTask.getTaskCategory())) {
+                    if ("registration".equals(associatedTask.getTaskCategory()) && associatedTask.getMaxParticipants() != null && associatedTask.getMaxParticipants() > 0) {
                         int maxParticipants = associatedTask.getMaxParticipants() != null ? associatedTask.getMaxParticipants() : 0;
                         int currentParticipants = associatedTask.getCurrentParticipants() != null ? associatedTask.getCurrentParticipants() : 0;
                         
@@ -219,6 +203,7 @@ public class ActivityServiceImpl implements ActivityService {
                     // 已经提交过，也算匹配成功
                     matchedCount = 1;
                 }
+                volunteerCompletionService.sync(associatedTask, student, activity);
                 participantIds.add(student.getId());
             } else {
                 // 不符合任务限制条件
@@ -238,7 +223,7 @@ public class ActivityServiceImpl implements ActivityService {
         }
 
         // 更新活动的参与学生列表
-        activity.setParticipantStudentIds(participantIds);
+        activity.setParticipantStudentIds(new ArrayList<>(participantIds));
         activity.setMatched(true);
         activity.setUpdateTime(LocalDateTime.now());
         activityRepository.save(activity);

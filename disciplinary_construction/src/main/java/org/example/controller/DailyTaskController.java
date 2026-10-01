@@ -92,6 +92,7 @@ public class DailyTaskController {
                 taskMap.put("type", task.getType());
                 taskMap.put("fields", task.getFields()); // 添加字段定义
                 taskMap.put("taskCategory", task.getTaskCategory()); // 任务类别
+                taskMap.put("activityCategory", org.example.util.TaskSubmissionValidation.category(task.getActivityCategory()));
                 taskMap.put("maxParticipants", task.getMaxParticipants()); // 最大报名人数
                 
                 // 计算当前报名人数（报名型任务）
@@ -135,6 +136,9 @@ public class DailyTaskController {
             result.put("code", 200);
             result.put("data", savedSubmission);
             result.put("msg", "任务提交成功");
+        } catch (IllegalArgumentException e) {
+            result.put("code", 400);
+            result.put("msg", e.getMessage());
         } catch (AccessDeniedException e) {
             throw e;
         } catch (Exception e) {
@@ -166,7 +170,7 @@ public class DailyTaskController {
     }
 
     // 删除任务（管理员）
-    @DeleteMapping("/delete/{id}")
+    @RequestMapping(value = "/delete/{id}", method = {RequestMethod.DELETE, RequestMethod.POST})
     public ResponseEntity<Map<String, Object>> deleteTask(@PathVariable String id) {
         Map<String, Object> result = new HashMap<>();
         dailyTaskService.deleteTask(id);

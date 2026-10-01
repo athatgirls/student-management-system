@@ -22,6 +22,7 @@ public class DailyTaskModel {
     private boolean active = true;  // 是否激活
     private List<TaskField> fields; // 任务字段定义（类似Excel表头）
     private String taskCategory;    // 任务类别：normal(普通任务，所有人都需要完成) 或 registration(报名型任务，限制人数)
+    private String activityCategory = "daily"; // academic / daily / volunteer; legacy records default to daily
     private Integer maxParticipants; // 报名型任务的最大报名人数（仅报名型任务有效）
     private Integer currentParticipants; // 当前已报名人数（仅报名型任务有效，自动计算）
     
@@ -41,5 +42,6 @@ public class DailyTaskModel {
         private List<String> options; // 如果是select类型，选项列表
         private String conditionalField; // 条件字段：依赖的字段名（当依赖字段的值等于conditionalValue时才显示）
         private String conditionalValue; // 条件值：当依赖字段等于此值时才显示当前字段
+        private String notBeforeField; // 日期不得早于指定字段
     }
 }

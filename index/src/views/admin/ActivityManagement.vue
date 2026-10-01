@@ -22,6 +22,7 @@
 
         <el-table :data="activities" style="width: 100%" border>
           <el-table-column prop="title" label="活动标题" min-width="200" />
+          <el-table-column label="活动分类" width="110"><template #default="{ row }">{{ { academic: '学术活动', daily: '日常活动', volunteer: '志愿活动' }[row.activityCategory || 'daily'] }}</template></el-table-column>
           <el-table-column label="活动时间" min-width="180">
             <template #default="scope">
               {{ formatDateTime(scope.row.activityTime) }}
@@ -114,6 +115,11 @@
 
         <!-- 创建新任务 -->
         <template v-if="activityForm.taskMode === 'create'">
+          <el-form-item label="活动分类" required>
+            <el-select v-model="activityForm.activityCategory">
+              <el-option label="学术活动" value="academic" /><el-option label="日常活动" value="daily" /><el-option label="志愿活动" value="volunteer" />
+            </el-select>
+          </el-form-item>
           <el-form-item label="任务类别" required>
             <el-radio-group v-model="activityForm.taskCategory">
               <el-radio label="normal">普通任务</el-radio>
@@ -389,6 +395,7 @@ const activityForm = reactive({
   taskMode: 'create', // 'create' 或 'link'
   // 创建新任务相关
   taskCategory: 'normal',
+  activityCategory: 'daily',
   maxParticipants: null,
   allowedGrades: [],
   allowedIdentities: [],
@@ -447,6 +454,7 @@ const handleOpenCreateDialog = () => {
   activityForm.taskDeadline = null
   activityForm.taskMode = 'create'
   activityForm.taskCategory = 'normal'
+  activityForm.activityCategory = 'daily'
   activityForm.maxParticipants = null
   activityForm.allowedGrades = []
   activityForm.allowedIdentities = []
@@ -497,6 +505,7 @@ const handleCreateActivity = async () => {
         deadline: activityForm.taskDeadline,
         type: '信息填写',
         taskCategory: activityForm.taskCategory,
+        activityCategory: activityForm.activityCategory,
         maxParticipants: activityForm.taskCategory === 'registration' ? activityForm.maxParticipants : null,
         allowedGrades: activityForm.allowedGrades,
         allowedIdentities: activityForm.allowedIdentities,

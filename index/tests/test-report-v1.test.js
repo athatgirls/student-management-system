@@ -1,0 +1,41 @@
+const { test } = require('node:test')
+const assert = require('node:assert/strict')
+const { readFileSync } = require('node:fs')
+const path = require('node:path')
+const vm = require('node:vm')
+const read = file => readFileSync(path.join(__dirname, '../src', file), 'utf8')
+const context = vm.createContext({})
+vm.runInContext(read('utils/submissionValidation.js').replace(/export /g, '') + '\nglobalThis.validate = {hasAttachments, orderedDates, taskDateError}', context)
+const {hasAttachments, orderedDates, taskDateError} = context.validate
+test('empty or malformed material lists are not accepted', () => {
+  for (const value of ['', null, '[]', '{}', 'invalid', '[{"name":"fake"}]']) assert.equal(hasAttachments(value), false)
+  assert.ok(hasAttachments('[{"url":"/uploads/test.pdf"}]'))
+})
+test('date order validation catches the report example and custom relationships', () => {
+  assert.equal(orderedDates('2026-10-03','2026-10-01'),false)
+  assert.equal(orderedDates('2026-10-01','2026-10-01'),true)
+  assert.match(taskDateError([{fieldName:'返校时间',fieldType:'date'}], {'离校时间':'2026-10-03','返校时间':'2026-10-01'}), /不能早于/)
+  assert.match(taskDateError([{fieldName:'返回',fieldType:'date',notBeforeField:'出发'}], {'出发':'2026-10-03','返回':'2026-10-01'}), /不能早于/)
+  assert.equal(taskDateError([{fieldName:'返校时间',fieldType:'date'}], {'离校时间':'2026-10-01','返校时间':'2026-10-03'}),'')
+})
+test('gateway-sensitive mutations use explicit POST routes', () => {
+  for (const file of ['api/party.js','api/competition.js','api/internship.js','api/daily.js']) assert.doesNotMatch(read(file), /method: '(put|delete)'|request\.(put|delete)\(/)
+  assert.match(read('api/competition.js'), /competitions\/\$\{id\}\/delete/)
+})
+test('profile and study are separated and requested student fields are editable', () => {
+  const source = read('views/Profile.vue')
+  assert.match(source, /<el-card v-if="!isStudyPage"/)
+  assert.match(source, /<el-card v-if="isStudyPage"/)
+  for (const field of ['major','className','politicalStatus','supervisor','researchDirection']) assert.doesNotMatch(source, new RegExp(`v-model="profileForm.${field}"[^>]*disabled`))
+  assert.match(source, /row.source === 'student'/)
+})
+test('employment intention no longer uses cross-account browser-local storage', () => {
+  assert.doesNotMatch(read('views/Internship.vue'), /localStorage\.(getItem|setItem)\('employment_/)
+  assert.match(read('views/Internship.vue'), /request.post\('\/employment-intentions\/me'/)
+  assert.match(read('views/admin/InternshipList.vue'), /<EmploymentIntentions/)
+})
+test('four requested party branches and volunteer navigation are available', () => {
+  assert.match(read('constants/partyBranches.js'), /'第一', '第二', '第三', '卓研'/)
+  assert.match(read('components/Layout.vue'), /\/daily\/volunteer/)
+  assert.doesNotMatch(read('components/Layout.vue'), /<div class="page-shell"/)
+})

@@ -391,7 +391,7 @@ const volunteerServices = [
   {
     id: 'service-001',
     studentId: previewStudent.studentId,
-    serviceName: '社区志愿服务',
+    serviceName: '社区志愿活动',
     serviceType: '社区服务',
     organization: '学院青年志愿者协会',
     serviceDate: toDate(-12),
@@ -646,7 +646,7 @@ export function createPreviewResponse(config = {}) {
   if (path.startsWith('/daily-tasks/student-incomplete-tasks')) return success([dailyTasks[0]])
   if (path === '/activities/list') {
     return success([
-      { id: 'activity-001', name: '学院志愿服务', title: '学院志愿服务', taskId: 'task-002', activityDate: toDate(5), active: true }
+      { id: 'activity-001', name: '学院志愿活动', title: '学院志愿活动', taskId: 'task-002', activityDate: toDate(5), active: true }
     ])
   }
   if (path.includes('/activities/') && path.includes('/import-students')) {

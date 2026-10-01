@@ -35,7 +35,7 @@
             <el-sub-menu index="/profile">
               <template #title>
                 <el-icon><User /></el-icon>
-                <span>个人信息模块</span>
+                <span>个人信息</span>
               </template>
               <el-menu-item index="/profile">个人资料</el-menu-item>
               <el-menu-item index="/profile/study">学习记录</el-menu-item>
@@ -43,9 +43,10 @@
             <el-sub-menu index="/daily">
               <template #title>
                 <el-icon><Calendar /></el-icon>
-                <span>日常管理模块</span>
+                <span>日常管理</span>
               </template>
               <el-menu-item index="/daily/academic">学术活动</el-menu-item>
+              <el-menu-item index="/daily/volunteer">志愿活动</el-menu-item>
               <el-menu-item index="/daily/daily">日常活动</el-menu-item>
               <el-menu-item index="/daily/leave">请假管理</el-menu-item>
               <el-menu-item index="/daily/honor">荣誉</el-menu-item>
@@ -54,7 +55,7 @@
             <el-sub-menu index="/internship">
               <template #title>
                 <el-icon><Briefcase /></el-icon>
-                <span>实习就业模块</span>
+                <span>实习就业</span>
               </template>
               <el-menu-item index="/internship/intent">就业意向采集</el-menu-item>
               <el-menu-item index="/internship/records">分类展示与记录</el-menu-item>
@@ -62,7 +63,7 @@
             <el-sub-menu index="/competition">
               <template #title>
                 <el-icon><Trophy /></el-icon>
-                <span>科创竞赛模块</span>
+                <span>科创竞赛</span>
               </template>
               <el-menu-item index="/competition/competition">学科竞赛</el-menu-item>
               <el-menu-item index="/competition/paper">发表文章</el-menu-item>
@@ -71,17 +72,17 @@
             </el-sub-menu>
             <el-menu-item index="/alumni">
               <el-icon><Connection /></el-icon>
-              <span>校友管理模块</span>
+              <span>校友管理</span>
             </el-menu-item>
             <el-sub-menu index="/party">
               <template #title>
                 <el-icon><Flag /></el-icon>
-                <span>党员管理模块</span>
+                <span>党员发展与管理</span>
               </template>
               <el-menu-item index="/party/member">党员信息/申请入党</el-menu-item>
               <el-menu-item index="/party/report">思想汇报</el-menu-item>
               <el-menu-item index="/party/course">微党课</el-menu-item>
-              <el-menu-item index="/party/service">志愿服务</el-menu-item>
+              <el-menu-item index="/party/service">志愿活动</el-menu-item>
             </el-sub-menu>
           </el-menu>
         </el-aside>
@@ -124,12 +125,6 @@
         </el-header>
 
         <el-main class="main-content">
-          <div class="page-shell" v-if="route.path !== '/home'">
-            <div class="page-title-group">
-              <span>{{ parentTitle || '学生端' }}</span>
-              <h1>{{ pageTitle }}</h1>
-            </div>
-          </div>
           <router-view />
         </el-main>
       </el-container>

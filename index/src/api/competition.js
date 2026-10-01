@@ -74,7 +74,7 @@ export const addProject = (data) => {
 export const updateCompetition = (id, data) => {
   return request({
     url: `/competitions/${id}`,
-    method: 'put',
+    method: 'post',
     data
   })
 }
@@ -83,7 +83,7 @@ export const updateCompetition = (id, data) => {
 export const updatePaper = (id, data) => {
   return request({
     url: `/papers/${id}`,
-    method: 'put',
+    method: 'post',
     data
   })
 }
@@ -92,7 +92,7 @@ export const updatePaper = (id, data) => {
 export const updatePatent = (id, data) => {
   return request({
     url: `/patents/${id}`,
-    method: 'put',
+    method: 'post',
     data
   })
 }
@@ -101,7 +101,7 @@ export const updatePatent = (id, data) => {
 export const updateProject = (id, data) => {
   return request({
     url: `/projects/${id}`,
-    method: 'put',
+    method: 'post',
     data
   })
 }
@@ -109,32 +109,32 @@ export const updateProject = (id, data) => {
 // 删除竞赛
 export const deleteCompetition = (id) => {
   return request({
-    url: `/competitions/${id}`,
-    method: 'delete'
+    url: `/competitions/${id}/delete`,
+    method: 'post'
   })
 }
 
 // 删除论文
 export const deletePaper = (id) => {
   return request({
-    url: `/papers/${id}`,
-    method: 'delete'
+    url: `/papers/${id}/delete`,
+    method: 'post'
   })
 }
 
 // 删除专利
 export const deletePatent = (id) => {
   return request({
-    url: `/patents/${id}`,
-    method: 'delete'
+    url: `/patents/${id}/delete`,
+    method: 'post'
   })
 }
 
 // 删除项目
 export const deleteProject = (id) => {
   return request({
-    url: `/projects/${id}`,
-    method: 'delete'
+    url: `/projects/${id}/delete`,
+    method: 'post'
   })
 }
 
@@ -176,7 +176,7 @@ export const getAllProjects = () => {
 export const auditCompetition = (data) => {
   return request({
     url: `/competitions/admin/${data.id}/audit`,
-    method: 'put',
+    method: 'post',
     data: {
       auditStatus: data.auditStatus,
       auditComment: data.auditComment
@@ -188,7 +188,7 @@ export const auditCompetition = (data) => {
 export const auditPaper = (data) => {
   return request({
     url: `/papers/admin/${data.id}/audit`,
-    method: 'put',
+    method: 'post',
     data: {
       auditStatus: data.auditStatus,
       auditComment: data.auditComment
@@ -200,7 +200,7 @@ export const auditPaper = (data) => {
 export const auditPatent = (data) => {
   return request({
     url: `/patents/admin/${data.id}/audit`,
-    method: 'put',
+    method: 'post',
     data: {
       auditStatus: data.auditStatus,
       auditComment: data.auditComment
@@ -212,7 +212,7 @@ export const auditPatent = (data) => {
 export const auditProject = (data) => {
   return request({
     url: `/projects/admin/${data.id}/audit`,
-    method: 'put',
+    method: 'post',
     data: {
       auditStatus: data.auditStatus,
       auditComment: data.auditComment
@@ -243,7 +243,7 @@ export const addCompetitionDict = (data) => {
 export const updateCompetitionDict = (id, data) => {
   return request({
     url: `/competition-dict/admin/update`,
-    method: 'put',
+    method: 'post',
     data: { ...data, id }
   })
 }
@@ -252,7 +252,7 @@ export const updateCompetitionDict = (id, data) => {
 export const deleteCompetitionDict = (id) => {
   return request({
     url: `/competition-dict/admin/delete/${id}`,
-    method: 'delete'
+    method: 'post'
   })
 }
 

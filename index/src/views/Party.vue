@@ -1,11 +1,5 @@
 <template>
   <div class="party-page">
-    <el-card class="page-header">
-      <div class="header-content">
-        <h2>党员管理</h2>
-        <p>管理您的党员信息、思想汇报、党课学习和志愿服务记录</p>
-      </div>
-    </el-card>
 
     <el-tabs
       v-model="activeTab"
@@ -248,13 +242,13 @@
                 <span>提交党课记录</span>
               </template>
               <el-form :model="courseForm" label-width="100px" label-position="top">
-                <el-form-item label="课程标题" required>
-                  <el-input v-model="courseForm.title" placeholder="请输入课程标题" />
+                <el-form-item label="微党课/推文题目" required>
+                  <el-input v-model="courseForm.title" placeholder="请输入微党课/推文题目" />
                 </el-form-item>
-                <el-form-item label="课程描述" required>
-                  <el-input v-model="courseForm.description" type="textarea" :rows="3" placeholder="请输入课程描述" />
+                <el-form-item label="推文发布链接" required>
+                  <el-input v-model="courseForm.description" type="textarea" :rows="3" placeholder="请输入推文发布链接" />
                 </el-form-item>
-                <el-form-item label="课程日期" required>
+                <el-form-item label="发布日期" required>
                   <el-date-picker
                     v-model="courseForm.courseDate"
                     type="date"
@@ -262,19 +256,6 @@
                     style="width: 100%"
                     value-format="YYYY-MM-DD"
                   />
-                </el-form-item>
-                <el-form-item label="课程类型" required>
-                  <el-select v-model="courseForm.courseType" placeholder="请选择" style="width: 100%">
-                    <el-option label="理论课" value="理论课" />
-                    <el-option label="实践课" value="实践课" />
-                    <el-option label="讨论课" value="讨论课" />
-                  </el-select>
-                </el-form-item>
-                <el-form-item label="授课教师">
-                  <el-input v-model="courseForm.instructor" placeholder="可选" />
-                </el-form-item>
-                <el-form-item label="上课地点">
-                  <el-input v-model="courseForm.location" placeholder="可选" />
                 </el-form-item>
                 <el-form-item>
                   <el-button type="primary" @click="submitCourse" :loading="courseLoading" style="width: 100%">提交</el-button>
@@ -291,9 +272,7 @@
                 </div>
               </template>
               <el-table :data="courseList" v-loading="courseListLoading" stripe>
-                <el-table-column prop="title" label="课程标题" min-width="150" />
-                <el-table-column prop="courseType" label="类型" width="100" />
-                <el-table-column prop="instructor" label="授课教师" width="120" />
+                <el-table-column prop="title" label="微党课/推文题目" min-width="150" />
                 <el-table-column prop="courseDate" label="日期" width="120" />
                 <el-table-column prop="auditStatus" label="审核状态" width="100">
                   <template #default="scope">
@@ -318,13 +297,13 @@
         </el-row>
       </el-tab-pane>
 
-      <!-- 志愿服务 -->
-      <el-tab-pane label="志愿服务" name="service">
+      <!-- 志愿活动 -->
+      <el-tab-pane label="志愿活动" name="service">
         <el-row :gutter="20">
           <el-col :span="8">
             <el-card>
               <template #header>
-                <span>提交志愿服务</span>
+                <span>提交志愿活动</span>
               </template>
               <el-form :model="serviceForm" label-width="100px" label-position="top">
                 <el-form-item label="服务名称" required>
@@ -404,7 +383,7 @@
     <el-dialog v-model="detailDialogVisible" :title="detailTitle" width="600px">
       <el-descriptions :column="1" border v-if="currentDetail">
         <el-descriptions-item
-          v-for="(value, key) in currentDetail"
+          v-for="(value, key) in visibleDetail(currentDetail)"
           :key="key"
           :label="getFieldLabel(key)"
         >
@@ -428,7 +407,7 @@
               </el-space>
             </template>
             <template v-else>
-              {{ value || '-' }}
+              {{ displayDetailValue(value) }}
             </template>
           </template>
         </el-descriptions-item>
@@ -449,9 +428,7 @@
         </el-form-item>
         <el-form-item label="所属支部" required>
           <el-select v-model="applicationForm.branch" placeholder="请选择党支部" style="width: 100%">
-            <el-option label="计算机学院党支部" value="计算机学院党支部" />
-            <el-option label="软件学院党支部" value="软件学院党支部" />
-            <el-option label="信息学院党支部" value="信息学院党支部" />
+            <el-option v-for="branch in PARTY_BRANCHES" :key="branch" :label="branch" :value="branch" />
           </el-select>
         </el-form-item>
         <el-form-item label="备注">
@@ -467,6 +444,7 @@
 </template>
 
 <script setup>
+import { PARTY_BRANCHES } from '@/constants/partyBranches'
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { User, Upload } from '@element-plus/icons-vue'
@@ -576,7 +554,7 @@ const courseLoading = ref(false)
 const courseList = ref([])
 const courseListLoading = ref(false)
 
-// 志愿服务
+// 志愿活动
 const serviceForm = reactive({
   serviceName: '',
   serviceDescription: '',
@@ -634,14 +612,21 @@ const formatDateTime = (dateTime) => {
 }
 
 // 获取字段标签
+const displayDetailValue = value => ({ pending: '待审核', approved: '已通过', rejected: '已驳回', submitted: '已提交', completed: '已完成' }[value] || value || '-')
+const visibleDetail = row => Object.fromEntries(Object.entries(row || {}).filter(([key, value]) => getFieldLabel(key) !== key && value != null && value !== '' && !['studentId', 'courseType', 'instructor', 'location'].includes(key)))
+
 const getFieldLabel = (key) => {
   const labelMap = {
+    studentName: '学生姓名',
+    status: '状态',
+    auditTime: '审核时间',
     title: '标题',
     content: '内容',
+    description: '推文发布链接',
     reportDate: '汇报日期',
     reportType: '汇报类型',
     remark: '备注',
-    courseDate: '课程日期',
+    courseDate: '发布日期',
     courseType: '课程类型',
     instructor: '授课教师',
     location: '上课地点',
@@ -959,7 +944,10 @@ const viewReportDetail = (row) => {
 
 // 微党课
 const submitCourse = async () => {
-  if (!courseForm.title || !courseForm.description || !courseForm.courseDate || !courseForm.courseType) {
+  if (!/^https?:\/\/[^\s]+$/i.test(courseForm.description)) {
+    ElMessage.warning('请填写以 https:// 或 http:// 开头的推文发布链接'); return
+  }
+  if (!courseForm.title || !courseForm.description || !courseForm.courseDate) {
     ElMessage.warning('请填写完整信息')
     return
   }
@@ -1025,7 +1013,7 @@ const viewCourseDetail = (row) => {
   detailDialogVisible.value = true
 }
 
-// 志愿服务
+// 志愿活动
 const submitService = async () => {
   if (!serviceForm.serviceName || !serviceForm.serviceDescription || !serviceForm.serviceDate || !serviceForm.serviceType) {
     ElMessage.warning('请填写完整信息')
@@ -1054,7 +1042,7 @@ const submitService = async () => {
       ElMessage.error(response?.message || response?.msg || '提交失败')
     }
   } catch (error) {
-    console.error('提交志愿服务失败:', error)
+    console.error('提交志愿活动失败:', error)
     ElMessage.error('提交失败')
   } finally {
     serviceLoading.value = false
@@ -1081,14 +1069,14 @@ const loadServices = async () => {
       serviceList.value = response
     }
   } catch (error) {
-    console.error('加载志愿服务失败:', error)
+    console.error('加载志愿活动失败:', error)
   } finally {
     serviceListLoading.value = false
   }
 }
 
 const viewServiceDetail = (row) => {
-  detailTitle.value = '志愿服务详情'
+  detailTitle.value = '志愿活动详情'
   currentDetail.value = row
   detailDialogVisible.value = true
 }

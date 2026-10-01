@@ -64,9 +64,7 @@
           <el-col :xs="24" :sm="24" :md="12" :lg="12">
             <el-form-item label="党支部" prop="branch">
               <el-select v-model="memberForm.branch" placeholder="请选择党支部" style="width: 100%">
-                <el-option label="计算机学院党支部" value="计算机学院党支部" />
-                <el-option label="软件学院党支部" value="软件学院党支部" />
-                <el-option label="信息学院党支部" value="信息学院党支部" />
+                <el-option v-for="branch in PARTY_BRANCHES" :key="branch" :label="branch" :value="branch" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -132,6 +130,7 @@
 </template>
 
 <script setup>
+import { PARTY_BRANCHES } from '@/constants/partyBranches'
 import { ref, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'

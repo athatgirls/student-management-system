@@ -4,10 +4,6 @@
     <!-- 页面头部 -->
     <el-card class="page-header-card" shadow="never">
       <div class="page-header">
-        <div class="header-content">
-          <h2>日常管理</h2>
-          <p>学术活动 / 日常活动 / 荣誉 — 一站式提交与追踪</p>
-        </div>
         <div class="header-stats">
           <el-card class="stat-card" shadow="hover">
             <div class="stat-content">
@@ -47,7 +43,7 @@
     </el-card>
 
     <div class="page-content">
-      <!-- 模块切换 + 操作区 -->
+      <!-- 切换 + 操作区 -->
       <el-card class="toolbar-card" shadow="never">
       <div class="toolbar">
         <el-tabs
@@ -61,9 +57,10 @@
           <el-tab-pane label="日常活动" name="daily" />
           <el-tab-pane label="请假管理" name="leave" />
           <el-tab-pane label="荣誉" name="honor" />
+          <el-tab-pane label="志愿活动" name="volunteer" />
           <el-tab-pane label="日常任务" name="tasks" />
         </el-tabs>
-          <div v-if="moduleKey !== 'tasks'" class="toolbar-right">
+          <div v-if="!['tasks', 'volunteer'].includes(moduleKey)" class="toolbar-right">
           <el-input
               v-model="searchKey"
               placeholder="按标题/发起人搜索"
@@ -76,13 +73,13 @@
                 <el-icon><Search /></el-icon>
               </template>
             </el-input>
-            <el-button type="primary" :icon="Plus" @click="openCreate">新增</el-button>
+            <el-button v-if="['leave', 'honor'].includes(moduleKey)" type="primary" :icon="Plus" @click="openCreate">新增</el-button>
         </div>
       </div>
       </el-card>
 
       <!-- 列表卡片 -->
-      <el-card v-if="moduleKey !== 'tasks'" class="content-card" shadow="hover">
+      <el-card v-if="!['tasks', 'volunteer'].includes(moduleKey)" class="content-card" shadow="hover">
         <template #header>
           <div class="card-header">
             <div class="card-title">
@@ -97,7 +94,7 @@
         </template>
 
         <el-table :data="rows" style="width: 100%" stripe>
-          <!-- 请假模块特殊显示 -->
+          <!-- 请假特殊显示 -->
           <template v-if="moduleKey === 'leave'">
             <el-table-column prop="reason" label="请假原因" min-width="240" show-overflow-tooltip>
               <template #default="scope">
@@ -158,7 +155,7 @@
               </template>
             </el-table-column>
           </template>
-          <!-- 其他模块显示 -->
+          <!-- 其他显示 -->
           <template v-else>
             <el-table-column prop="title" :label="moduleTitle + '标题'" :min-width="isMobile ? 150 : 240" show-overflow-tooltip>
               <template #default="scope">
@@ -226,13 +223,20 @@
         </el-table>
       </el-card>
 
+      <el-card v-if="moduleKey === 'volunteer'" class="content-card">
+        <template #header>志愿活动记录（与党员发展与管理同步）</template>
+        <el-table :data="volunteerHistory">
+          <el-table-column prop="serviceName" label="活动名称" /><el-table-column prop="serviceDate" label="活动日期" />
+          <el-table-column prop="serviceLocation" label="地点" /><el-table-column prop="auditStatus" label="审核状态" />
+        </el-table>
+      </el-card>
       <!-- 日常任务列表 (学生端) -->
-      <el-card v-else class="content-card" shadow="hover">
+      <el-card v-if="['academic', 'daily', 'volunteer', 'tasks'].includes(moduleKey)" class="content-card" shadow="hover">
         <template #header>
           <div class="card-header">
             <div class="card-title">
-              <span class="title-text">待完成的日常任务</span>
-              <el-tag type="info" effect="plain" size="small" class="ml8">共 {{ activeTasks.length }} 项</el-tag>
+              <span class="title-text">{{ moduleKey === 'tasks' ? '日常任务' : moduleTitle + '任务' }}</span>
+              <el-tag type="info" effect="plain" size="small" class="ml8">共 {{ categoryTasks.length }} 项</el-tag>
     </div>
           </div>
         </template>
@@ -241,7 +245,7 @@
         <el-tabs v-model="taskTab" @tab-change="handleTaskTabChange">
           <el-tab-pane label="普通任务" name="normal">
             <el-tag type="info" effect="plain" size="small" style="margin-bottom: 10px;">
-              共 {{ normalTasks.length }} 项（所有人都需要完成）
+              共 {{ normalTasks.length }} 项（按管理员设置的接收范围发布）
             </el-tag>
             <el-table :data="normalTasks" style="width: 100%" stripe class="task-table">
           <el-table-column prop="title" label="任务名称" :min-width="isMobile ? 150 : 200">
@@ -479,7 +483,7 @@
       </template>
     </el-dialog>
 
-    <!-- 新增弹窗（随模块联动字段） -->
+    <!-- 新增弹窗（随联动字段） -->
     <el-dialog v-model="createVisible" :title="'新增' + moduleTitle" width="760px" destroy-on-close>
       <el-form ref="createFormRef" :model="form" :rules="rules" label-width="110px">
         <!-- 学术活动 -->
@@ -604,7 +608,7 @@
             <el-col :span="12"><el-form-item label="授予单位" prop="awardOrg"><el-input v-model="form.awardOrg" /></el-form-item></el-col>
             <el-col :span="12"><el-form-item label="获奖日期" prop="awardDate"><el-date-picker v-model="form.awardDate" type="date" style="width:100%" /></el-form-item></el-col>
           </el-row>
-          <el-form-item label="佐证材料URL" prop="evidenceUrl"><el-input v-model="form.evidenceUrl" /></el-form-item>
+          <el-form-item label="证明材料" required><RecordAttachments v-model="honorAttachments" :limit="1" editable /></el-form-item>
           <el-form-item label="标签(逗号分隔)"><el-input v-model="form.tags" placeholder="示例：AI, 一作, Top会议" /></el-form-item>
           <el-form-item label="是否公开"><el-switch v-model="form.isPublic" /></el-form-item>
           <el-form-item label="荣誉描述"><el-input type="textarea" :rows="4" v-model="form.description" /></el-form-item>
@@ -774,6 +778,9 @@
 </template>
 
 <script setup>
+import RecordAttachments from '@/components/RecordAttachments.vue'
+import { taskDateError, orderedDates, hasAttachments } from '@/utils/submissionValidation'
+import { volunteerServiceApi } from '@/api/party'
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -820,9 +827,10 @@ const dict = {
 const route = useRoute()
 const router = useRouter()
 
-// 模块
+// 当前页面
 const moduleKey = ref('academic')
 const tabPathMap = {
+  volunteer: '/daily/volunteer',
   academic: '/daily/academic',
   daily: '/daily/daily',
   leave: '/daily/leave',
@@ -832,11 +840,12 @@ const tabPathMap = {
 const isSeparatedSubPage = computed(() => Boolean(route.path.split('/')[2]))
 const getRouteTab = () => {
   const pathTab = route.path.split('/')[2]
-  if (['academic', 'daily', 'leave', 'honor', 'tasks'].includes(pathTab)) return pathTab
-  if (['academic', 'daily', 'leave', 'honor', 'tasks'].includes(route.query.tab)) return route.query.tab
+  if (['academic', 'daily', 'leave', 'honor', 'tasks', 'volunteer'].includes(pathTab)) return pathTab
+  if (['academic', 'daily', 'leave', 'honor', 'tasks', 'volunteer'].includes(route.query.tab)) return route.query.tab
   return 'academic'
 }
 const moduleTitle = computed(() => {
+    if (moduleKey.value === 'volunteer') return '志愿活动'
     if (moduleKey.value === 'academic') return '学术活动'
     if (moduleKey.value === 'daily') return '日常活动'
     if (moduleKey.value === 'leave') return '请假管理'
@@ -846,18 +855,21 @@ const moduleTitle = computed(() => {
 
 /** ========= 日常任务相关 ========= */
 const activeTasks = ref([])
+const volunteerHistory = ref([])
+const honorAttachments = ref('')
+const categoryTasks = computed(() => activeTasks.value.filter(task => (task.activityCategory || 'daily') === (moduleKey.value === 'tasks' ? 'daily' : moduleKey.value)))
 const taskTab = ref('normal') // 任务标签页：normal(普通任务) 或 registration(报名型任务)
 const submitDialogVisible = ref(false)
 const currentTask = ref({})
 
 // 普通任务列表（所有人都需要完成）
 const normalTasks = computed(() => {
-  return activeTasks.value.filter(task => !task.taskCategory || task.taskCategory === 'normal')
+  return categoryTasks.value.filter(task => !task.taskCategory || task.taskCategory === 'normal')
 })
 
 // 报名型任务列表（限制报名人数）
 const registrationTasks = computed(() => {
-  return activeTasks.value.filter(task => task.taskCategory === 'registration')
+  return categoryTasks.value.filter(task => task.taskCategory === 'registration')
 })
 
 // 任务标签页切换
@@ -1053,6 +1065,8 @@ const openSubmit = async (task) => {
 }
 
 const handleSubmitTask = async () => {
+  const dateError = taskDateError((currentTask.value.fields || []).filter(shouldShowField), submitForm.fieldData)
+  if (dateError) return ElMessage.warning(dateError)
   // 检查报名型任务是否已满员
   if (currentTask.value.taskCategory === 'registration' && !currentTask.value.completed) {
     const maxParticipants = currentTask.value.maxParticipants
@@ -1066,7 +1080,7 @@ const handleSubmitTask = async () => {
   if (currentTask.value.fields && currentTask.value.fields.length > 0) {
     for (const field of currentTask.value.fields) {
       // 只验证显示的字段
-      if (shouldShowField(field) && field.required && !submitForm.fieldData[field.fieldName]) {
+      if (shouldShowField(field) && field.required && (submitForm.fieldData[field.fieldName] == null || String(submitForm.fieldData[field.fieldName]).trim() === '')) {
         return ElMessage.warning(`请填写必填字段：${field.fieldName}`)
       }
     }
@@ -1085,6 +1099,9 @@ const handleSubmitTask = async () => {
       ElMessage.success(currentTask.value.taskCategory === 'registration' ? '报名成功' : '提交成功')
       submitDialogVisible.value = false
       loadActiveTasks() // 刷新列表以更新完成状态
+      if (moduleKey.value === 'volunteer') loadBusinessData()
+    } else {
+      ElMessage.warning(res.msg || '提交失败，请检查填写内容')
     }
   } catch (e) {
     // 检查是否是报名人数已满的错误
@@ -1096,7 +1113,7 @@ const handleSubmitTask = async () => {
   }
 }
 
-// 列表数据（按模块存）
+// 列表数据（按存）
 const allRows = reactive({ academic: [], daily: [], honor: [], leave: [] })
 const rows = computed(() => allRows[moduleKey.value] || [])
 const stat = computed(() => ({
@@ -1106,13 +1123,14 @@ const stat = computed(() => ({
 
 // 获取业务列表
 const loadBusinessData = async () => {
-  if (moduleKey.value === 'tasks') {
-    loadActiveTasks()
-    return
+  if (moduleKey.value === 'volunteer') {
+    try { volunteerHistory.value = (await volunteerServiceApi.getStudentVolunteerServices(userInfo.value.studentId || userInfo.value.id)).data || [] } catch { /* shared interceptor */ }
   }
+  if (['academic', 'daily', 'tasks', 'volunteer'].includes(moduleKey.value)) loadActiveTasks()
+  if (['tasks', 'volunteer'].includes(moduleKey.value)) return
   try {
     if (moduleKey.value === 'leave') {
-      // 请假模块，使用专门的API
+      // 请假，使用专门的API
       // 从当前登录用户获取学号
       const studentId = userInfo.value.studentId || (store.state.user && store.state.user.studentId)
       if (!studentId) {
@@ -1146,7 +1164,7 @@ const applySearch = () => {
   }
   const key = searchKey.value.trim().toLowerCase()
   if (moduleKey.value === 'leave') {
-    // 请假模块：支持搜索请假原因、学生姓名
+    // 请假：支持搜索请假原因、学生姓名
     allRows[moduleKey.value] = allRows[moduleKey.value].filter(r => 
       (r.reason && r.reason.toLowerCase().includes(key)) ||
       (r.studentName && r.studentName.toLowerCase().includes(key)) ||
@@ -1217,6 +1235,7 @@ const rules = reactive({
   awardDate: [{ required: computed(() => moduleKey.value === 'honor').value, message: '请选择获奖日期', trigger: 'change' }]
 })
 const openCreate = () => {
+  honorAttachments.value = ''
   createVisible.value = true
   if (moduleKey.value === 'leave') {
     // 请假表单，只初始化请假相关字段，学生信息从后端自动获取
@@ -1235,6 +1254,11 @@ const openCreate = () => {
 }
 
 const submitCreate = async () => {
+  if (!orderedDates(form.startDate, form.endDate)) return ElMessage.warning('结束时间不能早于开始时间')
+  if (moduleKey.value === 'honor') {
+    if (!hasAttachments(honorAttachments.value)) return ElMessage.warning('请上传荣誉证明材料')
+    form.evidenceUrl = JSON.parse(honorAttachments.value)[0].url
+  }
   await createFormRef.value.validate()
   try {
     if (moduleKey.value === 'leave') {
@@ -1702,6 +1726,11 @@ const handleRouteTask = async () => {
     // 查找对应的任务
     const task = activeTasks.value.find(t => t.id === taskId)
     if (task) {
+      const category = task.activityCategory || 'daily'
+      if (category !== 'daily') {
+        await router.replace({ path: tabPathMap[category], query: { taskId } })
+        moduleKey.value = category
+      }
       // 自动打开填写弹窗
       await openSubmit(task)
     }

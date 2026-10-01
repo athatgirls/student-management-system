@@ -222,6 +222,7 @@ public class GradeController {
                 studyRecord.setSemester(semester);
                 studyRecord.setCourse(courseName);
                 studyRecord.setScore(score);
+                studyRecord.setSource("official");
                 studyRecord.setCredit(parseDouble(item.getCredit()));
                 studyRecord.setStatus(resolveStatus(score, trim(item.getStatus())));
 

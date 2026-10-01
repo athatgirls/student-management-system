@@ -10,6 +10,7 @@ import java.util.List;
 @Data
 @Document(collection = "activities")
 public class ActivityModel {
+    private String activityCategory = "daily";
     @Id
     private String id;
     private String title;           // 活动标题
