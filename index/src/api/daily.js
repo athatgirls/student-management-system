@@ -58,14 +58,14 @@ export function getDetail(moduleKey, id) {
 
 // 修改
 export function updateItem(moduleKey, id, form) {
-    const url = `/${URL[moduleKey]}/${id}`
-    return request.put(url, normalize(moduleKey, form))
+    const url = `/${URL[moduleKey]}/${id}/update`
+    return request.post(url, normalize(moduleKey, form))
 }
 
 // 删除
 export function deleteItem(moduleKey, id) {
-    const url = `/${URL[moduleKey]}/${id}`
-    return request.delete(url)
+    const url = `/${URL[moduleKey]}/${id}/delete`
+    return request.post(url)
 }
 
 // 审核接口 (Admin)

@@ -75,7 +75,7 @@ public class HonorController {
         return ResponseEntity.ok(Map.of("code", 200, "data", withStudentInfo(honor)));
     }
 
-    @PutMapping("/{id}")
+    @PostMapping("/{id}/update")
     public ResponseEntity<Map<String, Object>> update(@PathVariable String id,
                                                        @RequestBody HonorModel model,
                                                        @CurrentUser Map<String, Object> currentUser) {
@@ -93,7 +93,7 @@ public class HonorController {
         return ResponseEntity.ok(Map.of("code", 200, "data", service.update(model)));
     }
 
-    @DeleteMapping("/{id}")
+    @PostMapping("/{id}/delete")
     public ResponseEntity<Map<String, Object>> delete(@PathVariable String id,
                                                        @CurrentUser Map<String, Object> currentUser) {
         HonorModel existing = service.findById(id);

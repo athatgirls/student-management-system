@@ -652,12 +652,12 @@ export function createPreviewResponse(config = {}) {
       { id: 'activity-001', name: '学院志愿活动', title: '学院志愿活动', taskId: 'task-002', activityDate: toDate(5), active: true }
     ])
   }
-  const honorMatch = path.match(/^\/honors\/([^/]+)$/)
+  const honorMatch = path.match(/^\/honors\/([^/]+)(?:\/(update|delete))?$/)
   if (honorMatch) {
     const index = honors.findIndex(item => item.id === honorMatch[1])
     if (index < 0) return { code: 404, data: null, msg: '荣誉不存在' }
-    if (config.method === 'get') return success(honors[index])
-    if (config.method === 'put') {
+    if (config.method === 'get' && !honorMatch[2]) return success(honors[index])
+    if (config.method === 'post' && honorMatch[2] === 'update') {
       const input = parseBody(config.data)
       honors[index] = {
         ...honors[index],
@@ -671,7 +671,7 @@ export function createPreviewResponse(config = {}) {
       }
       return success(honors[index], '荣誉修改成功，待审核')
     }
-    if (config.method === 'delete') {
+    if (config.method === 'post' && honorMatch[2] === 'delete') {
       honors.splice(index, 1)
       return success(null, '荣誉已删除')
     }

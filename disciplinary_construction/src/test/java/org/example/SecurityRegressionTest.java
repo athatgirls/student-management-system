@@ -237,10 +237,11 @@ class SecurityRegressionTest {
         assertEquals(204,status(security,"admin-token","GET","/msi/employment-intentions/admin/list"));
         assertEquals(204,status(security,"student-token","POST","/msi/honors/create"));
         assertEquals(403,status(security,"student-token","POST","/msi/honors/audit"));
-        for (String method : List.of("GET", "PUT", "DELETE")) {
-            assertEquals(401, status(security, null, method, "/msi/honors/fixture"));
-            assertEquals(204, status(security, "student-token", method, "/msi/honors/fixture"));
-            assertEquals(204, status(security, "admin-token", method, "/msi/honors/fixture"));
+        for (String url : List.of("/msi/honors/fixture", "/msi/honors/fixture/update", "/msi/honors/fixture/delete")) {
+            String method = url.endsWith("fixture") ? "GET" : "POST";
+            assertEquals(401, status(security, null, method, url));
+            assertEquals(204, status(security, "student-token", method, url));
+            assertEquals(204, status(security, "admin-token", method, url));
         }
     }
 
