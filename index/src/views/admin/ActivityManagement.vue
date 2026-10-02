@@ -22,7 +22,7 @@
 
         <el-table :data="activities" style="width: 100%" border>
           <el-table-column prop="title" label="活动标题" min-width="200" />
-          <el-table-column label="活动分类" width="110"><template #default="{ row }">{{ { academic: '学术活动', daily: '日常活动', volunteer: '志愿活动' }[row.activityCategory || 'daily'] }}</template></el-table-column>
+          <el-table-column label="活动分类" width="110"><template #default="{ row }">{{ { academic: '学术活动', daily: '日常活动', routine: '日常任务', volunteer: '志愿活动' }[row.activityCategory || 'daily'] }}</template></el-table-column>
           <el-table-column label="活动时间" min-width="180">
             <template #default="scope">
               {{ formatDateTime(scope.row.activityTime) }}

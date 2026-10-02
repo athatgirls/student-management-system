@@ -179,6 +179,17 @@
               </el-button>
             </el-button-group>
           </div>
+
+          <div class="filter-row">
+            <div class="filter-label">活动分类：</div>
+            <el-button-group>
+              <el-button :type="activityCategoryFilter === 'all' ? 'primary' : ''" size="small" @click="activityCategoryFilter = 'all'">全部</el-button>
+              <el-button :type="activityCategoryFilter === 'academic' ? 'primary' : ''" size="small" @click="activityCategoryFilter = 'academic'">学术活动</el-button>
+              <el-button :type="activityCategoryFilter === 'daily' ? 'primary' : ''" size="small" @click="activityCategoryFilter = 'daily'">日常活动</el-button>
+              <el-button :type="activityCategoryFilter === 'routine' ? 'primary' : ''" size="small" @click="activityCategoryFilter = 'routine'">日常任务</el-button>
+              <el-button :type="activityCategoryFilter === 'volunteer' ? 'primary' : ''" size="small" @click="activityCategoryFilter = 'volunteer'">志愿活动</el-button>
+            </el-button-group>
+          </div>
           
           <!-- 纵向：限制类型筛选 -->
           <div class="filter-row">
@@ -240,6 +251,11 @@
         <el-table :data="filteredDailyTasks" style="width: 100%">
           <el-table-column prop="title" label="任务标题" min-width="200" />
           <el-table-column prop="description" label="描述" min-width="250" show-overflow-tooltip />
+          <el-table-column label="活动分类" width="110">
+            <template #default="scope">
+              {{ activityCategoryLabels[scope.row.activityCategory || 'daily'] }}
+            </template>
+          </el-table-column>
           <el-table-column label="任务类别" width="140">
             <template #default="scope">
               <el-tag :type="scope.row.taskCategory === 'registration' ? 'warning' : 'info'" effect="plain">
@@ -375,7 +391,7 @@
       <el-form :model="taskForm" label-width="100px">
         <el-form-item label="活动分类" required>
           <el-select v-model="taskForm.activityCategory">
-            <el-option label="学术活动" value="academic" /><el-option label="日常活动" value="daily" /><el-option label="志愿活动" value="volunteer" />
+            <el-option label="学术活动" value="academic" /><el-option label="日常活动" value="daily" /><el-option label="日常任务" value="routine" /><el-option label="志愿活动" value="volunteer" />
           </el-select>
         </el-form-item>
         <el-form-item label="任务标题" required>
@@ -383,6 +399,17 @@
         </el-form-item>
         <el-form-item label="任务描述">
           <el-input v-model="taskForm.description" type="textarea" rows="3" placeholder="请输入任务详细说明" />
+        </el-form-item>
+        <el-form-item label="发放文件">
+          <el-upload :http-request="uploadTaskAttachment" :show-file-list="false" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg">
+            <el-button :loading="taskAttachmentUploading">上传文件</el-button>
+          </el-upload>
+          <div v-if="taskForm.attachments.length" class="task-attachments">
+            <div v-for="(url, index) in taskForm.attachments" :key="url">
+              <el-link :href="url" target="_blank" rel="noopener">文件 {{ index + 1 }}</el-link>
+              <el-button link type="danger" @click="removeTaskAttachment(index)">移除</el-button>
+            </div>
+          </div>
         </el-form-item>
         <el-form-item label="截止日期" required>
           <el-date-picker v-model="taskForm.deadline" type="datetime" placeholder="选择截止时间" style="width: 100%" />
@@ -726,6 +753,7 @@ import {
   getDailyTaskStats, exportDailyTaskExcel,
   listItems, auditItem, getDetail, updateItem, deleteItem
 } from '@/api/daily'
+import { uploadFile } from '@/api/competition'
 import { getAllLeaveRequests, auditLeaveRequest, updateLeaveStatus } from '@/api/leave'
 import { getAllGrades } from '@/api/student'
 import { POLITICAL_STATUS_OPTIONS } from '@/constants/politicalStatus'
@@ -773,8 +801,10 @@ const hasCurrentTaskRestrictions = computed(() => {
 
 // 筛选条件
 const taskCategoryFilter = ref('all') // 任务类型筛选：all(全部) | normal(普通任务) | registration(报名型任务)
+const activityCategoryFilter = ref('all')
 const restrictionFilter = ref('all') // 限制类型筛选：all(全部) | grade(年级限制) | identity(政治面貌限制) | none(无限制)
 const selectedGradeFilter = ref(null) // 选中的年级筛选（当restrictionFilter为'grade'时使用）
+const activityCategoryLabels = { academic: '学术活动', daily: '日常活动', routine: '日常任务', volunteer: '志愿活动' }
 
 // 过滤后的任务列表
 const filteredDailyTasks = computed(() => {
@@ -790,6 +820,10 @@ const filteredDailyTasks = computed(() => {
       }
       return true
     })
+  }
+
+  if (activityCategoryFilter.value !== 'all') {
+    filtered = filtered.filter(task => (task.activityCategory || 'daily') === activityCategoryFilter.value)
   }
   
   // 按限制类型筛选
@@ -841,8 +875,34 @@ const taskForm = reactive({
   allowedIdentities: [], // 接收政治面貌列表
   allowedPoliticalStatuses: [], // 允许的政治面貌列表
   allowedPartyStages: [], // 允许的入党阶段列表
-  fields: [] // 字段定义列表
+  fields: [], // 字段定义列表
+  attachments: []
 })
+const taskAttachmentUploading = ref(false)
+
+const uploadTaskAttachment = async ({ file, onSuccess, onError }) => {
+  if (taskForm.attachments.length >= 5) {
+    ElMessage.warning('最多上传 5 个文件')
+    onError(new Error('附件数量超限'))
+    return
+  }
+  taskAttachmentUploading.value = true
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await uploadFile(formData)
+    if (res.code !== 200 || !res.data?.length) throw new Error(res.msg || '上传失败')
+    taskForm.attachments.push(...res.data)
+    onSuccess(res)
+  } catch (error) {
+    ElMessage.error(error.message || '上传失败')
+    onError(error)
+  } finally {
+    taskAttachmentUploading.value = false
+  }
+}
+
+const removeTaskAttachment = (index) => taskForm.attachments.splice(index, 1)
 
 // 添加字段
 const addField = () => {
@@ -943,7 +1003,8 @@ const handleCreateTask = async () => {
         allowedIdentities: [],
         allowedPoliticalStatuses: [],
         allowedPartyStages: [],
-        fields: []
+        fields: [],
+        attachments: []
       })
     }
   } catch (e) {

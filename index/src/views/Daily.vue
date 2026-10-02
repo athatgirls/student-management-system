@@ -270,6 +270,12 @@
               <span style="color: #606266;">{{ scope.row.description || '-' }}</span>
             </template>
           </el-table-column>
+          <el-table-column v-if="!isMobile" label="发放文件" width="150">
+            <template #default="scope">
+              <el-link v-for="url in scope.row.attachments || []" :key="url" :href="url" target="_blank" rel="noopener" type="primary">{{ getFileName(url) }}</el-link>
+              <span v-if="!scope.row.attachments?.length">-</span>
+            </template>
+          </el-table-column>
           <el-table-column label="截止/完成时间" :width="isMobile ? 140 : 240">
             <template #default="scope">
               <div class="time-cell">
@@ -335,6 +341,12 @@
               <el-table-column prop="description" label="描述" :min-width="isMobile ? 0 : 250" :class-name="isMobile ? 'hidden-mobile' : ''" show-overflow-tooltip>
                 <template #default="scope">
                   <span style="color: #606266;">{{ scope.row.description || '-' }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="!isMobile" label="发放文件" width="150">
+                <template #default="scope">
+                  <el-link v-for="url in scope.row.attachments || []" :key="url" :href="url" target="_blank" rel="noopener" type="primary">{{ getFileName(url) }}</el-link>
+                  <span v-if="!scope.row.attachments?.length">-</span>
                 </template>
               </el-table-column>
               <el-table-column label="报名情况" :width="isMobile ? 100 : 140">

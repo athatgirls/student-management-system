@@ -103,6 +103,8 @@ const dailyTasks = [
     title: '提交本周学习总结',
     content: '请填写本周课程学习情况和下周计划。',
     taskCategory: 'normal',
+    activityCategory: 'routine',
+    attachments: ['/uploads/preview-task-guide.pdf'],
     active: true,
     completed: false,
     deadline: toDate(3),
@@ -639,10 +641,11 @@ export function createPreviewResponse(config = {}) {
   }
   if (path === '/daily-tasks/completion-analysis') {
     return success([
-      { studentId: '10240001', studentName: '张同学', totalTasks: 8, completedTasks: 7, completionRate: 87.5, averageRate: 87.5 },
-      { studentId: '10240002', studentName: '李同学', totalTasks: 8, completedTasks: 6, completionRate: 75, averageRate: 75 }
+      { studentId: '10240001', name: '张同学', grade: '2024', totalRequired: 8, completedCount: 7, completionRate: 87.5 },
+      { studentId: '10240002', name: '李同学', grade: '2024', totalRequired: 8, completedCount: 6, completionRate: 75 }
     ])
   }
+  if (path === '/daily-tasks/my-completion') return success({ totalRequired: 8, completedCount: 7, incompleteCount: 1, completionRate: 87.5, incompleteTasks: [dailyTasks[0]] })
   if (path.startsWith('/daily-tasks/student-incomplete-tasks')) return success([dailyTasks[0]])
   if (path === '/activities/list') {
     return success([

@@ -400,6 +400,18 @@ public class DailyTaskServiceImpl implements DailyTaskService {
         
         return analysis;
     }
+
+    @Override
+    public Map<String, Object> getStudentTaskCompletionAnalysis(String studentId) {
+        StudentModel student = studentRepository.findById(studentId).orElse(null);
+        if (student == null) {
+            throw new IllegalArgumentException("学生不存在");
+        }
+        return getTaskCompletionAnalysis(null).stream()
+                .filter(analysis -> student.getStudentId().equals(analysis.get("studentId")))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("未找到学生完成度数据"));
+    }
     
     @Override
     public byte[] exportTaskCompletionAnalysisExcel(String grade) {

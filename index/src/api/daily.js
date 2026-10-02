@@ -131,6 +131,11 @@ export function getTaskCompletionAnalysis(grade) {
     return request.get('/daily-tasks/completion-analysis', { params })
 }
 
+// 获取当前学生自己的普通任务完成度
+export function getMyTaskCompletion() {
+    return request.get('/daily-tasks/my-completion')
+}
+
 // 导出任务完成度分析 (Admin)
 export function exportTaskCompletionAnalysis(grade) {
     const params = grade ? { grade } : {}

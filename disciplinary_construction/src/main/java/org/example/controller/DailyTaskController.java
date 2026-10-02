@@ -94,6 +94,7 @@ public class DailyTaskController {
                 taskMap.put("taskCategory", task.getTaskCategory()); // 任务类别
                 taskMap.put("activityCategory", org.example.util.TaskSubmissionValidation.category(task.getActivityCategory()));
                 taskMap.put("maxParticipants", task.getMaxParticipants()); // 最大报名人数
+                taskMap.put("attachments", task.getAttachments());
                 
                 // 计算当前报名人数（报名型任务）
                 if ("registration".equals(task.getTaskCategory())) {
@@ -201,6 +202,20 @@ public class DailyTaskController {
         } catch (Exception e) {
             result.put("code", 500);
             result.put("msg", "获取任务完成度分析失败: " + e.getMessage());
+        }
+        return ResponseEntity.ok(result);
+    }
+
+    // 获取当前学生自己的普通任务完成度
+    @GetMapping("/my-completion")
+    public ResponseEntity<Map<String, Object>> getMyTaskCompletion(@CurrentUser Map<String, Object> currentUser) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            result.put("code", 200);
+            result.put("data", dailyTaskService.getStudentTaskCompletionAnalysis((String) currentUser.get("userId")));
+        } catch (IllegalArgumentException e) {
+            result.put("code", 400);
+            result.put("msg", e.getMessage());
         }
         return ResponseEntity.ok(result);
     }

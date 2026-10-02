@@ -24,7 +24,7 @@ public interface DailyTaskService {
     
     // 任务完成度分析相关
     List<Map<String, Object>> getTaskCompletionAnalysis(String grade);
+    Map<String, Object> getStudentTaskCompletionAnalysis(String studentId);
     byte[] exportTaskCompletionAnalysisExcel(String grade);
     List<Map<String, Object>> getStudentIncompleteTasks(String studentId);
 }
-

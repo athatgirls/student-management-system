@@ -25,6 +25,7 @@ public class DailyTaskModel {
     private String activityCategory = "daily"; // academic / daily / volunteer; legacy records default to daily
     private Integer maxParticipants; // 报名型任务的最大报名人数（仅报名型任务有效）
     private Integer currentParticipants; // 当前已报名人数（仅报名型任务有效，自动计算）
+    private List<String> attachments; // 管理员随任务发放的文件 URL
     
     // 范围限制
     private List<String> allowedGrades; // 允许的年级列表（如：["2023", "2024"]），为空表示不限制
