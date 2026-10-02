@@ -96,11 +96,15 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="160" align="right" fixed="right">
+            <el-table-column label="操作" width="250" align="right" fixed="right">
               <template #default="scope">
                 <el-button link type="primary" @click="openReview(scope.row)">
                   查看 & 审核
                 </el-button>
+                <template v-if="moduleKey === 'honor'">
+                  <el-button link type="primary" @click="openHonorEdit(scope.row)">修改</el-button>
+                  <el-button link type="danger" @click="removeHonor(scope.row)">删除</el-button>
+                </template>
               </template>
             </el-table-column>
           </template>
@@ -688,6 +692,28 @@
         </el-col>
       </el-row>
     </el-dialog>
+
+    <el-dialog v-model="honorEditVisible" title="修改荣誉" width="760px" destroy-on-close>
+      <el-form :model="honorForm" label-width="100px">
+        <el-row :gutter="16">
+          <el-col :span="12"><el-form-item label="荣誉名称"><el-input v-model="honorForm.title" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="类别"><el-select v-model="honorForm.category" style="width:100%"><el-option v-for="item in honorCategories" :key="item" :label="item" :value="item" /></el-select></el-form-item></el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12"><el-form-item label="级别"><el-select v-model="honorForm.level" style="width:100%"><el-option v-for="item in dict.level" :key="item" :label="item" :value="item" /></el-select></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="获奖日期"><el-date-picker v-model="honorForm.awardDate" type="date" style="width:100%" /></el-form-item></el-col>
+        </el-row>
+        <el-form-item label="授予单位"><el-input v-model="honorForm.awardOrg" /></el-form-item>
+        <el-form-item label="证明材料"><el-input v-model="honorForm.evidenceUrl" /></el-form-item>
+        <el-form-item label="标签"><el-input v-model="honorForm.tags" placeholder="多个标签以逗号分隔" /></el-form-item>
+        <el-form-item label="是否公开"><el-switch v-model="honorForm.isPublic" /></el-form-item>
+        <el-form-item label="荣誉描述"><el-input v-model="honorForm.description" type="textarea" :rows="4" /></el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="honorEditVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitHonorEdit">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -698,7 +724,7 @@ import { Clock, CircleCheck, CircleClose, Link, Plus, Download, View, Delete, In
 import { 
   getAllDailyTasks, createDailyTask, deleteDailyTask, 
   getDailyTaskStats, exportDailyTaskExcel,
-  listItems, auditItem
+  listItems, auditItem, getDetail, updateItem, deleteItem
 } from '@/api/daily'
 import { getAllLeaveRequests, auditLeaveRequest, updateLeaveStatus } from '@/api/leave'
 import { getAllGrades } from '@/api/student'
@@ -716,6 +742,7 @@ const dict = {
     training: '培训',
   }
 }
+const honorCategories = ['竞赛', '论文', '专利', '奖学金', '社会服务', '其他']
 
 /** =========  ========= */
 const moduleKey = ref('honor') // 默认演示“荣誉”，可改：'academic' | 'daily' | 'honor'
@@ -1081,20 +1108,68 @@ const reviewForm = reactive({
   auditTime: new Date()
 })
 
-const openReview = (row) => {
-  Object.assign(reviewEntity, row)
+const openReview = async (row) => {
+  let entity = row
+  try {
+    if (moduleKey.value === 'honor') {
+      const res = await getDetail('honor', row.id)
+      if (res.code !== 200) return ElMessage.error('加载详情失败')
+      entity = res.data
+    }
+  } catch (e) {
+    return ElMessage.error('加载详情失败')
+  }
+  Object.assign(reviewEntity, entity)
   Object.assign(reviewForm, {
-    id: row.id || '',
-    title: row.title || '',
-    studentName: row.studentName || '',
-    userId: row.userId || '',
-    status: row.status || '', // 请假状态
-    auditStatus: row.auditStatus || 'pending',
-    auditComment: row.auditComment || '',
-    auditorId: row.auditorId || '',
-    auditTime: row.auditTime ? new Date(row.auditTime) : new Date()
+    id: entity.id || '',
+    title: entity.title || '',
+    studentName: entity.studentName || '',
+    userId: entity.userId || '',
+    status: entity.status || '', // 请假状态
+    auditStatus: entity.auditStatus || 'pending',
+    auditComment: entity.auditComment || '',
+    auditorId: entity.auditorId || '',
+    auditTime: entity.auditTime ? new Date(entity.auditTime) : new Date()
   })
   reviewVisible.value = true
+}
+
+const honorEditVisible = ref(false)
+const honorForm = reactive({})
+const openHonorEdit = (row) => {
+  Object.assign(honorForm, {
+    ...row,
+    awardDate: row.awardDate ? new Date(row.awardDate) : '',
+    tags: Array.isArray(row.tags) ? row.tags.join(', ') : (row.tags || '')
+  })
+  honorEditVisible.value = true
+}
+const submitHonorEdit = async () => {
+  if (!honorForm.title || !honorForm.awardDate || !honorForm.evidenceUrl) {
+    return ElMessage.warning('请填写荣誉名称、获奖日期和证明材料')
+  }
+  try {
+    const res = await updateItem('honor', honorForm.id, honorForm)
+    if (res.code === 200) {
+      ElMessage.success('修改成功，已重新提交审核')
+      honorEditVisible.value = false
+      loadBusinessData()
+    }
+  } catch (e) {
+    ElMessage.error('修改失败')
+  }
+}
+const removeHonor = async (row) => {
+  try {
+    await ElMessageBox.confirm(`确认删除荣誉“${row.title}”吗？`, '删除确认', { type: 'warning' })
+    const res = await deleteItem('honor', row.id)
+    if (res.code === 200) {
+      ElMessage.success('删除成功')
+      loadBusinessData()
+    }
+  } catch (e) {
+    if (e !== 'cancel' && e !== 'close') ElMessage.error('删除失败')
+  }
 }
 
 const quickApprove = () => {

@@ -237,6 +237,11 @@ class SecurityRegressionTest {
         assertEquals(204,status(security,"admin-token","GET","/msi/employment-intentions/admin/list"));
         assertEquals(204,status(security,"student-token","POST","/msi/honors/create"));
         assertEquals(403,status(security,"student-token","POST","/msi/honors/audit"));
+        for (String method : List.of("GET", "PUT", "DELETE")) {
+            assertEquals(401, status(security, null, method, "/msi/honors/fixture"));
+            assertEquals(204, status(security, "student-token", method, "/msi/honors/fixture"));
+            assertEquals(204, status(security, "admin-token", method, "/msi/honors/fixture"));
+        }
     }
 
     private FilterChainProxy securityFilterChain() throws Exception {

@@ -56,6 +56,18 @@ export function getDetail(moduleKey, id) {
     return request.get(url)
 }
 
+// 修改
+export function updateItem(moduleKey, id, form) {
+    const url = `/${URL[moduleKey]}/${id}`
+    return request.put(url, normalize(moduleKey, form))
+}
+
+// 删除
+export function deleteItem(moduleKey, id) {
+    const url = `/${URL[moduleKey]}/${id}`
+    return request.delete(url)
+}
+
 // 审核接口 (Admin)
 export function auditItem(moduleKey, data) {
     const url = `/${URL[moduleKey]}/audit`

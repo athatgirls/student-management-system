@@ -8,7 +8,7 @@ public interface HonorService {
     List<HonorModel> findAll();
     List<HonorModel> findByUserId(String userId);
     HonorModel findById(String id);
+    HonorModel update(HonorModel model);
     HonorModel audit(String id, String status, String comment, String auditorId);
     void delete(String id);
 }
-
