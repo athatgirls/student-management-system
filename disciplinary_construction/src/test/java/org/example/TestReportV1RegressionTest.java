@@ -5,11 +5,13 @@ import org.example.dto.StudentProfileUpdate;
 import org.example.model.*;
 import org.example.repository.*;
 import org.example.service.*;
+import org.example.service.Impl.ActivityServiceImpl;
 import org.example.util.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.*;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 import java.time.*;
 import java.util.*;
@@ -79,11 +81,10 @@ class TestReportV1RegressionTest {
         assertDoesNotThrow(() -> SubmissionValidation.validate(c));
         c.setDescription("描述文字"); assertThrows(IllegalArgumentException.class, () -> SubmissionValidation.validate(c));
     }
-    @Test void profileAcceptsStudentFieldsButRejectsUnknownPoliticalStatus() {
-        StudentProfileUpdate dto = new StudentProfileUpdate(); dto.setMajor("计算机"); dto.setClassName("一班"); dto.setSupervisor("导师"); dto.setPoliticalStatus("发展对象");
+    @Test void profileAcceptsStudentFieldsButExcludesPoliticalStatus() {
+        StudentProfileUpdate dto = new StudentProfileUpdate(); dto.setMajor("计算机"); dto.setClassName("一班"); dto.setSupervisor("导师"); dto.setWorkStatus("班委");
         StudentModel result = dto.toStudent("student-a"); assertEquals("计算机",result.getMajor()); assertEquals("一班",result.getClassName());
-        assertEquals("导师",result.getSupervisor()); assertEquals("发展对象",result.getPoliticalStatus());
-        dto.setPoliticalStatus("invalid"); assertThrows(IllegalArgumentException.class, () -> dto.toStudent("student-a"));
+        assertEquals("导师",result.getSupervisor()); assertEquals("班委",result.getWorkStatus()); assertNull(result.getPoliticalStatus());
     }
     private StudyRecordModel study() {
         StudyRecordModel r = new StudyRecordModel(); r.setCourse("课程"); r.setSemester("2026秋"); r.setScore(85); r.setCredit(2.0); r.setAttachments(FILES); return r;
@@ -110,8 +111,24 @@ class TestReportV1RegressionTest {
         EmploymentIntentionModel saved = c.save(input,user); assertEquals("student-a",saved.getId()); assertEquals("2026001",saved.getStudentId()); assertEquals("测试学生",saved.getStudentName());
         verify(repository).save(input);
     }
+    @Test void leaveAuditUsesAuthenticatedAdministratorIdentity() {
+        LeaveRequestService service = mock(LeaveRequestService.class);
+        LeaveRequestController controller = new LeaveRequestController();
+        ReflectionTestUtils.setField(controller, "leaveRequestService", service);
+        ReflectionTestUtils.setField(controller, "currentUserAccessService", access());
+        Map<String, Object> admin = Map.of("userId", "admin-a", "userType", "admin", "username", "可信管理员");
+        Map<String, Object> body = new HashMap<>(); body.put("auditStatus", "approved"); body.put("auditComment", "通过");
+        body.put("auditorId", "forged"); body.put("auditorName", "伪造管理员");
+        LeaveRequestModel saved = new LeaveRequestModel(); saved.setId("leave-a");
+        when(service.auditLeaveRequest("leave-a", "approved", "通过", "admin-a", "可信管理员")).thenReturn(saved);
+        assertEquals(200, controller.auditLeaveRequest("leave-a", body, admin).getBody().get("code"));
+        verify(service).auditLeaveRequest("leave-a", "approved", "通过", "admin-a", "可信管理员");
+        assertThrows(AccessDeniedException.class, () -> controller.auditLeaveRequest("leave-a", body, user));
+    }
     @Test void volunteerSyncUsesStableIdAndSchoolNumberAndDoesNotTreatSignupAsCompletion() {
         MongoTemplate mongo = mock(MongoTemplate.class); VolunteerCompletionService sync = new VolunteerCompletionService(mongo);
+        DailyTaskModel nonVolunteer = new DailyTaskModel(); nonVolunteer.setId("task-d"); nonVolunteer.setActivityCategory("daily");
+        assertFalse(sync.sync(nonVolunteer, student(), null)); verifyNoInteractions(mongo);
         DailyTaskModel task = new DailyTaskModel(); task.setId("task-a"); task.setActivityCategory("volunteer"); task.setTaskCategory("registration");
         sync.sync(task,student(),null); verifyNoInteractions(mongo);
         ActivityModel activity = new ActivityModel(); activity.setActivityTime(LocalDateTime.now());
@@ -119,5 +136,51 @@ class TestReportV1RegressionTest {
         verify(mongo,times(2)).upsert(argThat((Query q) -> "task:task-a:student:student-a".equals(q.getQueryObject().get("_id"))),
                 argThat((Update u) -> "2026001".equals(((org.bson.Document) u.getUpdateObject().get("$setOnInsert")).get("studentId"))
                         && "通过".equals(((org.bson.Document) u.getUpdateObject().get("$set")).get("auditStatus"))), eq(VolunteerServiceModel.class));
+    }
+    @Test void ordinaryVolunteerSubmissionCreatesRecordButRegistrationWaitsForAttendance() {
+        MongoTemplate mongo = mock(MongoTemplate.class); VolunteerCompletionService sync = new VolunteerCompletionService(mongo);
+        DailyTaskModel ordinary = new DailyTaskModel(); ordinary.setId("task-normal"); ordinary.setActivityCategory("volunteer"); ordinary.setTaskCategory("normal");
+        sync.sync(ordinary, student(), null);
+        verify(mongo).upsert(any(Query.class), any(Update.class), eq(VolunteerServiceModel.class));
+
+        reset(mongo);
+        DailyTaskModel registration = new DailyTaskModel(); registration.setId("task-registration"); registration.setActivityCategory("volunteer"); registration.setTaskCategory("registration");
+        sync.sync(registration, student(), null);
+        verifyNoInteractions(mongo);
+        sync.sync(registration, student(), new ActivityModel());
+        verify(mongo).upsert(any(Query.class), any(Update.class), eq(VolunteerServiceModel.class));
+    }
+    @Test void attendanceSyncAndCompensationReportCreatedSkippedAndOutOfScopeStudents() {
+        ActivityRepository activities = mock(ActivityRepository.class);
+        DailyTaskRepository tasks = mock(DailyTaskRepository.class);
+        StudentRepository students = mock(StudentRepository.class);
+        DailyTaskAudienceService audience = mock(DailyTaskAudienceService.class);
+        VolunteerCompletionService volunteer = mock(VolunteerCompletionService.class);
+        ActivityServiceImpl service = new ActivityServiceImpl();
+        ReflectionTestUtils.setField(service, "activityRepository", activities);
+        ReflectionTestUtils.setField(service, "taskRepository", tasks);
+        ReflectionTestUtils.setField(service, "studentRepository", students);
+        ReflectionTestUtils.setField(service, "dailyTaskAudienceService", audience);
+        ReflectionTestUtils.setField(service, "volunteerCompletionService", volunteer);
+        ActivityModel activity = new ActivityModel(); activity.setId("activity-a"); activity.setTitle("志愿活动"); activity.setTaskId("task-a"); activity.setParticipantStudentIds(Arrays.asList("student-a", "student-b", "student-missing"));
+        DailyTaskModel task = new DailyTaskModel(); task.setId("task-a"); task.setActivityCategory("volunteer");
+        StudentModel other = new StudentModel(); other.setId("student-b"); other.setStudentId("2026002"); other.setName("范围外学生");
+        when(activities.findById("activity-a")).thenReturn(Optional.of(activity));
+        when(tasks.findById("task-a")).thenReturn(Optional.of(task));
+        when(students.findById("student-a")).thenReturn(Optional.of(student()));
+        when(students.findById("student-b")).thenReturn(Optional.of(other));
+        when(students.findById("student-missing")).thenReturn(Optional.empty());
+        when(audience.matches(eq(task), any(StudentModel.class))).thenAnswer(invocation ->
+                "student-a".equals(((StudentModel) invocation.getArgument(1)).getId()));
+        when(volunteer.sync(eq(task), any(StudentModel.class), eq(activity))).thenReturn(true, false);
+
+        Map<String, Object> first = service.syncVolunteerAttendance("activity-a");
+        assertEquals(1, first.get("syncedCount")); assertEquals(1, first.get("skippedCount")); assertEquals(1, first.get("outOfScopeCount"));
+        Map<String, Object> repeated = service.syncVolunteerAttendance("activity-a");
+        assertEquals(0, repeated.get("syncedCount")); assertEquals(2, repeated.get("skippedCount"));
+
+        when(activities.findAll()).thenReturn(List.of(activity));
+        Map<String, Object> compensated = service.compensateVolunteerAttendance();
+        assertEquals(1, compensated.get("activityCount")); assertEquals(0, compensated.get("syncedCount"));
     }
 }

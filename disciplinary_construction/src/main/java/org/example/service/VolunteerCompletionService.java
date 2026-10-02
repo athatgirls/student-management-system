@@ -3,6 +3,7 @@ package org.example.service;
 import org.example.model.*;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.*;
+import com.mongodb.client.result.UpdateResult;
 import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 
@@ -11,10 +12,11 @@ import java.time.LocalDateTime;
 public class VolunteerCompletionService {
     private final MongoTemplate mongo;
     public VolunteerCompletionService(MongoTemplate mongo) { this.mongo = mongo; }
-    public void sync(DailyTaskModel task, StudentModel student, ActivityModel activity) {
-        if (!"volunteer".equals(task.getActivityCategory())) return;
+    /** @return true when a volunteer record was created; false when the stable record already existed. */
+    public boolean sync(DailyTaskModel task, StudentModel student, ActivityModel activity) {
+        if (!"volunteer".equals(task.getActivityCategory())) return false;
         // Signing up alone is not completion: registration activities require attendance import.
-        if (activity == null && "registration".equals(task.getTaskCategory())) return;
+        if (activity == null && "registration".equals(task.getTaskCategory())) return false;
         String id = "task:" + task.getId() + ":student:" + student.getId();
         LocalDateTime now = LocalDateTime.now();
         Update update = new Update().setOnInsert("studentId", student.getStudentId())
@@ -29,6 +31,7 @@ public class VolunteerCompletionService {
         } else {
             update.setOnInsert("serviceDate", now.toLocalDate().toString()).setOnInsert("auditStatus", "待审核");
         }
-        mongo.upsert(Query.query(Criteria.where("_id").is(id)), update, VolunteerServiceModel.class);
+        UpdateResult result = mongo.upsert(Query.query(Criteria.where("_id").is(id)), update, VolunteerServiceModel.class);
+        return result != null && result.getUpsertedId() != null;
     }
 }

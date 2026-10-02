@@ -134,7 +134,7 @@
         <el-row :gutter="20">
           <el-col :xs="24" :sm="24" :md="12" :lg="12">
             <el-form-item label="政治面貌" prop="politicalStatus">
-              <el-select v-model="profileForm.politicalStatus" placeholder="请选择政治面貌" style="width: 100%">
+              <el-select v-model="profileForm.politicalStatus" disabled title="请联系管理员审核设置" style="width: 100%">
                 <el-option
                   v-for="status in POLITICAL_STATUS_OPTIONS"
                   :key="status"
@@ -168,7 +168,7 @@
           </el-col>
           <el-col :xs="24" :sm="24" :md="8" :lg="8">
             <el-form-item label="任职情况" prop="workStatus">
-              <el-input v-model="profileForm.workStatus" disabled title="请联系管理员修改" />
+              <el-input v-model="profileForm.workStatus" placeholder="如：班委、学生组织、助管" />
             </el-form-item>
           </el-col>
         </el-row>
