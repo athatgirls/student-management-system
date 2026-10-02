@@ -212,11 +212,19 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" :width="isMobile ? 80 : 140" align="right" fixed="right">
+            <el-table-column label="操作" :width="isMobile ? 180 : 260" align="right" fixed="right">
               <template #default="scope">
                 <el-button link type="primary" :icon="View" :size="isMobile ? 'small' : 'default'" @click="openDetail(scope.row)">
                   {{ isMobile ? '详情' : '查看详情' }}
                 </el-button>
+                <template v-if="moduleKey === 'honor'">
+                  <el-button link type="primary" :icon="EditPen" :size="isMobile ? 'small' : 'default'" @click="openEdit(scope.row)">
+                    修改
+                  </el-button>
+                  <el-button link type="danger" :size="isMobile ? 'small' : 'default'" @click="removeHonor(scope.row)">
+                    删除
+                  </el-button>
+                </template>
               </template>
             </el-table-column>
           </template>
@@ -260,6 +268,12 @@
           <el-table-column prop="description" label="描述" :min-width="isMobile ? 0 : 250" :class-name="isMobile ? 'hidden-mobile' : ''" show-overflow-tooltip>
             <template #default="scope">
               <span style="color: #606266;">{{ scope.row.description || '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column v-if="!isMobile" label="发放文件" width="150">
+            <template #default="scope">
+              <el-link v-for="url in scope.row.attachments || []" :key="url" :href="url" target="_blank" rel="noopener" type="primary">{{ getFileName(url) }}</el-link>
+              <span v-if="!scope.row.attachments?.length">-</span>
             </template>
           </el-table-column>
           <el-table-column label="截止/完成时间" :width="isMobile ? 140 : 240">
@@ -327,6 +341,12 @@
               <el-table-column prop="description" label="描述" :min-width="isMobile ? 0 : 250" :class-name="isMobile ? 'hidden-mobile' : ''" show-overflow-tooltip>
                 <template #default="scope">
                   <span style="color: #606266;">{{ scope.row.description || '-' }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="!isMobile" label="发放文件" width="150">
+                <template #default="scope">
+                  <el-link v-for="url in scope.row.attachments || []" :key="url" :href="url" target="_blank" rel="noopener" type="primary">{{ getFileName(url) }}</el-link>
+                  <span v-if="!scope.row.attachments?.length">-</span>
                 </template>
               </el-table-column>
               <el-table-column label="报名情况" :width="isMobile ? 100 : 140">
@@ -484,7 +504,7 @@
     </el-dialog>
 
     <!-- 新增弹窗（随联动字段） -->
-    <el-dialog v-model="createVisible" :title="'新增' + moduleTitle" width="760px" destroy-on-close>
+    <el-dialog v-model="createVisible" :title="(editingHonor ? '修改' : '新增') + moduleTitle" width="760px" destroy-on-close>
       <el-form ref="createFormRef" :model="form" :rules="rules" label-width="110px">
         <!-- 学术活动 -->
         <template v-if="moduleKey === 'academic'">
@@ -783,9 +803,9 @@ import { taskDateError, orderedDates, hasAttachments } from '@/utils/submissionV
 import { volunteerServiceApi } from '@/api/party'
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Clock, CircleCheck, CircleClose, Link, EditPen, Search, Plus, Calendar, User, View, Location } from '@element-plus/icons-vue'
-import { getActiveDailyTasks, submitDailyTask, getMyDailyTaskSubmission, listItems, createItem } from '@/api/daily'
+import { getActiveDailyTasks, submitDailyTask, getMyDailyTaskSubmission, listItems, createItem, getDetail, updateItem, deleteItem } from '@/api/daily'
 import { createLeaveRequest, getMyLeaveRequests, checkIn, uploadLeaveEvidence } from '@/api/leave'
 import { useStore } from 'vuex'
 import { getImageUrl, isImage, getFileName } from '@/utils/imageUrl'
@@ -1180,6 +1200,7 @@ const applySearch = () => {
 // 新增
 const createVisible = ref(false)
 const createFormRef = ref()
+const editingHonor = ref(false)
 const initAcademic = {
   id: '', studentId: '', studentName: '', title: '', type: '讲座',
   organizer: '', speaker: '', attachmentUrl: '',
@@ -1235,6 +1256,7 @@ const rules = reactive({
   awardDate: [{ required: computed(() => moduleKey.value === 'honor').value, message: '请选择获奖日期', trigger: 'change' }]
 })
 const openCreate = () => {
+  editingHonor.value = false
   honorAttachments.value = ''
   createVisible.value = true
   if (moduleKey.value === 'leave') {
@@ -1297,9 +1319,11 @@ const submitCreate = async () => {
         }
       }
     } else {
-      const res = await createItem(moduleKey.value, form)
+      const res = editingHonor.value
+        ? await updateItem('honor', form.id, form)
+        : await createItem(moduleKey.value, form)
       if (res.code === 200) {
-        ElMessage.success('提交成功，待审核')
+        ElMessage.success(editingHonor.value ? '修改成功，已重新提交审核' : '提交成功，待审核')
         createVisible.value = false
         loadBusinessData()
       }
@@ -1588,9 +1612,41 @@ const submitCheckIn = async () => {
     ElMessage.error('销假失败')
   }
 }
-const openDetail = (row) => {
-  Object.assign(detailEntity, row)
-  detailVisible.value = true
+const openDetail = async (row) => {
+  try {
+    const res = moduleKey.value === 'honor' ? await getDetail('honor', row.id) : { code: 200, data: row }
+    if (res.code === 200) {
+      Object.assign(detailEntity, res.data)
+      detailVisible.value = true
+    }
+  } catch (e) {
+    ElMessage.error('加载详情失败')
+  }
+}
+
+const openEdit = (row) => {
+  editingHonor.value = true
+  Object.assign(form, {
+    ...initHonor,
+    ...row,
+    tags: Array.isArray(row.tags) ? row.tags.join(', ') : (row.tags || ''),
+    awardDate: row.awardDate ? new Date(row.awardDate) : '',
+  })
+  honorAttachments.value = row.evidenceUrl ? JSON.stringify([{ url: row.evidenceUrl }]) : ''
+  createVisible.value = true
+}
+
+const removeHonor = async (row) => {
+  try {
+    await ElMessageBox.confirm(`确认删除荣誉“${row.title}”吗？`, '删除确认', { type: 'warning' })
+    const res = await deleteItem('honor', row.id)
+    if (res.code === 200) {
+      ElMessage.success('删除成功')
+      loadBusinessData()
+    }
+  } catch (e) {
+    if (e !== 'cancel' && e !== 'close') ElMessage.error('删除失败')
+  }
 }
 
 // 详情展示的键值对

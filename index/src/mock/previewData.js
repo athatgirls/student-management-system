@@ -103,6 +103,8 @@ const dailyTasks = [
     title: '提交本周学习总结',
     content: '请填写本周课程学习情况和下周计划。',
     taskCategory: 'normal',
+    activityCategory: 'routine',
+    attachments: ['/uploads/preview-task-guide.pdf'],
     active: true,
     completed: false,
     deadline: toDate(3),
@@ -639,15 +641,40 @@ export function createPreviewResponse(config = {}) {
   }
   if (path === '/daily-tasks/completion-analysis') {
     return success([
-      { studentId: '10240001', studentName: '张同学', totalTasks: 8, completedTasks: 7, completionRate: 87.5, averageRate: 87.5 },
-      { studentId: '10240002', studentName: '李同学', totalTasks: 8, completedTasks: 6, completionRate: 75, averageRate: 75 }
+      { studentId: '10240001', name: '张同学', grade: '2024', totalRequired: 8, completedCount: 7, completionRate: 87.5 },
+      { studentId: '10240002', name: '李同学', grade: '2024', totalRequired: 8, completedCount: 6, completionRate: 75 }
     ])
   }
+  if (path === '/daily-tasks/my-completion') return success({ totalRequired: 8, completedCount: 7, incompleteCount: 1, completionRate: 87.5, incompleteTasks: [dailyTasks[0]] })
   if (path.startsWith('/daily-tasks/student-incomplete-tasks')) return success([dailyTasks[0]])
   if (path === '/activities/list') {
     return success([
       { id: 'activity-001', name: '学院志愿活动', title: '学院志愿活动', taskId: 'task-002', activityDate: toDate(5), active: true }
     ])
+  }
+  const honorMatch = path.match(/^\/honors\/([^/]+)(?:\/(update|delete))?$/)
+  if (honorMatch) {
+    const index = honors.findIndex(item => item.id === honorMatch[1])
+    if (index < 0) return { code: 404, data: null, msg: '荣誉不存在' }
+    if (config.method === 'get' && !honorMatch[2]) return success(honors[index])
+    if (config.method === 'post' && honorMatch[2] === 'update') {
+      const input = parseBody(config.data)
+      honors[index] = {
+        ...honors[index],
+        ...input,
+        id: honors[index].id,
+        userId: honors[index].userId,
+        auditStatus: 'pending',
+        auditComment: null,
+        auditorId: null,
+        auditTime: null
+      }
+      return success(honors[index], '荣誉修改成功，待审核')
+    }
+    if (config.method === 'post' && honorMatch[2] === 'delete') {
+      honors.splice(index, 1)
+      return success(null, '荣誉已删除')
+    }
   }
   if (path.includes('/activities/') && path.includes('/import-students')) {
     return success({ success: true, matchedCount: 2, unmatchedCount: 0, matchedResults: students, unmatchedResults: [] })

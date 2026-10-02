@@ -69,6 +69,14 @@
       </el-col>
     </el-row>
 
+    <el-card class="task-completion-card" style="margin-top: 20px;">
+      <div class="task-completion-header">
+        <span>普通任务完成度</span>
+        <strong>{{ taskCompletion.completedCount }}/{{ taskCompletion.totalRequired }} · {{ taskCompletion.completionRate }}%</strong>
+      </div>
+      <el-progress :percentage="taskCompletion.completionRate" :stroke-width="10" :show-text="false" />
+    </el-card>
+
     <el-row :gutter="20" class="main-content-row" style="margin-top: 20px;">
       <el-col :xs="24" :sm="24" :md="12" :lg="12" class="recent-activities-col">
         <el-card>
@@ -204,6 +212,10 @@
                   <span class="time-label">截止时间：</span>
                   <span class="time-value">{{ todo.deadlineText }}</span>
                 </div>
+                <div v-if="todo.attachments?.length" class="todo-time-item">
+                  <span class="time-label">发放文件：</span>
+                  <el-link v-for="(url, index) in todo.attachments" :key="url" :href="url" target="_blank" rel="noopener" type="primary" @click.stop>文件{{ index + 1 }}</el-link>
+                </div>
               </div>
               </div>
             </template>
@@ -322,7 +334,7 @@ import {
   Clock
 } from '@element-plus/icons-vue'
 import { getPersonalStats } from '@/api/home'
-import { getActiveDailyTasks } from '@/api/daily'
+import { getActiveDailyTasks, getMyTaskCompletion } from '@/api/daily'
 import { getProfile, getRecentActivities } from '@/api/student'
 import { getMyLeaveRequests } from '@/api/leave'
 
@@ -384,6 +396,7 @@ const personalStats = ref({
   papers: 0,
   projects: 0
 })
+const taskCompletion = ref({ totalRequired: 0, completedCount: 0, completionRate: 0 })
 
 // 最近活动
 const recentActivities = ref([])
@@ -630,6 +643,7 @@ const loadTodoList = async () => {
           taskCategory: task.taskCategory, // 任务类别
           maxParticipants: task.maxParticipants, // 最大报名人数
           currentParticipants: task.currentParticipants, // 当前报名人数
+          attachments: task.attachments || [],
           priority: 1 // 日常任务优先级较低
         }
       })
@@ -679,6 +693,21 @@ const loadTodoList = async () => {
     })
   } catch (e) {
     console.error('加载待办事项失败', e)
+  }
+}
+
+const loadTaskCompletion = async () => {
+  try {
+    const res = await getMyTaskCompletion()
+    if (res.code === 200 && res.data) {
+      taskCompletion.value = {
+        totalRequired: res.data.totalRequired || 0,
+        completedCount: res.data.completedCount || 0,
+        completionRate: res.data.completionRate || 0
+      }
+    }
+  } catch (error) {
+    console.error('加载任务完成度失败', error)
   }
 }
 
@@ -847,6 +876,7 @@ onMounted(async () => {
   // 确保用户信息加载完成后再加载个人统计数据（需要studentId）
   await loadPersonalData()
   loadTodoList()
+  loadTaskCompletion()
   loadRecentActivities() // 加载最近活动
   
   // 每秒更新时间
@@ -887,6 +917,19 @@ onMounted(async () => {
 
 .stat-card {
   height: 120px;
+}
+
+.task-completion-card {
+  max-width: 100%;
+}
+
+.task-completion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+  color: #303133;
 }
 
 .stat-content {
