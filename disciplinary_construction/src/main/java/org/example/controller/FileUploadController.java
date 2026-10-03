@@ -1,7 +1,9 @@
 package org.example.controller;
 
 import org.example.response.ResponseResult;
+import org.example.service.ObjectStorageService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -11,10 +13,8 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -28,6 +28,9 @@ import java.util.UUID;
 public class FileUploadController {
     @org.springframework.beans.factory.annotation.Autowired
     private org.example.repository.UploadedFileRepository uploadedFiles;
+
+    @Autowired
+    private ObjectStorageService objectStorage;
 
     private void recordOwner(String filename, MultipartFile file, HttpServletRequest request) {
         Object owner = request.getAttribute("userId");
@@ -43,9 +46,6 @@ public class FileUploadController {
             ".jpg", ".jpeg", ".png", ".pdf", ".doc", ".docx"
     ));
 
-    @Value("${app.upload-dir:uploads}")
-    private String uploadDir;
-
     @Value("${server.servlet.context-path:}")
     private String contextPath;
 
@@ -58,8 +58,6 @@ public class FileUploadController {
         }
 
         try {
-            Path uploadPath = getUploadPath();
-            Files.createDirectories(uploadPath);
             String baseUrl = getBaseUrl(request);
 
             for (MultipartFile file : files) {
@@ -69,12 +67,8 @@ public class FileUploadController {
                         return new ResponseResult<>(400, validationError, null);
                     }
                     String filename = buildSafeFilename(file.getOriginalFilename());
-                    Path filePath = uploadPath.resolve(filename).normalize();
-                    if (!filePath.startsWith(uploadPath)) {
-                        return new ResponseResult<>(400, "Invalid file path", null);
-                    }
                     try (InputStream inputStream = file.getInputStream()) {
-                        Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
+                        objectStorage.putObject(filename, inputStream, file.getSize(), file.getContentType());
                     }
                     recordOwner(filename, file, request);
                     fileUrls.add(baseUrl + "/uploads/" + filename);
@@ -99,16 +93,9 @@ public class FileUploadController {
                 return new ResponseResult<>(400, validationError, null);
             }
 
-            Path uploadPath = getUploadPath();
-            Files.createDirectories(uploadPath);
-
             String filename = buildSafeFilename(file.getOriginalFilename());
-            Path filePath = uploadPath.resolve(filename).normalize();
-            if (!filePath.startsWith(uploadPath)) {
-                return new ResponseResult<>(400, "Invalid file path", null);
-            }
             try (InputStream inputStream = file.getInputStream()) {
-                Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
+                objectStorage.putObject(filename, inputStream, file.getSize(), file.getContentType());
             }
 
             recordOwner(filename, file, request);
@@ -149,10 +136,6 @@ public class FileUploadController {
         }
         String requestContextPath = request.getContextPath();
         return requestContextPath != null && !requestContextPath.isEmpty() ? requestContextPath : "";
-    }
-
-    private Path getUploadPath() {
-        return Paths.get(uploadDir).toAbsolutePath().normalize();
     }
 
     private String buildSafeFilename(String originalFilename) {

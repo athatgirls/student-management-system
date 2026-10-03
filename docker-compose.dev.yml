@@ -28,6 +28,24 @@ services:
       timeout: 3s
       retries: 20
 
+  rustfs:
+    image: rustfs/rustfs:latest
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-rustfsadmin}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-rustfsadmin}
+    command: ["rustfs", "/data"]
+    volumes:
+      - rustfs_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   backend:
     image: maven:3.9.9-eclipse-temurin-11
     working_dir: /app
@@ -35,6 +53,8 @@ services:
       mongo:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      rustfs:
         condition: service_healthy
     ports:
       - "1010:1010"
@@ -47,6 +67,10 @@ services:
       REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET:-MIS_DEV_ONLY_CHANGE_THIS_64_CHAR_MINIMUM_SECRET_20260831_DEMO}
       APP_UPLOAD_DIR: /app/uploads
+      RUSTFS_ENDPOINT: http://rustfs:9000
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-rustfsadmin}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-rustfsadmin}
+      RUSTFS_BUCKET: ${RUSTFS_BUCKET:-uploads}
       APP_CORS_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
       APP_BOOTSTRAP_ENABLED: "true"
       APP_BOOTSTRAP_ADMIN_USERNAME: ${APP_BOOTSTRAP_ADMIN_USERNAME:-admin}
@@ -90,6 +114,7 @@ volumes:
   mongo_data:
   redis_data:
   uploads_data:
+  rustfs_data:
   maven_cache:
   frontend_node_modules:
   frontend_npm_cache:
