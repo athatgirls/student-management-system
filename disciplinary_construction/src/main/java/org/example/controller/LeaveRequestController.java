@@ -135,7 +135,7 @@ public class LeaveRequestController {
     }
     
     // 学生销假
-    @PutMapping("/check-in/{id}")
+    @RequestMapping(value = "/check-in/{id}", method = {RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<Map<String, Object>> checkIn(
             @PathVariable String id,
             @RequestBody Map<String, Object> requestBody,
@@ -169,7 +169,7 @@ public class LeaveRequestController {
     }
     
     // 管理员手动更新请假状态
-    @PutMapping("/update-status/{id}")
+    @RequestMapping(value = "/update-status/{id}", method = {RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<Map<String, Object>> updateLeaveStatus(
             @PathVariable String id,
             @RequestBody Map<String, Object> requestBody) {
@@ -189,6 +189,9 @@ public class LeaveRequestController {
                 return ResponseEntity.ok(result);
             }
             
+            if (!java.util.Arrays.asList("pending", "approved", "rejected", "on_leave", "pending_check_in", "completed", "overdue").contains(status)) {
+                return ResponseEntity.badRequest().body(Map.of("code", 400, "msg", "无效的请假状态"));
+            }
             leaveRequest.setStatus(status);
             leaveRequest.setUpdateTime(java.time.LocalDateTime.now());
             leaveRequestService.updateLeaveRequest(leaveRequest);

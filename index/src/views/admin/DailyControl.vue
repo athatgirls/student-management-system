@@ -361,7 +361,7 @@
         </el-table-column>
         <el-table-column prop="submissionTime" label="提交时间" width="180">
           <template #default="scope">
-            {{ scope.row.submissionTime ? new Date(scope.row.submissionTime).toLocaleString() : '-' }}
+            {{ scope.row.submissionTime ? fmtDateTime(scope.row.submissionTime) : '-' }}
           </template>
         </el-table-column>
         <!-- 动态显示字段列 -->
@@ -412,7 +412,7 @@
           </div>
         </el-form-item>
         <el-form-item label="截止日期" required>
-          <el-date-picker v-model="taskForm.deadline" type="datetime" placeholder="选择截止时间" style="width: 100%" />
+          <el-date-picker v-model="taskForm.deadline" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" format="YYYY-MM-DD HH:mm" placeholder="选择截止时间" style="width: 100%" />
         </el-form-item>
         <el-form-item label="任务类型">
           <el-input v-model="taskForm.type" placeholder="请输入任务类型" />
@@ -742,6 +742,7 @@
 </template>
 
 <script setup>
+import { formatDateTime as fmtDateTime } from '@/utils/dateTime'
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Clock, CircleCheck, CircleClose, Link, Plus, Download, View, Delete, InfoFilled } from '@element-plus/icons-vue'
@@ -973,6 +974,7 @@ const loadTasks = async () => {
 }
 
 const handleCreateTask = async () => {
+  if (taskAttachmentUploading.value) return ElMessage.warning('请等待文件上传完成')
   if (!taskForm.title || !taskForm.deadline || !taskForm.type.trim()) {
     ElMessage.warning('请填写任务标题、任务类型和截止日期')
     return
@@ -1011,6 +1013,8 @@ const handleCreateTask = async () => {
       ElMessage.success('任务发布成功')
       closeTaskDialog()
       loadTasks()
+    } else {
+      ElMessage.error(res.msg || '发布失败')
     }
   } catch (e) {
     ElMessage.error('发布失败')
@@ -1240,7 +1244,6 @@ const removeHonor = async (row) => {
 
 const quickApprove = () => {
   reviewForm.auditStatus = 'approved'
-  if (moduleKey.value === 'leave') reviewForm.status = 'approved'
   submitReview()
 }
 const quickReject  = () => { reviewForm.auditStatus = 'rejected'; submitReview() }
@@ -1452,17 +1455,6 @@ const batchApprove = () => { multipleSelection.value.forEach(it => (it.auditStat
 const batchReject  = () => { multipleSelection.value.forEach(it => (it.auditStatus = 'rejected')); ElMessage.success('已批量驳回') }
 
 /** ========= 公共 ========= */
-const fmtDateTime = (d) => {
-  if (!d) return ''
-  const date = (d instanceof Date) ? d : new Date(d)
-  if (Number.isNaN(+date)) return String(d)
-  const y = date.getFullYear()
-  const m = String(date.getMonth()+1).padStart(2,'0')
-  const day = String(date.getDate()).padStart(2,'0')
-  const h = String(date.getHours()).padStart(2,'0')
-  const min = String(date.getMinutes()).padStart(2,'0')
-  return `${y}-${m}-${day} ${h}:${min}`
-}
 
 const fmtDate = (d) => {
   if (!d) return ''

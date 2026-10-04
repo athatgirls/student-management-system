@@ -799,6 +799,8 @@
 
 <script setup>
 import RecordAttachments from '@/components/RecordAttachments.vue'
+import { formatDateTime as fmtDateTime } from '@/utils/dateTime'
+import { taskMatchesTab } from '@/utils/taskCategory'
 import { taskDateError, orderedDates, hasAttachments } from '@/utils/submissionValidation'
 import { volunteerServiceApi } from '@/api/party'
 import { ref, reactive, computed, onMounted, watch } from 'vue'
@@ -877,7 +879,7 @@ const moduleTitle = computed(() => {
 const activeTasks = ref([])
 const volunteerHistory = ref([])
 const honorAttachments = ref('')
-const categoryTasks = computed(() => activeTasks.value.filter(task => (task.activityCategory || 'daily') === (moduleKey.value === 'tasks' ? 'daily' : moduleKey.value)))
+const categoryTasks = computed(() => activeTasks.value.filter(task => taskMatchesTab(task, moduleKey.value)))
 const taskTab = ref('normal') // 任务标签页：normal(普通任务) 或 registration(报名型任务)
 const submitDialogVisible = ref(false)
 const currentTask = ref({})
@@ -1742,17 +1744,6 @@ const fmtDate = (d) => {
   const day = String(date.getDate()).padStart(2,'0')
   return `${y}-${m}-${day}`
 }
-const fmtDateTime = (d) => {
-  if (!d) return ''
-  const date = (d instanceof Date) ? d : new Date(d)
-  if (Number.isNaN(+date)) return String(d)
-  const y = date.getFullYear()
-  const m = String(date.getMonth()+1).padStart(2,'0')
-  const day = String(date.getDate()).padStart(2,'0')
-  const h = String(date.getHours()).padStart(2,'0')
-  const min = String(date.getMinutes()).padStart(2,'0')
-  return `${y}-${m}-${day} ${h}:${min}`
-}
 const onTabChange = (tabName = moduleKey.value) => { 
   searchKey.value = '' 
   if (route.path !== tabPathMap[tabName]) {
@@ -1783,7 +1774,7 @@ const handleRouteTask = async () => {
     const task = activeTasks.value.find(t => t.id === taskId)
     if (task) {
       const category = task.activityCategory || 'daily'
-      if (category !== 'daily') {
+      if (!['daily', 'routine'].includes(category)) {
         await router.replace({ path: tabPathMap[category], query: { taskId } })
         moduleKey.value = category
       }

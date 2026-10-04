@@ -43,10 +43,13 @@ public class DailyTaskServiceImpl implements DailyTaskService {
     private DailyTaskAudienceService dailyTaskAudienceService;
     @Autowired
     private org.example.service.VolunteerCompletionService volunteerCompletionService;
+    @Autowired
+    private org.example.service.TaskAttachmentAccessService taskAttachmentAccessService;
 
     @Override
     public DailyTaskModel createTask(DailyTaskModel task) {
         task.setId(null);
+        taskAttachmentAccessService.validate(task);
         dailyTaskAudienceService.validateAndNormalize(task);
         task.setActivityCategory(org.example.util.TaskSubmissionValidation.category(task.getActivityCategory()));
         task.setCreateTime(LocalDateTime.now());
@@ -179,7 +182,7 @@ public class DailyTaskServiceImpl implements DailyTaskService {
                 row.put("major", student.getMajor());
                 row.put("grade", student.getGrade());
                 row.put("status", "已报名");
-                row.put("submissionTime", submission.getSubmissionTime());
+                row.put("submissionTime", org.example.util.UtcTimestamps.toWire(submission.getSubmissionTime()));
                 row.put("content", submission.getContent());
                 
                 // 如果任务有字段定义，解析字段化数据
@@ -226,7 +229,7 @@ public class DailyTaskServiceImpl implements DailyTaskService {
                 DailyTaskSubmissionModel submission = submissionMap.get(student.getId());
                 if (submission != null) {
                     row.put("status", "已完成");
-                    row.put("submissionTime", submission.getSubmissionTime());
+                    row.put("submissionTime", org.example.util.UtcTimestamps.toWire(submission.getSubmissionTime()));
                     row.put("content", submission.getContent());
                     
                     // 如果任务有字段定义，解析字段化数据
@@ -356,6 +359,13 @@ public class DailyTaskServiceImpl implements DailyTaskService {
         List<Map<String, Object>> analysis = new ArrayList<>();
         
         for (StudentModel student : students) {
+            analysis.add(completionFor(student, normalTasks, studentSubmissionsMap.getOrDefault(student.getId(), Collections.emptyMap())));
+        }
+        return analysis;
+    }
+
+    private Map<String, Object> completionFor(StudentModel student, List<DailyTaskModel> normalTasks,
+            Map<String, DailyTaskSubmissionModel> studentSubmissions) {
             // 计算该学生需要完成的任务（根据限制条件）
             String studentPartyStage = dailyTaskAudienceService.resolvePartyStage(student);
             List<DailyTaskModel> requiredTasks = normalTasks.stream()
@@ -363,7 +373,6 @@ public class DailyTaskServiceImpl implements DailyTaskService {
                     .collect(Collectors.toList());
             
             // 计算已完成的任务
-            Map<String, DailyTaskSubmissionModel> studentSubmissions = studentSubmissionsMap.getOrDefault(student.getId(), new HashMap<>());
             int completedCount = 0;
             List<Map<String, Object>> incompleteTasks = new ArrayList<>();
             
@@ -395,10 +404,7 @@ public class DailyTaskServiceImpl implements DailyTaskService {
             studentAnalysis.put("completionRate", Math.round(completionRate * 100.0) / 100.0);
             studentAnalysis.put("incompleteTasks", incompleteTasks);
             
-            analysis.add(studentAnalysis);
-        }
-        
-        return analysis;
+            return studentAnalysis;
     }
 
     @Override
@@ -407,10 +413,12 @@ public class DailyTaskServiceImpl implements DailyTaskService {
         if (student == null) {
             throw new IllegalArgumentException("学生不存在");
         }
-        return getTaskCompletionAnalysis(null).stream()
-                .filter(analysis -> student.getStudentId().equals(analysis.get("studentId")))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("未找到学生完成度数据"));
+        List<DailyTaskModel> tasks = taskRepository.findByActive(true).stream()
+                .filter(task -> !"registration".equals(task.getTaskCategory()))
+                .collect(Collectors.toList());
+        Map<String, DailyTaskSubmissionModel> submissions = new HashMap<>();
+        submissionRepository.findByStudentId(studentId).forEach(item -> submissions.put(item.getTaskId(), item));
+        return completionFor(student, tasks, submissions);
     }
     
     @Override
@@ -485,7 +493,7 @@ public class DailyTaskServiceImpl implements DailyTaskService {
                 taskInfo.put("taskTitle", task.getTitle());
                 taskInfo.put("description", task.getDescription());
                 taskInfo.put("deadline", task.getDeadline());
-                taskInfo.put("createTime", task.getCreateTime());
+                taskInfo.put("createTime", org.example.util.UtcTimestamps.toWire(task.getCreateTime()));
                 incompleteTasks.add(taskInfo);
             }
         }

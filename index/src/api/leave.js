@@ -22,7 +22,7 @@ export function getMyLeaveRequests(studentId) {
 export function checkIn(id, checkInComment, latitude, longitude, address) {
   return request({
     url: `/leave/check-in/${id}`,
-    method: 'put',
+    method: 'post',
     data: { 
       checkInComment,
       latitude,
@@ -64,7 +64,7 @@ export function auditLeaveRequest(id, auditStatus, auditComment) {
 export function updateLeaveStatus(id, status) {
   return request({
     url: `/leave/update-status/${id}`,
-    method: 'put',
+    method: 'post',
     data: { status }
   })
 }

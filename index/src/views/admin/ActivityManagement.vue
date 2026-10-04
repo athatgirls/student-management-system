@@ -105,6 +105,8 @@
           <el-date-picker
             v-model="activityForm.activityTime"
             type="datetime"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+            format="YYYY-MM-DD HH:mm"
             placeholder="选择活动时间"
             style="width: 100%"
           />
@@ -116,6 +118,8 @@
           <el-date-picker
             v-model="activityForm.taskDeadline"
             type="datetime"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+            format="YYYY-MM-DD HH:mm"
             placeholder="选择截止时间"
             style="width: 100%"
           />
@@ -134,8 +138,11 @@
         <template v-if="activityForm.taskMode === 'create'">
           <el-form-item label="活动分类" required>
             <el-select v-model="activityForm.activityCategory">
-              <el-option label="学术活动" value="academic" /><el-option label="日常活动" value="daily" /><el-option label="志愿活动" value="volunteer" />
+              <el-option label="学术活动" value="academic" /><el-option label="日常活动" value="daily" /><el-option label="日常任务" value="routine" /><el-option label="志愿活动" value="volunteer" />
             </el-select>
+          </el-form-item>
+          <el-form-item label="发放文件">
+            <RecordAttachments v-model="activityForm.attachments" editable label="上传任务文件" @uploading="activityAttachmentUploading = $event" />
           </el-form-item>
           <el-form-item label="任务类别" required>
             <el-radio-group v-model="activityForm.taskCategory">
@@ -388,6 +395,7 @@
 </template>
 
 <script setup>
+import RecordAttachments from '@/components/RecordAttachments.vue'
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, UploadFilled } from '@element-plus/icons-vue'
@@ -423,6 +431,7 @@ const manualStudents = ref([])
 const availableTasks = ref([])
 const tasksLoading = ref(false)
 const createLoading = ref(false)
+const activityAttachmentUploading = ref(false)
 const gradeList = ref([])
 const identityOptions = POLITICAL_STATUS_OPTIONS
 
@@ -439,6 +448,7 @@ const activityForm = reactive({
   maxParticipants: null,
   allowedGrades: [],
   allowedIdentities: [],
+  attachments: '',
   // 关联已有任务
   taskId: ''
 })
@@ -507,6 +517,7 @@ const handleOpenCreateDialog = () => {
   activityForm.allowedGrades = []
   activityForm.allowedIdentities = []
   activityForm.taskId = ''
+  activityForm.attachments = ''
   loadGradeList()
   createDialogVisible.value = true
 }
@@ -531,6 +542,7 @@ const handleCreateActivity = async () => {
     return
   }
 
+  if (activityAttachmentUploading.value) return ElMessage.warning('请等待文件上传完成')
   // 验证任务信息
   let taskId = null
   if (activityForm.taskMode === 'create') {
@@ -557,6 +569,7 @@ const handleCreateActivity = async () => {
         maxParticipants: activityForm.taskCategory === 'registration' ? activityForm.maxParticipants : null,
         allowedGrades: activityForm.allowedGrades,
         allowedIdentities: activityForm.allowedIdentities,
+        attachments: JSON.parse(activityForm.attachments || '[]').map(file => file.url),
         fields: []
       }
       

@@ -8,6 +8,7 @@ import java.util.Optional;
 
 public interface DailyTaskRepository extends MongoRepository<DailyTaskModel, String> {
     List<DailyTaskModel> findByActive(boolean active);
+    List<DailyTaskModel> findByActiveAndAttachmentsContaining(boolean active, String attachment);
     Optional<DailyTaskModel> findByTitle(String title);
 }
 

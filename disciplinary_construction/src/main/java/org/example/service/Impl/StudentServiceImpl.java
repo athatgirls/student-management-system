@@ -105,7 +105,7 @@ public class StudentServiceImpl implements StudentService {
                 newTask.setTitle(taskTitle);
                 newTask.setDescription("系统检测到您的个人资料不完整，请前往个人信息模块完善性别、宿舍、联系方式等信息。");
                 newTask.setType("信息填写");
-                newTask.setDeadline(java.time.LocalDateTime.now().plusMonths(1));
+                newTask.setDeadline(java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Shanghai")).plusMonths(1));
                 newTask.setActive(true);
                 newTask.setCreateTime(java.time.LocalDateTime.now());
                 newTask.setUpdateTime(java.time.LocalDateTime.now());

@@ -11,7 +11,7 @@ function Api($method, $path, $body, $token) {
   $args = @{ Uri="$base$path"; Method=$method; Headers=$headers; ContentType='application/json'; SkipHttpErrorCheck=$true }
   if ($null -ne $body) { $args.Body = $body | ConvertTo-Json -Depth 12 -Compress }
   $r = Invoke-WebRequest @args
-  try { $data = $r.Content | ConvertFrom-Json } catch { $data = $r.Content }
+  try { $data = $r.Content | ConvertFrom-Json -DateKind String } catch { $data = $r.Content }
   return @{ status=[int]$r.StatusCode; data=$data }
 }
 try {
@@ -26,14 +26,14 @@ try {
   $admin = (Api POST '/admin/login' @{username='admin';password=$env:REPORT_TEST_ADMIN_PASSWORD} $null).data.data.token
   Check ([bool]$admin) 'administrator login'
   $temporary='Temporary9!'+[guid]::NewGuid().ToString('N'); $permanent='Permanent9!'+[guid]::NewGuid().ToString('N')
-  $created=(Api POST '/student/create' @{studentId='fixture-100001';name='测试学生';grade='2026';major='计算机';status='在读';password=$temporary} $admin).data
+  $created=(Api POST '/student/create' @{studentId='fixture-100001';name='测试学生';grade='2026';major='计算机';politicalStatus='发展对象';status='在读';password=$temporary} $admin).data
   Check ($created.code -eq 200) 'create fixture student'
   $studentDbId=$created.data.id
   Check ((Api POST '/student/change-initial-password' @{studentId='fixture-100001';initialPassword=$temporary;newPassword=$permanent} $null).data.code -eq 200) 'initial password POST'
   $student=(Api POST '/student/login' @{account='fixture-100001';password=$permanent} $null).data.data.token
   Check ([bool]$student) 'student login'
-  $saved=(Api POST '/student/profile/update' @{major='软件工程';className='一班';politicalStatus='发展对象';supervisor='导师';researchDirection='人工智能';name='伪造';id='victim';password='Spoof123!'} $student).data
-  Check ($saved.code -eq 200 -and $saved.data.major -eq '软件工程' -and $saved.data.className -eq '一班' -and $saved.data.supervisor -eq '导师' -and $saved.data.politicalStatus -eq '发展对象' -and $saved.data.name -eq '测试学生') 'self-service fields persist without identity escalation'
+  $saved=(Api POST '/student/profile/update' @{major='软件工程';className='一班';politicalStatus='中共党员';supervisor='导师';researchDirection='人工智能';workStatus='学生助管';phone='13000000000';name='伪造';id='victim';password='Spoof123!'} $student).data
+  Check ($saved.code -eq 200 -and $saved.data.major -eq '软件工程' -and $saved.data.className -eq '一班' -and $saved.data.supervisor -eq '导师' -and $saved.data.politicalStatus -eq '发展对象' -and $saved.data.workStatus -eq '学生助管' -and $saved.data.name -eq '测试学生') 'self-service fields persist without identity escalation'
   $intent=(Api POST '/employment-intentions/me' @{id='victim';intentionType='就业';targetCity='武汉';targetPosition='研发'} $student).data
   Check ($intent.id -eq $studentDbId) 'intention bound to authenticated owner'
   Check ((Api GET '/employment-intentions/me' $null $student).data.targetCity -eq '武汉') 'intention survives server reload'
@@ -86,9 +86,60 @@ try {
   }
   $history=(Api GET '/volunteer-service/student/fixture-100001' $null $student).data.data
   Check ($history.Count -eq 1 -and $history[0].auditStatus -eq '通过') 'completed volunteer sync is idempotent and visible in party records'
+  Check ((Api POST "/activities/$($activity.id)/sync-volunteer-attendance" $null $student).status -eq 403) 'student cannot synchronize attendance'
+  $sync=(Api POST "/activities/$($activity.id)/sync-volunteer-attendance" $null $admin).data
+  Check ($sync.code -eq 200 -and $sync.data.skippedCount -eq 1) 'attendance resync skips existing stable record'
+  Check ((Api POST '/activities/compensate-volunteer-attendance' $null $admin).data.data.activityCount -eq 1) 'historical confirmed attendance compensation'
   Check ((Api POST "/activities/delete/$($activity.id)" $null $student).status -eq 403) 'student cannot delete admin activity'
   Check ((Api POST "/activities/delete/$($activity.id)" $null $admin).data.code -eq 200) 'POST activity delete'
-  Write-Output "REPORT_V1_INTEGRATION_OK checks=$checks"
+  # V2: administrator-distributed files preserve private-proof ownership and audience restrictions.
+  $adminUpload=Invoke-RestMethod -Uri "$base/upload" -Method Post -Headers @{Authorization="Bearer $admin"} -Form @{file=Get-Item (Join-Path $PSScriptRoot '../index/src/assets/logo.png')}
+  $handout=$adminUpload.data[0]
+  Check ((Invoke-WebRequest -Uri "http://127.0.0.1:18086$handout" -Headers @{Authorization="Bearer $student"} -SkipHttpErrorCheck).StatusCode -eq 403) 'unpublished admin file is not public to students'
+  Check ((Api POST '/daily-tasks/create' @{title='伪造任务附件';attachments=@($materialUrl)} $admin).data.code -eq 400) 'student proof cannot be republished as task handout'
+  Check ((Api POST '/daily-tasks/create' @{title='非法附件';attachments=@('javascript:alert(1)')} $admin).data.code -eq 400) 'executable handout URL rejected'
+  $handoutTask=(Api POST '/daily-tasks/create' @{title='日常任务文件';type='信息填写';taskCategory='normal';activityCategory='routine';deadline=$deadline;allowedGrades=@('2026');attachments=@($handout)} $admin).data.data
+  Check ([bool]$handoutTask.id -and $handoutTask.deadline -eq $deadline) 'daily-task category and unchanged local deadline persist'
+  Check ((Invoke-WebRequest -Uri "http://127.0.0.1:18086$handout" -Headers @{Authorization="Bearer $student"}).StatusCode -eq 200) 'eligible task recipient downloads admin handout'
+  Check ((Invoke-WebRequest -Uri "http://127.0.0.1:18086$handout" -SkipHttpErrorCheck).StatusCode -eq 401) 'task handout still requires authentication'
+  $otherTemp='Temporary9!'+[guid]::NewGuid().ToString('N'); $otherPass='Permanent9!'+[guid]::NewGuid().ToString('N')
+  $otherCreated=(Api POST '/student/create' @{studentId='fixture-100002';name='范围外学生';grade='2025';major='计算机';password=$otherTemp} $admin).data.data
+  Check ((Api POST '/student/change-initial-password' @{studentId='fixture-100002';initialPassword=$otherTemp;newPassword=$otherPass} $null).data.code -eq 200) 'other fixture initializes own password'
+  $other=(Api POST '/student/login' @{account='fixture-100002';password=$otherPass} $null).data.data.token
+  Check ([bool]$other) 'other fixture login'
+  Check ((Invoke-WebRequest -Uri "http://127.0.0.1:18086$handout" -Headers @{Authorization="Bearer $other"} -SkipHttpErrorCheck).StatusCode -eq 403) 'out-of-scope student cannot download handout'
+  Check ((Api GET '/daily-tasks/active' $null $other).data.data.id -notcontains $handoutTask.id) 'out-of-scope task hidden'
+  $before=(Api GET '/daily-tasks/my-completion' $null $student).data.data
+  Check ($before.totalRequired -eq 3 -and $before.completedCount -eq 0) 'homepage completion counts two ordinary fixtures and profile task, excludes registration'
+  $submitted=(Api POST '/daily-tasks/submit' @{taskId=$handoutTask.id;content='测试内容'} $student).data.data
+  Check ($submitted.submissionTime -match 'Z$' -and [Math]::Abs(([DateTimeOffset]::Parse($submitted.submissionTime)-[DateTimeOffset]::UtcNow).TotalSeconds) -lt 60) 'completion timestamp is accurate explicit UTC'
+  $after=(Api GET '/daily-tasks/my-completion' $null $student).data.data
+  Check ($after.totalRequired -eq 3 -and $after.completedCount -eq 1 -and $after.completionRate -eq 33.33) 'student homepage completion becomes 33.33 percent'
+  $analysis=(Api GET '/daily-tasks/completion-analysis' $null $admin).data.data | Where-Object studentId -eq 'fixture-100001'
+  Check ($analysis.completionRate -eq $after.completionRate -and $analysis.totalRequired -eq $after.totalRequired) 'administrator and student completion numbers agree'
+  Check ((Api GET '/daily-tasks/completion-analysis' $null $student).status -eq 403) 'student cannot view other students completion'
+  # V2: owner/admin honor maintenance and fresh approval after edits.
+  $honor=(Api POST '/honors/create' @{title='荣誉维护';awardDate='2026-10-01';evidenceUrl=$materialUrl} $student).data.data
+  Check ((Api GET "/honors/$($honor.id)" $null $other).status -eq 403) 'other student cannot view honor'
+  Check ((Api POST "/honors/$($honor.id)/update" @{title='越权';evidenceUrl=$materialUrl} $other).status -eq 403) 'other student cannot edit honor'
+  Check ((Api POST "/honors/$($honor.id)/delete" $null $other).status -eq 403) 'other student cannot delete honor'
+  Check ((Api POST '/honors/audit' @{id=$honor.id;auditStatus='approved'} $admin).data.data.auditStatus -eq 'approved') 'administrator approves honor'
+  $changed=(Api POST "/honors/$($honor.id)/update" @{title='修改后的荣誉';awardDate='2026-10-01';evidenceUrl=$materialUrl;userId=$otherCreated.id;auditStatus='approved';auditorId='spoof'} $student).data.data
+  Check ($changed.userId -eq $studentDbId -and $changed.auditStatus -eq 'pending' -and -not $changed.auditorId -and [Math]::Abs(([DateTimeOffset]::Parse($changed.createTime)-[DateTimeOffset]::Parse($honor.createTime)).TotalMilliseconds) -lt 1) 'own honor edit preserves owner and creation time and clears audit'
+  Check ((Api POST "/honors/$($honor.id)/update" @{title='管理员修改';awardDate='2026-10-01';evidenceUrl=$materialUrl} $admin).data.data.title -eq '管理员修改') 'administrator edits student honor'
+  Check ((Api POST "/honors/$($honor.id)/delete" $null $student).status -eq 200) 'student deletes own honor'
+  $honor=(Api POST '/honors/create' @{title='管理员删除';evidenceUrl=$materialUrl} $student).data.data
+  Check ((Api POST "/honors/$($honor.id)/delete" $null $admin).status -eq 200) 'administrator deletes student honor'
+  # V2: campus-compatible leave audit, state changes and check-in.
+  $leave=(Api POST '/leave/create' @{reason='测试请假';startDate='2026-10-01';endDate='2026-10-02';studentId='spoof'} $student).data.data
+  Check ([bool]$leave.id -and $leave.studentId -eq 'fixture-100001') 'student leave uses authenticated identity'
+  Check ((Api POST "/leave/audit/$($leave.id)" @{auditStatus='approved'} $student).status -eq 403) 'student cannot approve leave'
+  $approved=(Api POST "/leave/audit/$($leave.id)" @{auditStatus='approved';auditComment='测试通过';auditorId='spoof';auditorName='spoof'} $admin).data.data
+  Check ($approved.auditStatus -eq 'approved' -and $approved.status -eq 'approved' -and $approved.auditorId -ne 'spoof') 'POST leave approval succeeds and uses authenticated auditor'
+  Check ((Api POST "/leave/update-status/$($leave.id)" @{status='on_leave'} $admin).data.code -eq 200) 'POST manual leave status succeeds'
+  Check ((Api POST "/leave/check-in/$($leave.id)" @{checkInComment='返校';latitude=30.0;longitude=114.0;address='校园'} $other).status -eq 403) 'other student cannot check in owner leave'
+  Check ((Api POST "/leave/check-in/$($leave.id)" @{checkInComment='返校';latitude=30.0;longitude=114.0;address='校园'} $student).data.data.status -eq 'completed') 'POST owner leave check-in succeeds'
+  Write-Output "REPORT_V2_INTEGRATION_OK checks=$checks"
 } finally {
   & docker @composeArgs down --volumes
 }

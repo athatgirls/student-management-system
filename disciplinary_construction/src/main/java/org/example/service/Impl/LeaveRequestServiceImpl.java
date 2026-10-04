@@ -99,6 +99,8 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
     
     @Override
     public LeaveRequestModel auditLeaveRequest(String id, String auditStatus, String auditComment, String auditorId, String auditorName) {
+        if (!java.util.Arrays.asList("approved", "rejected").contains(auditStatus))
+            throw new IllegalArgumentException("请选择通过或驳回");
         LeaveRequestModel leaveRequest = leaveRequestRepository.findById(id).orElse(null);
         if (leaveRequest == null) {
             return null;
@@ -147,9 +149,9 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
     }
     
     @Override
-    @Scheduled(cron = "0 0 1 * * ?") // 每天凌晨1点执行
+    @Scheduled(cron = "0 0 1 * * ?", zone = "Asia/Shanghai") // 北京时间凌晨1点执行
     public void updateLeaveStatusAutomatically() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"));
         
         // 1. 将已批准且开始时间已到的请假状态改为"on_leave"（假期中）
         // 注意：只处理状态为"approved"的，不处理已销假（completed）的

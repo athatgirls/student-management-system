@@ -87,7 +87,7 @@ public class DailyTaskController {
                 taskMap.put("title", task.getTitle());
                 taskMap.put("description", task.getDescription());
                 taskMap.put("deadline", task.getDeadline());
-                taskMap.put("createTime", task.getCreateTime()); // 添加发布时间
+                taskMap.put("createTime", org.example.util.UtcTimestamps.toWire(task.getCreateTime()));
                 taskMap.put("active", task.isActive());
                 taskMap.put("type", task.getType());
                 taskMap.put("fields", task.getFields()); // 添加字段定义
@@ -108,7 +108,7 @@ public class DailyTaskController {
                 DailyTaskSubmissionModel submission = dailyTaskService.getSubmissionByTaskAndStudent(task.getId(), userId);
                 taskMap.put("completed", submission != null);
                 if (submission != null) {
-                    taskMap.put("submissionTime", submission.getSubmissionTime());
+                    taskMap.put("submissionTime", org.example.util.UtcTimestamps.toWire(submission.getSubmissionTime()));
                 }
                 return taskMap;
             });

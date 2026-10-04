@@ -89,7 +89,7 @@ class SecurityRegressionTest {
     @Test void privateFileRequiresOwnerAndLegacyFilesAreAdminOnly() throws Exception {
         UploadedFileRepository files = mock(UploadedFileRepository.class);
         CurrentUserAccessService access = new CurrentUserAccessService(mock(StudentRepository.class));
-        PrivateFileController controller = new PrivateFileController(files, access);
+        PrivateFileController controller = new PrivateFileController(files, access, mock(TaskAttachmentAccessService.class));
         ReflectionTestUtils.setField(controller, "uploadDir", dir.toString());
         Files.writeString(dir.resolve("fixture.pdf"), "fixture");
         UploadedFileModel meta = new UploadedFileModel(); meta.setOwnerId("a");

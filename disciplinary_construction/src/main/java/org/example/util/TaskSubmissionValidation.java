@@ -14,7 +14,7 @@ public final class TaskSubmissionValidation {
     }
     public static void validate(DailyTaskModel task, String content) {
         if (!task.isActive()) throw new IllegalArgumentException("任务已停用");
-        if (task.getDeadline() != null && task.getDeadline().isBefore(LocalDateTime.now())) throw new IllegalArgumentException("任务已截止");
+        if (task.getDeadline() != null && task.getDeadline().isBefore(LocalDateTime.now(ZoneId.of("Asia/Shanghai")))) throw new IllegalArgumentException("任务已截止");
         if (task.getFields() == null || task.getFields().isEmpty()) return;
         JsonNode values;
         try { values = new ObjectMapper().readTree(content == null ? "{}" : content); }

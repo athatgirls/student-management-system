@@ -20,6 +20,9 @@ import org.example.service.Impl.PartyMemberServiceImpl;
 @EnableScheduling
 public class MISApplication {
     public static void main(String[] args) {
+        // Keep MongoDB LocalDateTime conversion stable across Windows and Linux deployments.
+        // Event timestamps carry an explicit Z on the wire; user-entered deadlines remain local.
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("UTC"));
         SpringApplication.run(MISApplication.class, args);
     }
 
