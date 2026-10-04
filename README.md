@@ -27,7 +27,7 @@
 | --- | --- |
 | 前端 | Vue 3、Vue Router、Vuex、Element Plus、ECharts、Axios |
 | 后端 | Java 11、Spring Boot 2.7.18、Spring Security、JWT、BCrypt |
-| 数据存储 | MongoDB 7、Redis 7.2、持久化附件目录 |
+| 数据存储 | MongoDB 7、Redis 7.2、RustFS S3 兼容对象存储 |
 | 部署 | Docker Compose、Nginx，另提供 Caddy 自动 HTTPS 模板 |
 | 持续集成 | GitHub Actions：后端测试与打包、前端 lint/build、生产依赖审计 |
 
@@ -103,6 +103,7 @@ chmod 600 .env
 | 配置 | 用途 |
 | --- | --- |
 | `MONGO_ROOT_PASSWORD`、`REDIS_PASSWORD` | 独立的数据库随机密码 |
+| `RUSTFS_ACCESS_KEY`、`RUSTFS_SECRET_KEY` | RustFS S3 凭据，生产环境必填且不得使用开发默认值 |
 | `JWT_SECRET` | 足够长度的随机签名密钥，不使用示例值 |
 | `APP_BOOTSTRAP_ADMIN_USERNAME`、`APP_BOOTSTRAP_ADMIN_PASSWORD` | 首次初始化管理员 |
 | `APP_DEMO_DATA_ENABLED=false` | 正式环境不创建演示数据 |
@@ -142,9 +143,9 @@ curl -f http://127.0.0.1:8080/health
 
 学校服务器无法访问外网时，在可联网的构建环境完成测试与镜像构建，再通过学校授权的传输渠道上传离线镜像、部署配置和校验文件，使用 `docker load` 导入。只上传源码或 Dockerfile 不会使服务器自动具备离线构建所需的依赖。
 
-每次升级应先备份数据库和附件，记录旧镜像版本及实际 Compose 配置，再切换前后端。保留项目名和持久化卷，检查容器健康、登录、首次改密、个人资料保存、名单导入和附件权限；失败时使用已验证的回滚方案。
+每次升级应先备份数据库、兼容保留的本地 `uploads_data` 卷和 RustFS 的 `rustfs_data` 对象卷，记录旧镜像版本及实际 Compose 配置，再切换前后端。保留项目名和持久化卷，检查容器健康、登录、首次改密、个人资料保存、名单导入和附件权限；失败时使用已验证的回滚方案。
 
-仓库提供 [scripts/backup.sh](scripts/backup.sh) 作为基础部署备份脚本。自定义项目名、路径或覆盖文件的部署应先适配脚本；脚本本身不会停止业务写入，需根据一致性要求安排停写窗口。备份应限制访问权限、离机保存，并定期验证恢复。
+仓库提供 [scripts/backup.sh](scripts/backup.sh) 作为基础部署备份脚本。它以 `COMPOSE_PROJECT_NAME`（默认 `mis`）定位 RustFS 卷；自定义项目名、路径或覆盖文件的部署应先验证该变量。脚本本身不会停止业务写入，需根据一致性要求安排停写窗口。备份应限制访问权限、离机保存，并定期验证恢复和重启后的附件读回。本仓库尚未上线，未提供历史 `/app/uploads` 附件迁移或双读回退。
 
 详细说明见 [DEPLOY.md](DEPLOY.md) 和 [DOCKER.md](DOCKER.md)。其中公网自动 HTTPS 的示例不等同于学校离线部署步骤。
 

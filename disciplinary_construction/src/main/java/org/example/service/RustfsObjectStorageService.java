@@ -5,9 +5,12 @@ import io.minio.GetObjectArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import io.minio.RemoveObjectArgs;
 import io.minio.errors.ErrorResponseException;
 import org.example.config.RustfsStorageProperties;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.PostConstruct;
 import java.io.IOException;
@@ -15,6 +18,7 @@ import java.io.InputStream;
 
 @Service
 public class RustfsObjectStorageService implements ObjectStorageService {
+    private static final Logger log = LoggerFactory.getLogger(RustfsObjectStorageService.class);
     private final MinioClient client;
     private final RustfsStorageProperties properties;
 
@@ -45,6 +49,7 @@ public class RustfsObjectStorageService implements ObjectStorageService {
                             ? "application/octet-stream" : contentType)
                     .build());
         } catch (Exception e) {
+            log.error("RustFS object write failed for key {}", key, e);
             throw new IOException("无法写入 RustFS 对象", e);
         }
     }
@@ -55,9 +60,21 @@ public class RustfsObjectStorageService implements ObjectStorageService {
             return client.getObject(GetObjectArgs.builder().bucket(properties.getBucket()).object(key).build());
         } catch (Exception e) {
             if (isNotFound(e)) {
+                log.info("RustFS object was not found for key {}", key);
                 throw new ObjectStorageNotFoundException("对象不存在", e);
             }
+            log.error("RustFS object read failed for key {}", key, e);
             throw new IOException("无法读取 RustFS 对象", e);
+        }
+    }
+
+    @Override
+    public void deleteObject(String key) throws IOException {
+        try {
+            client.removeObject(RemoveObjectArgs.builder().bucket(properties.getBucket()).object(key).build());
+        } catch (Exception e) {
+            log.error("RustFS object deletion failed for key {}", key, e);
+            throw new IOException("无法删除 RustFS 对象", e);
         }
     }
 

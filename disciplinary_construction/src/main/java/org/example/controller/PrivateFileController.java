@@ -11,11 +11,14 @@ import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.AccessDeniedException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.Map;
 import java.io.IOException;
 
 @RestController
 public class PrivateFileController {
+    private static final Logger log = LoggerFactory.getLogger(PrivateFileController.class);
     private final UploadedFileRepository files;
     private final CurrentUserAccessService access;
     private final ObjectStorageService objectStorage;
@@ -33,7 +36,11 @@ public class PrivateFileController {
         try {
             object = new InputStreamResource(objectStorage.getObject(filename));
         } catch (ObjectStorageNotFoundException e) {
+            log.info("Requested file object is missing for key {}", filename);
             return ResponseEntity.notFound().build();
+        } catch (IOException e) {
+            log.error("File download failed for key {}", filename, e);
+            throw e;
         }
         boolean image = filename.endsWith(".png") || filename.endsWith(".jpg") || filename.endsWith(".jpeg");
         MediaType type = image ? (filename.endsWith(".png") ? MediaType.IMAGE_PNG : MediaType.IMAGE_JPEG) : MediaType.APPLICATION_OCTET_STREAM;
@@ -42,9 +49,6 @@ public class PrivateFileController {
                 .header("Content-Security-Policy", "default-src 'none'; sandbox")
                 .header(HttpHeaders.CONTENT_DISPOSITION, (image ? "inline" : "attachment") + "; filename=\"" + filename + "\"")
                 .contentType(type);
-        if (metadata != null) {
-            response.contentLength(metadata.getSize());
-        }
         return response.body(object);
     }
 }

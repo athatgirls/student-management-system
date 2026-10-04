@@ -29,9 +29,10 @@ docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build
 | `backend` | Spring Boot API | 无 |
 | `mongo` | 主数据库 | 无 |
 | `redis` | 在线状态和缓存 | 无 |
+| `rustfs` | 私有附件对象存储 | 无 |
 | `caddy` | HTTPS 证书和公网入口 | 80、443 |
 
-持久化卷包括 `mongo_data`、`redis_data`、`uploads_data`、`caddy_data`。普通 `down` 不会删除卷。
+持久化卷包括 `mongo_data`、`redis_data`、`uploads_data`、`rustfs_data`、`caddy_data`。普通 `down` 不会删除卷。生产环境必须在 `.env` 设置 `RUSTFS_ACCESS_KEY` 和 `RUSTFS_SECRET_KEY`；开发编排的默认凭据仅限本机使用，RustFS API 和控制台均只绑定回环地址。
 
 ## 常用命令
 
@@ -67,10 +68,14 @@ docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --force-r
 
 ### 想清空本地测试数据
 
-以下命令会永久删除该编排的数据库、缓存和上传卷，只能用于确认可丢弃的测试环境：
+以下命令会永久删除该编排的数据库、缓存、兼容 uploads 卷和 RustFS 对象卷，只能用于确认可丢弃的测试环境：
 
 ```powershell
 docker compose -f docker-compose.dev.yml down -v
 ```
 
 生产环境不要执行 `down -v`。
+
+### 附件备份与读回
+
+生产附件存放在 `rustfs_data` 卷。执行 `./scripts/backup.sh` 会同时导出 Mongo、兼容的 `/app/uploads` 和 RustFS 数据；RustFS 卷名由 `COMPOSE_PROJECT_NAME`（默认 `mis`）确定。恢复 RustFS 归档前先停写，然后将归档解压到同名卷，重启 `rustfs` 与 `backend`，并以有权限的账号下载一个已上传附件确认可读。本项目尚未上线，不包含旧 `/app/uploads` 文件的迁移或双读回退。

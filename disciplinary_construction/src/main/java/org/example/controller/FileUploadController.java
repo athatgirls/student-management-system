@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
@@ -26,6 +28,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/msi/upload")
 public class FileUploadController {
+    private static final Logger log = LoggerFactory.getLogger(FileUploadController.class);
     @org.springframework.beans.factory.annotation.Autowired
     private org.example.repository.UploadedFileRepository uploadedFiles;
 
@@ -66,17 +69,20 @@ public class FileUploadController {
                     if (validationError != null) {
                         return new ResponseResult<>(400, validationError, null);
                     }
+                }
+            }
+
+            for (MultipartFile file : files) {
+                if (!file.isEmpty()) {
                     String filename = buildSafeFilename(file.getOriginalFilename());
-                    try (InputStream inputStream = file.getInputStream()) {
-                        objectStorage.putObject(filename, inputStream, file.getSize(), file.getContentType());
-                    }
-                    recordOwner(filename, file, request);
+                    storeAndRecord(filename, file, request);
                     fileUrls.add(baseUrl + "/uploads/" + filename);
                 }
             }
 
             return ResponseResult.success(fileUrls);
         } catch (IOException e) {
+            log.error("Batch file upload failed", e);
             return new ResponseResult<>(500, "文件上传失败", null);
         }
     }
@@ -94,14 +100,28 @@ public class FileUploadController {
             }
 
             String filename = buildSafeFilename(file.getOriginalFilename());
-            try (InputStream inputStream = file.getInputStream()) {
-                objectStorage.putObject(filename, inputStream, file.getSize(), file.getContentType());
-            }
-
-            recordOwner(filename, file, request);
+            storeAndRecord(filename, file, request);
             return ResponseResult.success(getBaseUrl(request) + "/uploads/" + filename);
         } catch (IOException e) {
+            log.error("Single file upload failed", e);
             return new ResponseResult<>(500, "文件上传失败", null);
+        }
+    }
+
+    private void storeAndRecord(String filename, MultipartFile file, HttpServletRequest request) throws IOException {
+        try (InputStream inputStream = file.getInputStream()) {
+            objectStorage.putObject(filename, inputStream, file.getSize(), file.getContentType());
+        }
+        try {
+            recordOwner(filename, file, request);
+        } catch (RuntimeException e) {
+            log.error("File ownership persistence failed for key {}; deleting stored object", filename, e);
+            try {
+                objectStorage.deleteObject(filename);
+            } catch (IOException deleteFailure) {
+                log.error("Compensating deletion failed for key {}", filename, deleteFailure);
+            }
+            throw e;
         }
     }
 

@@ -22,10 +22,13 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -58,7 +61,7 @@ class ObjectStorageControllerTest {
         ObjectStorageService storage = mock(ObjectStorageService.class);
         UploadedFileModel metadata = new UploadedFileModel();
         metadata.setOwnerId("student-a");
-        metadata.setSize(7);
+        metadata.setSize(99);
         when(files.findById("fixture.pdf")).thenReturn(Optional.of(metadata));
         when(storage.getObject("fixture.pdf")).thenReturn(new ByteArrayInputStream("fixture".getBytes(StandardCharsets.UTF_8)));
         PrivateFileController controller = new PrivateFileController(files,
@@ -68,7 +71,47 @@ class ObjectStorageControllerTest {
 
         assertEquals(200, response.getStatusCodeValue());
         assertEquals("no-store", response.getHeaders().getCacheControl());
+        assertEquals(-1, response.getHeaders().getContentLength());
         assertEquals("fixture", new String(response.getBody().getInputStream().readAllBytes(), StandardCharsets.UTF_8));
         verify(storage).getObject("fixture.pdf");
+    }
+
+    @Test
+    void invalidFileInBatchWritesNeitherObjectNorOwnership() {
+        UploadedFileRepository files = mock(UploadedFileRepository.class);
+        ObjectStorageService storage = mock(ObjectStorageService.class);
+        FileUploadController controller = new FileUploadController();
+        ReflectionTestUtils.setField(controller, "uploadedFiles", files);
+        ReflectionTestUtils.setField(controller, "objectStorage", storage);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setAttribute("userId", "student-a");
+        MockMultipartFile valid = new MockMultipartFile("file", "evidence.png", "image/png",
+                new byte[]{(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a});
+        MockMultipartFile invalid = new MockMultipartFile("file", "invalid.pdf", "application/pdf", "not a pdf".getBytes(StandardCharsets.UTF_8));
+
+        ResponseResult<?> response = controller.uploadFiles(new MockMultipartFile[]{valid, invalid}, request);
+
+        assertEquals(400, response.getCode());
+        verifyNoInteractions(storage, files);
+    }
+
+    @Test
+    void ownershipPersistenceFailureDeletesStoredObject() throws Exception {
+        UploadedFileRepository files = mock(UploadedFileRepository.class);
+        ObjectStorageService storage = mock(ObjectStorageService.class);
+        doThrow(new RuntimeException("database unavailable")).when(files).insert(any(UploadedFileModel.class));
+        FileUploadController controller = new FileUploadController();
+        ReflectionTestUtils.setField(controller, "uploadedFiles", files);
+        ReflectionTestUtils.setField(controller, "objectStorage", storage);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setAttribute("userId", "student-a");
+        MockMultipartFile file = new MockMultipartFile("file", "evidence.png", "image/png",
+                new byte[]{(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a});
+
+        assertThrows(RuntimeException.class, () -> controller.uploadSingleFile(file, request));
+
+        ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
+        verify(storage).deleteObject(key.capture());
+        assertTrue(key.getValue().matches("[0-9a-f-]{36}\\.png"));
     }
 }

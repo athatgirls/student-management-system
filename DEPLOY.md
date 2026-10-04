@@ -41,11 +41,13 @@ MONGO_ROOT_USERNAME=mis_admin
 MONGO_ROOT_PASSWORD=第一条随机值
 REDIS_PASSWORD=第二条随机值
 JWT_SECRET=第三条随机值
+RUSTFS_ACCESS_KEY=第四条随机值
+RUSTFS_SECRET_KEY=第五条随机值
 
 APP_CORS_ALLOWED_ORIGINS=https://mis.example.com
 APP_BOOTSTRAP_ENABLED=true
 APP_BOOTSTRAP_ADMIN_USERNAME=admin
-APP_BOOTSTRAP_ADMIN_PASSWORD=第四条随机值
+APP_BOOTSTRAP_ADMIN_PASSWORD=第六条随机值
 
 APP_DEMO_DATA_ENABLED=false
 APP_DEMO_STUDENT_PASSWORD=不要使用默认值
@@ -93,7 +95,7 @@ docker compose -f docker-compose.yml -f docker-compose.https.yml ps
 ./scripts/backup.sh
 ```
 
-会在 `backups/` 生成 MongoDB 压缩归档和上传文件压缩包。建议再把备份同步到另一台机器或对象存储，并配置定时任务：
+会在 `backups/` 生成 MongoDB 压缩归档、兼容的本地上传目录压缩包，以及 RustFS 对象卷压缩包。脚本通过 `COMPOSE_PROJECT_NAME`（默认 `mis`）确定 RustFS 卷名；使用自定义项目名时先在 `.env` 设置同名变量。建议再把备份同步到另一台机器或对象存储，并配置定时任务：
 
 ```cron
 30 2 * * * cd /opt/student-management-system && ./scripts/backup.sh >> /var/log/mis-backup.log 2>&1
@@ -113,9 +115,14 @@ docker compose exec -T mongo mongorestore \
   --archive --gzip --drop < backups/mongo_时间.archive.gz
 
 docker compose exec -T backend tar -xzf - -C /app < backups/uploads_时间.tar.gz
+
+docker compose stop backend rustfs
+docker run --rm -v "${COMPOSE_PROJECT_NAME:-mis}_rustfs_data":/data -v "$PWD/backups":/backup alpine:3.20 \
+  tar -xzf /backup/rustfs_时间.tar.gz -C /data
+docker compose start rustfs backend
 ```
 
-恢复后检查登录、学生列表、文件访问和统计数据。
+恢复后检查登录、学生列表、文件访问和统计数据；再重启 `rustfs` 与 `backend`，以管理员或附件所有者身份下载一个已存在附件，确认对象数据在重启后仍可读。本仓库尚未上线，本次对象存储接入不包含旧 `/app/uploads` 历史附件迁移或双读回退。
 
 ## 7. 上线验收清单
 
@@ -124,6 +131,7 @@ docker compose exec -T backend tar -xzf - -C /app < backups/uploads_时间.tar.g
 - 管理员和学生能登录，学生访问管理员接口返回 403；
 - 新建、修改、查询、上传和 `.xlsx` 导入可用；
 - 重启容器后数据仍存在；
+- 上传附件后重启 `rustfs` 与 `backend`，原附件仍可按所有者/管理员权限读回；
 - 备份文件可以在测试环境恢复；
 - `.env` 权限已限制，例如 `chmod 600 .env`；
 - 演示数据关闭，默认密码全部更换。
