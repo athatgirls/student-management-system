@@ -387,7 +387,7 @@
     </el-dialog>
 
     <!-- 发布任务弹窗 -->
-    <el-dialog v-model="taskDialogVisible" title="发布新日常任务" width="800px" destroy-on-close>
+    <el-dialog v-model="taskDialogVisible" title="发布新日常任务" width="800px" destroy-on-close @closed="resetTaskForm">
       <el-form :model="taskForm" label-width="100px">
         <el-form-item label="活动分类" required>
           <el-select v-model="taskForm.activityCategory">
@@ -415,10 +415,7 @@
           <el-date-picker v-model="taskForm.deadline" type="datetime" placeholder="选择截止时间" style="width: 100%" />
         </el-form-item>
         <el-form-item label="任务类型">
-          <el-select v-model="taskForm.type" style="width: 100%">
-            <el-option label="信息填写" value="信息填写" />
-            <el-option label="文件上传" value="文件上传" />
-          </el-select>
+          <el-input v-model="taskForm.type" placeholder="请输入任务类型" />
         </el-form-item>
         
         <el-form-item label="任务类别" required>
@@ -563,7 +560,7 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="taskDialogVisible = false">取消</el-button>
+        <el-button @click="closeTaskDialog">取消</el-button>
         <el-button type="primary" @click="handleCreateTask">发布</el-button>
       </template>
     </el-dialog>
@@ -868,7 +865,7 @@ const taskForm = reactive({
   title: '',
   description: '',
   deadline: '',
-  type: '信息填写',
+  type: '',
   taskCategory: 'normal', // 任务类别：normal(普通任务) 或 registration(报名型任务)
   maxParticipants: null, // 报名人数限制（仅报名型任务有效）
   allowedGrades: [], // 允许的年级列表
@@ -903,6 +900,29 @@ const uploadTaskAttachment = async ({ file, onSuccess, onError }) => {
 }
 
 const removeTaskAttachment = (index) => taskForm.attachments.splice(index, 1)
+
+const resetTaskForm = () => {
+  Object.assign(taskForm, {
+    activityCategory: 'daily',
+    title: '',
+    description: '',
+    deadline: '',
+    type: '',
+    taskCategory: 'normal',
+    maxParticipants: null,
+    allowedGrades: [],
+    allowedIdentities: [],
+    allowedPoliticalStatuses: [],
+    allowedPartyStages: [],
+    fields: [],
+    attachments: []
+  })
+}
+
+const closeTaskDialog = () => {
+  taskDialogVisible.value = false
+  resetTaskForm()
+}
 
 // 添加字段
 const addField = () => {
@@ -953,8 +973,8 @@ const loadTasks = async () => {
 }
 
 const handleCreateTask = async () => {
-  if (!taskForm.title || !taskForm.deadline) {
-    ElMessage.warning('请填写任务标题和截止日期')
+  if (!taskForm.title || !taskForm.deadline || !taskForm.type.trim()) {
+    ElMessage.warning('请填写任务标题、任务类型和截止日期')
     return
   }
   
@@ -981,6 +1001,7 @@ const handleCreateTask = async () => {
 
   const taskData = {
     ...taskForm,
+    type: taskForm.type.trim(),
     fields: fieldsToSubmit
   }
   
@@ -988,24 +1009,8 @@ const handleCreateTask = async () => {
     const res = await createDailyTask(taskData)
     if (res.code === 200) {
       ElMessage.success('任务发布成功')
-      taskDialogVisible.value = false
+      closeTaskDialog()
       loadTasks()
-      // 重置表单
-      Object.assign(taskForm, { 
-        activityCategory: 'daily',
-        title: '', 
-        description: '', 
-        deadline: '', 
-        type: '信息填写',
-        taskCategory: 'normal',
-        maxParticipants: null,
-        allowedGrades: [],
-        allowedIdentities: [],
-        allowedPoliticalStatuses: [],
-        allowedPartyStages: [],
-        fields: [],
-        attachments: []
-      })
     }
   } catch (e) {
     ElMessage.error('发布失败')
