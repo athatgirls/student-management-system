@@ -21,12 +21,15 @@ test('date order validation catches the report example and custom relationships'
 test('gateway-sensitive mutations use explicit POST routes', () => {
   for (const file of ['api/party.js','api/competition.js','api/internship.js','api/daily.js']) assert.doesNotMatch(read(file), /method: '(put|delete)'|request\.(put|delete)\(/)
   assert.match(read('api/competition.js'), /competitions\/\$\{id\}\/delete/)
+  assert.match(read('api/leave.js'), /leave\/audit\/\$\{id\}[\s\S]*method: 'post'/)
+  assert.doesNotMatch(read('views/admin/DailyControl.vue'), /localStorage\.getItem\('userInfo'/)
 })
-test('profile and study are separated and requested student fields are editable', () => {
+test('profile and study are separated while political status remains administrator-controlled', () => {
   const source = read('views/Profile.vue')
   assert.match(source, /<el-card v-if="!isStudyPage"/)
   assert.match(source, /<el-card v-if="isStudyPage"/)
-  for (const field of ['major','className','politicalStatus','supervisor','researchDirection']) assert.doesNotMatch(source, new RegExp(`v-model="profileForm.${field}"[^>]*disabled`))
+  for (const field of ['major','className','supervisor','researchDirection','workStatus']) assert.doesNotMatch(source, new RegExp(`v-model="profileForm.${field}"[^>]*disabled`))
+  assert.match(source, /v-model="profileForm.politicalStatus"[^>]*disabled/)
   assert.match(source, /row.source === 'student'/)
 })
 test('employment intention no longer uses cross-account browser-local storage', () => {
@@ -38,4 +41,19 @@ test('four requested party branches and volunteer navigation are available', () 
   assert.match(read('constants/partyBranches.js'), /'第一', '第二', '第三', '卓研'/)
   assert.match(read('components/Layout.vue'), /\/daily\/volunteer/)
   assert.doesNotMatch(read('components/Layout.vue'), /<div class="page-shell"/)
+})
+test('party and daily volunteer views share the student volunteer-record API', () => {
+  const api = read('api/party.js')
+  assert.match(api, /getStudentVolunteerServices: \(studentId\) => request\.get\(`\/volunteer-service\/student\/\$\{studentId\}`\)/)
+  for (const file of ['views/Party.vue', 'views/Daily.vue']) {
+    const source = read(file)
+    assert.match(source, /volunteerServiceApi/)
+    assert.match(source, /volunteerServiceApi\.getStudentVolunteerServices\(/)
+  }
+})
+test('registration tasks wait for attendance confirmation before volunteer credit', () => {
+  const source = read('views/Daily.vue')
+  assert.match(source, /已报名待到场/)
+  assert.match(source, /导入到场名单后才计入志愿记录/)
+  assert.match(read('views/admin/ActivityManagement.vue'), /报名不等于完成/)
 })

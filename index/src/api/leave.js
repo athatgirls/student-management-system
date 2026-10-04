@@ -49,15 +49,13 @@ export function getAllLeaveRequests() {
 }
 
 // 管理员审核请假
-export function auditLeaveRequest(id, auditStatus, auditComment, auditorId, auditorName) {
+export function auditLeaveRequest(id, auditStatus, auditComment) {
   return request({
     url: `/leave/audit/${id}`,
-    method: 'put',
+    method: 'post',
     data: {
       auditStatus,
-      auditComment,
-      auditorId,
-      auditorName
+      auditComment
     }
   })
 }
@@ -86,4 +84,3 @@ export function uploadLeaveEvidence(files) {
     }
   })
 }
-

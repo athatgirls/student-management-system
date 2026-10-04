@@ -20,5 +20,10 @@ public interface ActivityService {
     // 导入学生并自动匹配任务
     // students: List<Map<String, String>> 格式：[{"name": "张三", "studentId": "102311306"}, ...]
     Map<String, Object> importStudentsAndMatchTasks(String activityId, List<Map<String, String>> students);
-}
 
+    // Re-sync volunteer records from an activity's confirmed attendance list.
+    Map<String, Object> syncVolunteerAttendance(String activityId);
+
+    // Compensate all historical volunteer activities that already have confirmed attendance.
+    Map<String, Object> compensateVolunteerAttendance();
+}
