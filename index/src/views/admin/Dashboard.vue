@@ -56,6 +56,29 @@
       </el-col>
     </el-row>
 
+    <el-card class="completion-card">
+      <template #header>
+        <div class="card-header">
+          <span>普通任务完成度</span>
+          <el-button link type="primary" @click="router.push('/admin/daily/task-completion-analysis')">查看分析</el-button>
+        </div>
+      </template>
+      <el-table :data="taskCompletionAnalysis" max-height="300">
+        <el-table-column prop="studentId" label="学号" min-width="130" />
+        <el-table-column prop="name" label="姓名" min-width="100" />
+        <el-table-column prop="grade" label="年级" min-width="90" />
+        <el-table-column label="完成情况" min-width="180">
+          <template #default="{ row }">
+            {{ row.completedCount }}/{{ row.totalRequired }}
+            <el-progress :percentage="row.completionRate" :show-text="false" :stroke-width="8" />
+          </template>
+        </el-table-column>
+        <el-table-column prop="completionRate" label="完成度" width="100">
+          <template #default="{ row }">{{ row.completionRate }}%</template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
     <!-- 图表和详细信息 -->
     <el-row :gutter="20" style="margin-top: 20px;">
       <el-col :xs="24" :sm="24" :md="16" :lg="16">
@@ -216,6 +239,7 @@ import {
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import request from '@/api/request'
+import { getTaskCompletionAnalysis } from '@/api/daily'
 
 const router = useRouter()
 
@@ -250,6 +274,7 @@ const displayedRecentActivities = computed(() => {
 
 // 待审批事项
 const pendingApprovals = ref([])
+const taskCompletionAnalysis = ref([])
 
 // 图表引用
 const majorChart = ref(null)
@@ -321,6 +346,17 @@ const loadStatistics = async () => {
     }
   } catch (error) {
     // 静默处理错误
+  }
+}
+
+const loadTaskCompletionAnalysis = async () => {
+  try {
+    const res = await getTaskCompletionAnalysis()
+    if (res.code === 200 && Array.isArray(res.data)) {
+      taskCompletionAnalysis.value = res.data
+    }
+  } catch (error) {
+    // Keep the dashboard available when task statistics cannot be loaded.
   }
 }
 
@@ -434,6 +470,7 @@ onMounted(() => {
     initChart()
     // 然后加载数据并更新图表
     loadStatistics()
+    loadTaskCompletionAnalysis()
   })
 })
 </script>
@@ -445,6 +482,10 @@ onMounted(() => {
 
 .statistics-cards {
   margin-bottom: 20px;
+}
+
+.completion-card {
+  margin-top: 20px;
 }
 
 .stat-card {

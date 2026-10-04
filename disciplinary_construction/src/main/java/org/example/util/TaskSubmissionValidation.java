@@ -9,7 +9,7 @@ public final class TaskSubmissionValidation {
     private TaskSubmissionValidation() { }
     public static String category(String category) {
         if (category == null || category.isBlank()) return "daily";
-        if (!Arrays.asList("academic", "daily", "volunteer").contains(category)) throw new IllegalArgumentException("请选择有效的活动分类");
+        if (!Arrays.asList("academic", "daily", "volunteer", "routine").contains(category)) throw new IllegalArgumentException("请选择有效的活动分类");
         return category;
     }
     public static void validate(DailyTaskModel task, String content) {

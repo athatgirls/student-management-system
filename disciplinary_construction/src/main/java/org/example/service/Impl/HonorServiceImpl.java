@@ -41,6 +41,16 @@ public class HonorServiceImpl implements HonorService {
     }
 
     @Override
+    public HonorModel update(HonorModel model) {
+        model.setAuditStatus("pending");
+        model.setAuditComment(null);
+        model.setAuditorId(null);
+        model.setAuditTime(null);
+        model.setUpdateTime(LocalDateTime.now());
+        return repository.save(model);
+    }
+
+    @Override
     public HonorModel audit(String id, String status, String comment, String auditorId) {
         HonorModel model = findById(id);
         if (model != null) {
@@ -59,4 +69,3 @@ public class HonorServiceImpl implements HonorService {
         repository.deleteById(id);
     }
 }
-

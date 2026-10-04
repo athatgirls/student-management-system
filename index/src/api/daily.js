@@ -56,6 +56,18 @@ export function getDetail(moduleKey, id) {
     return request.get(url)
 }
 
+// 修改
+export function updateItem(moduleKey, id, form) {
+    const url = `/${URL[moduleKey]}/${id}/update`
+    return request.post(url, normalize(moduleKey, form))
+}
+
+// 删除
+export function deleteItem(moduleKey, id) {
+    const url = `/${URL[moduleKey]}/${id}/delete`
+    return request.post(url)
+}
+
 // 审核接口 (Admin)
 export function auditItem(moduleKey, data) {
     const url = `/${URL[moduleKey]}/audit`
@@ -117,6 +129,11 @@ export function getMyDailyTaskSubmission(taskId) {
 export function getTaskCompletionAnalysis(grade) {
     const params = grade ? { grade } : {}
     return request.get('/daily-tasks/completion-analysis', { params })
+}
+
+// 获取当前学生自己的普通任务完成度
+export function getMyTaskCompletion() {
+    return request.get('/daily-tasks/my-completion')
 }
 
 // 导出任务完成度分析 (Admin)

@@ -42,7 +42,7 @@ public class HonorController {
 
     @GetMapping("/list")
     public ResponseEntity<Map<String, Object>> list(@RequestParam(required = false) String userId,
-                                                     @CurrentUser Map<String, Object> currentUser) {
+                                                      @CurrentUser Map<String, Object> currentUser) {
         if (!currentUserAccessService.isAdmin(currentUser)) {
             userId = currentUserAccessService.requireUserId(currentUser);
         }
@@ -56,23 +56,53 @@ public class HonorController {
         }
         
         // 填充学生姓名和学号
-        List<HonorModel> honorsWithStudentInfo = honors.stream().map(honor -> {
-            if (honor.getUserId() != null && !honor.getUserId().isEmpty()) {
-                try {
-                    StudentModel student = studentService.findById(honor.getUserId());
-                    if (student != null) {
-                        honor.setStudentName(student.getName());
-                        honor.setStudentId(student.getStudentId());
-                    }
-                } catch (Exception e) {
-                    // 忽略错误，保持原有数据
-                }
-            }
-            return honor;
-        }).collect(Collectors.toList());
+        List<HonorModel> honorsWithStudentInfo = honors.stream()
+                .map(this::withStudentInfo)
+                .collect(Collectors.toList());
         
         result.put("data", honorsWithStudentInfo);
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> detail(@PathVariable String id,
+                                                       @CurrentUser Map<String, Object> currentUser) {
+        HonorModel honor = service.findById(id);
+        if (honor == null) {
+            return ResponseEntity.notFound().build();
+        }
+        currentUserAccessService.requireStudentAccess(currentUser, honor.getUserId());
+        return ResponseEntity.ok(Map.of("code", 200, "data", withStudentInfo(honor)));
+    }
+
+    @PostMapping("/{id}/update")
+    public ResponseEntity<Map<String, Object>> update(@PathVariable String id,
+                                                       @RequestBody HonorModel model,
+                                                       @CurrentUser Map<String, Object> currentUser) {
+        HonorModel existing = service.findById(id);
+        if (existing == null) {
+            return ResponseEntity.notFound().build();
+        }
+        currentUserAccessService.requireStudentAccess(currentUser, existing.getUserId());
+        if (model.getEvidenceUrl() == null || model.getEvidenceUrl().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("code", 400, "msg", "请上传荣誉证明材料"));
+        }
+        model.setId(id);
+        model.setUserId(existing.getUserId());
+        model.setCreateTime(existing.getCreateTime());
+        return ResponseEntity.ok(Map.of("code", 200, "data", service.update(model)));
+    }
+
+    @PostMapping("/{id}/delete")
+    public ResponseEntity<Map<String, Object>> delete(@PathVariable String id,
+                                                       @CurrentUser Map<String, Object> currentUser) {
+        HonorModel existing = service.findById(id);
+        if (existing == null) {
+            return ResponseEntity.notFound().build();
+        }
+        currentUserAccessService.requireStudentAccess(currentUser, existing.getUserId());
+        service.delete(id);
+        return ResponseEntity.ok(Map.of("code", 200));
     }
 
     @PostMapping("/audit")
@@ -85,5 +115,21 @@ public class HonorController {
         result.put("code", 200);
         result.put("data", service.audit(id, status, comment, auditorId));
         return ResponseEntity.ok(result);
+    }
+
+    private HonorModel withStudentInfo(HonorModel honor) {
+        if (studentService == null || honor.getUserId() == null || honor.getUserId().isEmpty()) {
+            return honor;
+        }
+        try {
+            StudentModel student = studentService.findById(honor.getUserId());
+            if (student != null) {
+                honor.setStudentName(student.getName());
+                honor.setStudentId(student.getStudentId());
+            }
+        } catch (Exception e) {
+            // Keep the honor record available when a student record cannot be loaded.
+        }
+        return honor;
     }
 }
