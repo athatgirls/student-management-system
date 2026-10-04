@@ -44,6 +44,18 @@ try {
   $materialUrl=$upload.data[0]
   Check ((Invoke-WebRequest -Uri "http://127.0.0.1:18086$materialUrl" -Headers @{Authorization="Bearer $student"}).StatusCode -eq 200) 'owner can view uploaded proof'
   Check ((Invoke-WebRequest -Uri "http://127.0.0.1:18086$materialUrl" -SkipHttpErrorCheck).StatusCode -eq 401) 'proof remains private'
+  $beforeRestart=(Invoke-WebRequest -Uri "http://127.0.0.1:18086$materialUrl" -Headers @{Authorization="Bearer $student"}).RawContentStream.ToArray()
+  & docker @composeArgs up -d --no-deps --force-recreate --pull never rustfs
+  if ($LASTEXITCODE) { throw 'RustFS recreation failed' }
+  $storageReady=$false
+  for ($i=0;$i -lt 60;$i++) {
+    & docker @composeArgs exec -T rustfs curl -fsS http://127.0.0.1:9000/health/ready 2>$null | Out-Null
+    if (!$LASTEXITCODE) { $storageReady=$true; break }
+    Start-Sleep -Seconds 2
+  }
+  Check $storageReady 'RustFS ready after container recreation'
+  $afterRestart=(Invoke-WebRequest -Uri "http://127.0.0.1:18086$materialUrl" -Headers @{Authorization="Bearer $student"}).RawContentStream.ToArray()
+  Check ([Convert]::ToBase64String($beforeRestart) -eq [Convert]::ToBase64String($afterRestart)) 'stored proof survives RustFS container recreation byte-for-byte'
   $attachments=ConvertTo-Json -InputObject @(@{name='测试材料.png';url=$materialUrl}) -Compress
   $study=(Api POST '/study-records' @{semester='2026秋';course='课程';score=85;credit=2;attachments=$attachments;studentDbId='victim'} $student).data
   Check ($study.studentDbId -eq $studentDbId -and $study.source -eq 'student') 'learning record owner and source'

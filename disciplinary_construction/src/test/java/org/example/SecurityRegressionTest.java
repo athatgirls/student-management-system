@@ -89,9 +89,9 @@ class SecurityRegressionTest {
     @Test void privateFileRequiresOwnerAndLegacyFilesAreAdminOnly() throws Exception {
         UploadedFileRepository files = mock(UploadedFileRepository.class);
         CurrentUserAccessService access = new CurrentUserAccessService(mock(StudentRepository.class));
-        PrivateFileController controller = new PrivateFileController(files, access, mock(TaskAttachmentAccessService.class));
-        ReflectionTestUtils.setField(controller, "uploadDir", dir.toString());
-        Files.writeString(dir.resolve("fixture.pdf"), "fixture");
+        ObjectStorageService storage = mock(ObjectStorageService.class);
+        when(storage.getObject("fixture.pdf")).thenReturn(new java.io.ByteArrayInputStream("fixture".getBytes()));
+        PrivateFileController controller = new PrivateFileController(files, access, mock(TaskAttachmentAccessService.class), storage);
         UploadedFileModel meta = new UploadedFileModel(); meta.setOwnerId("a");
         when(files.findById("fixture.pdf")).thenReturn(Optional.of(meta));
         Map<String,Object> owner = Map.of("userId", "a", "userType", "student");

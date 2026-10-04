@@ -26,6 +26,11 @@ springdoc:
     enabled: false
 
 app:
+  storage:
+    endpoint: ${RUSTFS_ENDPOINT}
+    access-key: ${RUSTFS_ACCESS_KEY}
+    secret-key: ${RUSTFS_SECRET_KEY}
+    bucket: ${RUSTFS_BUCKET:uploads}
   demo-data:
     enabled: ${APP_DEMO_DATA_ENABLED:false}
   bootstrap:

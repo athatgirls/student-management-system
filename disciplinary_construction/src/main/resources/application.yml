@@ -46,6 +46,11 @@ management:
 
 app:
   upload-dir: ${APP_UPLOAD_DIR:uploads}
+  storage:
+    endpoint: ${RUSTFS_ENDPOINT:http://localhost:9000}
+    access-key: ${RUSTFS_ACCESS_KEY:rustfsadmin}
+    secret-key: ${RUSTFS_SECRET_KEY:rustfsadmin}
+    bucket: ${RUSTFS_BUCKET:uploads}
   bootstrap:
     enabled: ${APP_BOOTSTRAP_ENABLED:true}
     admin:

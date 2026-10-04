@@ -7,6 +7,7 @@ previous=${3:?Expected previous application tag}
 [[ "$release" =~ ^[a-f0-9]{7,40}$ && "$revision" =~ ^[a-f0-9]{40}$ && "$previous" =~ ^[a-f0-9]{7,40}$ ]] || exit 1
 [[ "$revision" == "$release"* ]] || exit 1
 deployment=/home/hbutjsj/mis-deploy-fdd0a6d/mis-offline-fdd0a6d
+export RUSTFS_ENV_FILE="$deployment/rustfs.env"
 bundle=$(cd -- "$(dirname -- "$0")" && pwd -P)
 [[ $(id -u) == 0 && -f "$deployment/.env" ]] || { echo 'Root and existing deployment required'; exit 1; }
 cd "$bundle"
@@ -34,9 +35,20 @@ docker load -i images.tar
 for service in backend frontend; do
   [[ $(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' mis-$service:$release) == "$revision" ]]
 done
+[[ $(docker image inspect -f '{{.Id}}' mis-rustfs:1.0.1) == sha256:1803faef57627e2d9c2e7d89d655d712ddded5389040054987163043fecb6a3c ]]
 backup="$deployment/backups/report-${release}-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$backup/config" "$backup/uploads" "$deployment/releases/$release"
 cp -p "$deployment/.env" "$backup/config/.env"
+if [[ -f "$RUSTFS_ENV_FILE" ]]; then
+  cp -p "$RUSTFS_ENV_FILE" "$backup/config/rustfs.env"
+else
+  # Random credentials stay on the server, never in Git or the offline package.
+  access_key=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
+  secret_key=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
+  printf 'RUSTFS_ENDPOINT=http://rustfs:9000\nRUSTFS_ACCESS_KEY=%s\nRUSTFS_SECRET_KEY=%s\nRUSTFS_BUCKET=uploads\nRUSTFS_CONSOLE_ENABLE=false\n' "$access_key" "$secret_key" > "$RUSTFS_ENV_FILE"
+  unset access_key secret_key
+fi
+chmod 600 "$RUSTFS_ENV_FILE"
 for i in "${!configs[@]}"; do cp -p "${configs[$i]}" "$backup/config/compose-$i.yaml"; done
 docker inspect -f '{{.Config.Image}} {{.Image}}' "$backend" "$frontend" > "$backup/previous-images.txt"
 printf '%q ' "${old[@]}" > "$backup/compose-command.txt"
@@ -48,6 +60,7 @@ rollback() {
   code=$?
   trap - ERR
   echo "Upgrade failed; restoring previous application images. Backup: $backup"
+  if [[ -n "${storage:-}" ]]; then docker start "$storage" >/dev/null || true; fi
   "${old[@]}" up -d --no-deps --pull never --wait --wait-timeout 240 backend frontend || true
   exit "$code"
 }
@@ -58,7 +71,18 @@ trap rollback ERR
 test -s "$backup/mongo.archive.gz"
 gzip -t "$backup/mongo.archive.gz"
 docker cp "$backend:/app/uploads/." "$backup/uploads/"
+mapfile -t storage_ids < <(docker ps -aq --filter label=com.docker.compose.project=mis --filter label=com.docker.compose.service=rustfs)
+[[ ${#storage_ids[@]} -le 1 ]]
+if [[ ${#storage_ids[@]} == 1 ]]; then
+  storage=${storage_ids[0]}
+  storage_volume=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}}' "$storage")
+  [[ -n "$storage_volume" ]]
+  docker stop "$storage" >/dev/null
+  docker run --rm --pull never --entrypoint sh -v "$storage_volume:/data:ro" mis-rustfs:1.0.1 -c 'tar -czf - -C /data .' > "$backup/rustfs.tar.gz"
+  gzip -t "$backup/rustfs.tar.gz"
+fi
 echo "BACKUP_OK $backup"
+"${new[@]}" up -d --no-deps --pull never --wait --wait-timeout 240 rustfs
 "${new[@]}" up -d --no-deps --pull never --wait --wait-timeout 240 backend frontend
 "${new[@]}" exec -T frontend nginx -t
 "${new[@]}" exec -T backend curl --fail --silent http://127.0.0.1:1010/SCSE@hbut/actuator/health

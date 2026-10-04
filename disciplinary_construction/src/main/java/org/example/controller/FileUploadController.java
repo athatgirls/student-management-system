@@ -1,20 +1,22 @@
 package org.example.controller;
 
 import org.example.response.ResponseResult;
+import org.example.service.ObjectStorageService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -26,8 +28,12 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/msi/upload")
 public class FileUploadController {
+    private static final Logger log = LoggerFactory.getLogger(FileUploadController.class);
     @org.springframework.beans.factory.annotation.Autowired
     private org.example.repository.UploadedFileRepository uploadedFiles;
+
+    @Autowired
+    private ObjectStorageService objectStorage;
 
     private void recordOwner(String filename, MultipartFile file, HttpServletRequest request) {
         Object owner = request.getAttribute("userId");
@@ -43,9 +49,6 @@ public class FileUploadController {
             ".jpg", ".jpeg", ".png", ".pdf", ".doc", ".docx"
     ));
 
-    @Value("${app.upload-dir:uploads}")
-    private String uploadDir;
-
     @Value("${server.servlet.context-path:}")
     private String contextPath;
 
@@ -58,8 +61,6 @@ public class FileUploadController {
         }
 
         try {
-            Path uploadPath = getUploadPath();
-            Files.createDirectories(uploadPath);
             String baseUrl = getBaseUrl(request);
 
             for (MultipartFile file : files) {
@@ -68,21 +69,20 @@ public class FileUploadController {
                     if (validationError != null) {
                         return new ResponseResult<>(400, validationError, null);
                     }
+                }
+            }
+
+            for (MultipartFile file : files) {
+                if (!file.isEmpty()) {
                     String filename = buildSafeFilename(file.getOriginalFilename());
-                    Path filePath = uploadPath.resolve(filename).normalize();
-                    if (!filePath.startsWith(uploadPath)) {
-                        return new ResponseResult<>(400, "Invalid file path", null);
-                    }
-                    try (InputStream inputStream = file.getInputStream()) {
-                        Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
-                    }
-                    recordOwner(filename, file, request);
+                    storeAndRecord(filename, file, request);
                     fileUrls.add(baseUrl + "/uploads/" + filename);
                 }
             }
 
             return ResponseResult.success(fileUrls);
         } catch (IOException e) {
+            log.error("Batch file upload failed", e);
             return new ResponseResult<>(500, "文件上传失败", null);
         }
     }
@@ -99,22 +99,29 @@ public class FileUploadController {
                 return new ResponseResult<>(400, validationError, null);
             }
 
-            Path uploadPath = getUploadPath();
-            Files.createDirectories(uploadPath);
-
             String filename = buildSafeFilename(file.getOriginalFilename());
-            Path filePath = uploadPath.resolve(filename).normalize();
-            if (!filePath.startsWith(uploadPath)) {
-                return new ResponseResult<>(400, "Invalid file path", null);
-            }
-            try (InputStream inputStream = file.getInputStream()) {
-                Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
-            }
-
-            recordOwner(filename, file, request);
+            storeAndRecord(filename, file, request);
             return ResponseResult.success(getBaseUrl(request) + "/uploads/" + filename);
         } catch (IOException e) {
+            log.error("Single file upload failed", e);
             return new ResponseResult<>(500, "文件上传失败", null);
+        }
+    }
+
+    private void storeAndRecord(String filename, MultipartFile file, HttpServletRequest request) throws IOException {
+        try (InputStream inputStream = file.getInputStream()) {
+            objectStorage.putObject(filename, inputStream, file.getSize(), file.getContentType());
+        }
+        try {
+            recordOwner(filename, file, request);
+        } catch (RuntimeException e) {
+            log.error("File ownership persistence failed for key {}; deleting stored object", filename, e);
+            try {
+                objectStorage.deleteObject(filename);
+            } catch (IOException deleteFailure) {
+                log.error("Compensating deletion failed for key {}", filename, deleteFailure);
+            }
+            throw e;
         }
     }
 
@@ -149,10 +156,6 @@ public class FileUploadController {
         }
         String requestContextPath = request.getContextPath();
         return requestContextPath != null && !requestContextPath.isEmpty() ? requestContextPath : "";
-    }
-
-    private Path getUploadPath() {
-        return Paths.get(uploadDir).toAbsolutePath().normalize();
     }
 
     private String buildSafeFilename(String originalFilename) {

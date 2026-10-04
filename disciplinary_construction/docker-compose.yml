@@ -20,6 +20,22 @@ services:
     volumes:
       - redis_data:/data
 
+  rustfs:
+    image: rustfs/rustfs:1.0.1@sha256:1803faef57627e2d9c2e7d89d655d712ddded5389040054987163043fecb6a3c
+    container_name: mis-rustfs
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-rustfsadmin}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-rustfsadmin}
+    command: ["rustfs", "/data"]
+    volumes:
+      - rustfs_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   backend:
     build:
       context: .
@@ -29,6 +45,7 @@ services:
     depends_on:
       - mongo
       - redis
+      - rustfs
     ports:
       - "1010:1010"
     environment:
@@ -41,6 +58,10 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       JWT_SECRET: ${JWT_SECRET:-MIS_DEV_ONLY_CHANGE_THIS_64_CHAR_MINIMUM_SECRET_20260424_DEPLOY}
       APP_UPLOAD_DIR: /app/uploads
+      RUSTFS_ENDPOINT: http://rustfs:9000
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-rustfsadmin}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-rustfsadmin}
+      RUSTFS_BUCKET: ${RUSTFS_BUCKET:-uploads}
       APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       KNIFE4J_ENABLE: "false"
     volumes:
@@ -50,3 +71,4 @@ volumes:
   mongo_data:
   redis_data:
   uploads_data:
+  rustfs_data:
