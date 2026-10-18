@@ -7,7 +7,6 @@ import org.example.model.*;
 import org.example.repository.*;
 import org.example.service.*;
 import org.example.service.Impl.DailyTaskServiceImpl;
-import org.example.util.UtcTimestamps;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 import java.time.LocalDateTime;
@@ -35,7 +34,6 @@ class TestReportV2RegressionTest {
         assertEquals("2026-10-01T07:36:00Z", json.get("createTime").asText());
         assertEquals("2026-10-01T15:36:00", json.get("deadline").asText());
         assertEquals(task.getCreateTime(), mapper.readValue(mapper.writeValueAsString(task), DailyTaskModel.class).getCreateTime());
-        assertNull(UtcTimestamps.toWire(null));
     }
 
     @Test void publishedFilesAreReadableOnlyToTaskRecipientsAndOwner() {

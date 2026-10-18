@@ -49,14 +49,14 @@ public class CompetitionDictController {
     }
 
     @Operation(summary = "管理员修改竞赛")
-    @RequestMapping(value = "/admin/update", method = {RequestMethod.PUT, RequestMethod.POST})
+    @PostMapping("/admin/update")
     public ResponseResult<CompetitionDictModel> updateCompetition(@RequestBody CompetitionDictModel competition) {
         CompetitionDictModel result = competitionDictService.updateCompetition(competition);
         return ResponseResult.success(result);
     }
 
     @Operation(summary = "管理员删除竞赛")
-    @RequestMapping(value = "/admin/delete/{id}", method = {RequestMethod.DELETE, RequestMethod.POST})
+    @PostMapping("/admin/delete/{id}")
     public ResponseResult<String> deleteCompetition(@PathVariable String id) {
         competitionDictService.deleteCompetition(id);
         return ResponseResult.success("删除成功");

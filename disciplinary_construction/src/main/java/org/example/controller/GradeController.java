@@ -14,7 +14,6 @@ import org.example.service.StudentService;
 import org.example.util.StudentGradePolicy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -49,6 +48,28 @@ public class GradeController {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @GetMapping("/template")
+    public ResponseEntity<byte[]> downloadTemplate() throws java.io.IOException {
+        try (org.apache.poi.xssf.usermodel.XSSFWorkbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
+             java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream()) {
+            org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("成绩导入模板");
+            String[][] rows = {
+                {"学号", "姓名", "学期", "课程名称", "成绩", "学分", "状态"},
+                {"10240001", "张同学", "2025-2026-1", "Web 前端开发", "92", "3", "已通过"}
+            };
+            for (int i = 0; i < rows.length; i++) {
+                org.apache.poi.ss.usermodel.Row row = sheet.createRow(i);
+                for (int j = 0; j < rows[i].length; j++) row.createCell(j).setCellValue(rows[i][j]);
+            }
+            for (int i = 0; i < rows[0].length; i++) sheet.setColumnWidth(i, 22 * 256);
+            workbook.write(output);
+            return ResponseEntity.ok()
+                    .header("Content-Disposition", "attachment; filename=grade-import-template.xlsx")
+                    .contentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .body(output.toByteArray());
+        }
+    }
 
     @PostMapping("/create")
     public ResponseEntity<Map<String, Object>> createGrade(@RequestBody Map<String, Object> requestBody) {
@@ -106,7 +127,7 @@ public class GradeController {
         return ResponseEntity.ok(result);
     }
 
-    @DeleteMapping("/delete/{id}")
+    @PostMapping("/delete/{id}")
     public ResponseEntity<Map<String, Object>> deleteGrade(@PathVariable String id) {
         Map<String, Object> result = new HashMap<>();
         try {
@@ -122,7 +143,7 @@ public class GradeController {
         return ResponseEntity.ok(result);
     }
 
-    @DeleteMapping("/delete-by-name")
+    @PostMapping("/delete-by-name")
     public ResponseEntity<Map<String, Object>> deleteGradeByName(@RequestParam("gradeName") String gradeName) {
         Map<String, Object> result = new HashMap<>();
         try {

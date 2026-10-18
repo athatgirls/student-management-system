@@ -461,8 +461,8 @@ function adminDashboard() {
       { id: 'activity-002', title: '李同学更新实习信息', description: '新增企业实习记录', time: toDateTime(-2) }
     ],
     pendingApprovals: [
-      { id: 'approval-001', title: '竞赛获奖审核', description: '中国国际大学生创新大赛', time: toDateTime(-1) },
-      { id: 'approval-002', title: '日常活动审核', description: '班级团日活动', time: toDateTime(-2) }
+      { id: 'approval-001', dataId: 'leave-001', dataType: 'leave', title: '请假申请', description: '学生请假申请待审核', time: toDateTime(-1) },
+      { id: 'approval-002', dataId: 'daily-001', dataType: 'daily', title: '日常活动审核', description: '班级团日活动', time: toDateTime(-2) }
     ],
     systemInfo: {
       onlineUsers: 12,
@@ -479,7 +479,7 @@ function auditStats() {
     project: { pending: 1 },
     paper: { pending: 0 },
     patent: { pending: 0 },
-    daily: { pending: 2 }
+    daily: { pending: 2, leave: 1, dailyActivity: 1, academic: 0, honor: 0 }
   }
   return { code: 200, data, ...data }
 }
@@ -721,14 +721,22 @@ export function createPreviewResponse(config = {}) {
     return { code: 400, data: null, msg: '预览模式不支持导入名单，数据不会保存' }
   }
 
-  if (['post', 'put', 'delete'].includes((config.method || '').toLowerCase())) {
+  if ((config.method || '').toLowerCase() === 'post') {
     return success({ id: `preview-${Date.now()}`, success: true }, '预览模式操作成功')
   }
 
   return success([])
 }
 
-export function previewAdapter(config) {
+export async function previewAdapter(config) {
+  if (normalizeUrl(config) === '/grade/template') {
+    const { default: writeExcel } = await import('write-excel-file/browser')
+    const rows = [
+      ['学号', '姓名', '学期', '课程名称', '成绩', '学分', '状态'],
+      ['10240001', '张同学', '2025-2026-1', 'Web 前端开发', '92', '3', '已通过']
+    ].map(row => row.map(value => ({ value, type: String })))
+    return { data: await writeExcel(rows, { sheet: '成绩导入模板' }).toBlob(), status: 200, statusText: 'OK', headers: {}, config, request: null }
+  }
   return Promise.resolve({
     data: createPreviewResponse(config),
     status: 200,

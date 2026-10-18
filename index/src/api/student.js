@@ -39,7 +39,7 @@ export function createStudent(studentData) {
 export function updateStudent(studentData) {
   return request({
     url: '/student/update',
-    method: 'put',
+    method: 'post',
     data: studentData
   })
 }
@@ -48,7 +48,7 @@ export function updateStudent(studentData) {
 export function deleteStudent(id) {
   return request({
     url: `/student/delete/${id}`,
-    method: 'delete'
+    method: 'post'
   })
 }
 
@@ -111,7 +111,7 @@ export function importStudents(formData) {
 export function batchDeleteStudents(ids) {
   return request({
     url: '/student/batch-delete',
-    method: 'delete',
+    method: 'post',
     data: { ids }
   })
 }
@@ -128,7 +128,7 @@ export function getAllGrades() {
 export function batchUpdateStatus(data) {
   return request({
     url: '/student/batch-update-status',
-    method: 'put',
+    method: 'post',
     data
   })
 }
@@ -154,7 +154,7 @@ export function getRecentActivities() {
 export function resetStudentPassword(studentId, newPassword = null) {
   return request({
     url: '/student/reset-password',
-    method: 'put',
+    method: 'post',
     data: { studentId, newPassword }
   })
 }
@@ -163,7 +163,7 @@ export function resetStudentPassword(studentId, newPassword = null) {
 export function changePassword(oldPassword, newPassword) {
   return request({
     url: '/student/change-password',
-    method: 'put',
+    method: 'post',
     data: { oldPassword, newPassword }
   })
 }

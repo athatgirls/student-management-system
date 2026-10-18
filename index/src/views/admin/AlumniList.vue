@@ -27,7 +27,7 @@
           :data="alumniList" 
           stripe 
           style="width: 100%" 
-          table-layout="auto"
+          table-layout="fixed"
           :default-sort="{prop: 'graduationDate', order: 'descending'}"
         >
           <el-table-column prop="student.name" label="姓名" min-width="100" fixed="left"/>
@@ -245,7 +245,7 @@ const loadData = async () => {
       searchAlumniList(searchValue.value, searchYear.value === null ? '' : searchYear.value.getFullYear(), pageData.currentPage, pageData.pageSize),
       getTotalCount(searchValue.value, searchYear.value === null ? '' : searchYear.value.getFullYear())
     ])
-    alumniList.value = alumniData.data
+    alumniList.value = Array.isArray(alumniData.data) ? alumniData.data : []
     pageData.totalCount = totalCount.data
   } catch (error) {
     console.error('加载数据失败:', error)
@@ -333,6 +333,7 @@ const onUpdateAlumniDialogClose = () => {
 }
 
 const handleSearch = () => {
+  pageData.currentPage = 1
   loadData()
 }
 
@@ -358,15 +359,18 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .search-input {
-  min-width: 200px;
+  width: 280px;
+  min-width: 180px;
 }
 
 .year-picker {
   width: 150px;
+  flex: 0 0 150px;
 }
 
 /* 表格容器 */
@@ -379,7 +383,6 @@ onMounted(() => {
 /* 表格优化 */
 :deep(.el-table) {
   font-size: 14px;
-  min-width: 1400px; /* 确保表格有足够的最小宽度 */
 }
 
 :deep(.el-table th) {
@@ -423,6 +426,7 @@ onMounted(() => {
   .search-input,
   .year-picker {
     width: 100%;
+    flex: auto;
   }
 
   .table-container {
@@ -432,7 +436,6 @@ onMounted(() => {
 
   :deep(.el-table) {
     font-size: 12px;
-    min-width: 1200px;
   }
 
   :deep(.el-table .el-table__cell) {

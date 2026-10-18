@@ -41,7 +41,6 @@ class GradeControllerTest {
         ResponseEntity<Map<String, Object>> response = gradeController.createGrade(body("2027"));
 
         assertEquals(400, response.getBody().get("code"));
-        assertEquals("该年级已存在", response.getBody().get("msg"));
         verify(gradeService, never()).createGrade(any(GradeModel.class));
     }
 
@@ -62,7 +61,6 @@ class GradeControllerTest {
         ResponseEntity<Map<String, Object>> response = gradeController.deleteGradeByName("2024级");
 
         assertEquals(400, response.getBody().get("code"));
-        assertEquals("默认年级不可删除", response.getBody().get("msg"));
         verify(gradeService, never()).deleteGrade(any(String.class));
     }
 

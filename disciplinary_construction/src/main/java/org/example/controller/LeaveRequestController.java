@@ -102,7 +102,7 @@ public class LeaveRequestController {
     }
     
     // 管理员审核请假
-    @RequestMapping(value = "/audit/{id}", method = {RequestMethod.PUT, RequestMethod.POST})
+    @PostMapping("/audit/{id}")
     public ResponseEntity<Map<String, Object>> auditLeaveRequest(
             @PathVariable String id,
             @RequestBody Map<String, Object> requestBody,
@@ -135,7 +135,7 @@ public class LeaveRequestController {
     }
     
     // 学生销假
-    @RequestMapping(value = "/check-in/{id}", method = {RequestMethod.PUT, RequestMethod.POST})
+    @PostMapping("/check-in/{id}")
     public ResponseEntity<Map<String, Object>> checkIn(
             @PathVariable String id,
             @RequestBody Map<String, Object> requestBody,
@@ -169,7 +169,7 @@ public class LeaveRequestController {
     }
     
     // 管理员手动更新请假状态
-    @RequestMapping(value = "/update-status/{id}", method = {RequestMethod.PUT, RequestMethod.POST})
+    @PostMapping("/update-status/{id}")
     public ResponseEntity<Map<String, Object>> updateLeaveStatus(
             @PathVariable String id,
             @RequestBody Map<String, Object> requestBody) {

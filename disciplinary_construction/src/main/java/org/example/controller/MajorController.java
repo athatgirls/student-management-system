@@ -4,7 +4,6 @@ import org.example.model.MajorModel;
 import org.example.service.MajorService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -64,7 +63,7 @@ public class MajorController {
         return ResponseEntity.ok(result);
     }
 
-    @DeleteMapping("/delete-by-name")
+    @PostMapping("/delete-by-name")
     public ResponseEntity<Map<String, Object>> deleteMajorByName(@RequestParam("majorName") String majorName) {
         Map<String, Object> result = new HashMap<>();
         try {

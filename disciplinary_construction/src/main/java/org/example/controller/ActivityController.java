@@ -29,6 +29,9 @@ public class ActivityController {
             result.put("code", 200);
             result.put("data", savedActivity);
             result.put("msg", "活动创建成功");
+        } catch (IllegalArgumentException e) {
+            result.put("code", 400);
+            result.put("msg", e.getMessage());
         } catch (Exception e) {
             result.put("code", 500);
             result.put("msg", "活动创建失败: " + e.getMessage());
@@ -72,7 +75,7 @@ public class ActivityController {
     }
 
     // 删除活动
-    @RequestMapping(value = "/delete/{id}", method = {RequestMethod.DELETE, RequestMethod.POST})
+    @PostMapping("/delete/{id}")
     public ResponseEntity<Map<String, Object>> deleteActivity(@PathVariable String id) {
         Map<String, Object> result = new HashMap<>();
         try {

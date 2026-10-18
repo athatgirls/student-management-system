@@ -30,7 +30,7 @@ public class IdeologicalTweetController {
     }
 
     @Operation(summary = "更新思想动态")
-    @PutMapping("/update")
+    @PostMapping("/update")
     public ResponseResult<IdeologicalTweetModel> updateIdeologicalTweet(@RequestBody IdeologicalTweetModel ideologicalTweet, @CurrentUser Map<String, Object> currentUser) {
         String userId = (String) currentUser.get("userId");
         ideologicalTweet.setStudentId(userId);
@@ -39,7 +39,7 @@ public class IdeologicalTweetController {
     }
 
     @Operation(summary = "删除思想动态")
-    @DeleteMapping("/delete/{id}")
+    @PostMapping("/delete/{id}")
     public ResponseResult<String> deleteIdeologicalTweet(@PathVariable String id) {
         ideologicalTweetService.deleteIdeologicalTweet(id);
         return ResponseResult.success("删除成功");

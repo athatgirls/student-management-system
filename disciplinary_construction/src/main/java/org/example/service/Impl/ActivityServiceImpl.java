@@ -47,6 +47,10 @@ public class ActivityServiceImpl implements ActivityService {
     @Override
     public ActivityModel createActivity(ActivityModel activity) {
         DailyTaskModel task = taskRepository.findById(activity.getTaskId()).orElseThrow(() -> new IllegalArgumentException("关联任务不存在"));
+        if (activity.getActivityTime() == null || task.getDeadline() == null
+                || !task.getDeadline().isAfter(activity.getActivityTime())) {
+            throw new IllegalArgumentException("截止日期必须大于活动开始时间");
+        }
         activity.setActivityCategory(org.example.util.TaskSubmissionValidation.category(task.getActivityCategory()));
         activity.setId(null);
         activity.setCreateTime(LocalDateTime.now());

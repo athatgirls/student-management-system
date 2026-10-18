@@ -66,12 +66,12 @@
                 导入学生
               </el-button>
               <el-button
-                v-if="row.activityCategory === 'volunteer'"
+                v-if="scope.row.activityCategory === 'volunteer'"
                 type="success"
                 link
                 size="small"
-                :disabled="!(row.participantStudentIds || []).length"
-                @click="handleSyncVolunteer(row)"
+                :disabled="!(scope.row.participantStudentIds || []).length"
+                @click="handleSyncVolunteer(scope.row)"
               >
                 同步志愿到场
               </el-button>
@@ -543,6 +543,12 @@ const handleCreateActivity = async () => {
   }
 
   if (activityAttachmentUploading.value) return ElMessage.warning('请等待文件上传完成')
+  const deadline = activityForm.taskMode === 'create'
+    ? activityForm.taskDeadline
+    : availableTasks.value.find(task => task.id === activityForm.taskId)?.deadline
+  if (!deadline || new Date(deadline).getTime() <= new Date(activityForm.activityTime).getTime()) {
+    return ElMessage.warning('截止日期必须大于活动开始时间')
+  }
   // 验证任务信息
   let taskId = null
   if (activityForm.taskMode === 'create') {

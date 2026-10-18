@@ -1032,6 +1032,9 @@ const handleAdd = () => {
 const handleEdit = (row) => {
   dialogTitle.value = '编辑实习就业记录'
   Object.assign(form, row)
+  for (const field of ['technologyStack', 'frameworks', 'databases', 'cloudPlatforms', 'developmentTools']) {
+    form[field] = Array.isArray(row[field]) ? [...row[field]] : (row[field] || '').split(',').filter(Boolean)
+  }
   dialogVisible.value = true
 }
 
@@ -1098,14 +1101,20 @@ const handleDelete = async (row) => {
 
 // 提交表单
 const handleSubmit = async () => {
+  if (!await formRef.value.validate().catch(() => false)) return
   try {
-    await formRef.value.validate()
-    
+    const payload = { ...form }
+    for (const field of ['technologyStack', 'frameworks', 'databases', 'cloudPlatforms', 'developmentTools']) {
+      payload[field] = Array.isArray(form[field]) ? form[field].join(',') : form[field] || ''
+    }
+    for (const field of ['startDate', 'endDate']) {
+      payload[field] = form[field] ? new Date(form[field]).toISOString() : null
+    }
     let res
     if (form.id) {
-      res = await updateInternship(form)
+      res = await updateInternship(payload)
     } else {
-      res = await addInternship(form)
+      res = await addInternship(payload)
     }
     
     if (res.code === 200) {
@@ -1117,7 +1126,7 @@ const handleSubmit = async () => {
       ElMessage.error(res.msg || '操作失败')
     }
   } catch (error) {
-    ElMessage.error('表单验证失败')
+    ElMessage.error(error.response?.data?.msg || error.message || '保存失败')
   }
 }
 

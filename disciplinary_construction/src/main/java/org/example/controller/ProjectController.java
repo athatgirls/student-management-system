@@ -50,7 +50,7 @@ public class ProjectController {
         }
     }
 
-    @RequestMapping(value = "/{id}", method = {RequestMethod.PUT, RequestMethod.POST})
+    @PostMapping("/{id}")
     public ResponseEntity<?> updateProject(@PathVariable String id, @RequestBody ProjectModel project,
                                            @CurrentUser Map<String, Object> currentUser) {
         ProjectModel existing = projectService.getProjectById(id);
@@ -77,7 +77,6 @@ public class ProjectController {
         return deleteProject(id, currentUser);
     }
 
-    @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteProject(@PathVariable String id,
                                            @CurrentUser Map<String, Object> currentUser) {
         ProjectModel existing = projectService.getProjectById(id);
@@ -133,7 +132,7 @@ public class ProjectController {
         }
     }
 
-    @RequestMapping(value = "/admin/{id}/audit", method = {RequestMethod.PUT, RequestMethod.POST})
+    @PostMapping("/admin/{id}/audit")
     public ResponseEntity<?> auditProject(@PathVariable String id, @RequestBody Map<String, String> auditData,
                                           @CurrentUser Map<String, Object> currentUser) {
         try {

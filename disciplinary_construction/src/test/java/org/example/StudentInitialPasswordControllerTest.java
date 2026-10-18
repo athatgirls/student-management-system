@@ -12,14 +12,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -29,6 +23,7 @@ class StudentInitialPasswordControllerTest {
     private static final String URL = "/msi/student/change-initial-password";
     private static final String BODY = "{\"studentId\":\"test-student\",\"initialPassword\":\"OldTest123\",\"newPassword\":\"NewTest456\"}";
     @Mock private StudentService studentService;
+    @Mock private org.example.service.CurrentUserAccessService currentUserAccessService;
     @Mock private org.example.service.LoginAttemptLimiter loginAttemptLimiter;
     @InjectMocks private StudentController controller;
     private MockMvc mvc;
@@ -39,20 +34,24 @@ class StudentInitialPasswordControllerTest {
     }
 
     @Test
-    void postAndLegacyPutRejectEmptyInputWithoutDatabaseAccess() throws Exception {
+    void postRejectsEmptyInputAndLegacyPutIsNotAllowed() throws Exception {
         mvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(400));
         mvc.perform(put(URL).contentType(MediaType.APPLICATION_JSON).content("{}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(400));
+                .andExpect(status().isMethodNotAllowed());
         verifyNoInteractions(studentService);
     }
 
     @Test
     void getCannotChangePassword() throws Exception {
-        RequestMapping mapping = StudentController.class.getMethod("changeInitialPassword", Map.class)
-                .getAnnotation(RequestMapping.class);
-        assertArrayEquals(new RequestMethod[]{RequestMethod.POST, RequestMethod.PUT}, mapping.method());
-        verifyNoInteractions(studentService);
+        org.example.aspect.CurrentUserAspect identity = mock(org.example.aspect.CurrentUserAspect.class);
+        when(identity.supportsParameter(any())).thenCallRealMethod();
+        when(identity.resolveArgument(any(), any(), any(), any()))
+                .thenReturn(java.util.Map.of("userId", "admin", "userType", "admin"));
+        MockMvcBuilders.standaloneSetup(controller).setCustomArgumentResolvers(identity).build()
+                .perform(get(URL).contentType(MediaType.APPLICATION_JSON).content(BODY));
+        verify(studentService, never()).findByStudentId(anyString());
+        verify(studentService, never()).changePassword(anyString(), anyString(), anyString());
     }
 
     @Test

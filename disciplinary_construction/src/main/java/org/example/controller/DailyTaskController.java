@@ -171,7 +171,7 @@ public class DailyTaskController {
     }
 
     // 删除任务（管理员）
-    @RequestMapping(value = "/delete/{id}", method = {RequestMethod.DELETE, RequestMethod.POST})
+    @PostMapping("/delete/{id}")
     public ResponseEntity<Map<String, Object>> deleteTask(@PathVariable String id) {
         Map<String, Object> result = new HashMap<>();
         dailyTaskService.deleteTask(id);

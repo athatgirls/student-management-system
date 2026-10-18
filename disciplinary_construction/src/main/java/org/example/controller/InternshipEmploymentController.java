@@ -66,7 +66,7 @@ public class InternshipEmploymentController {
     /**
      * 更新实习就业记录
      */
-    @RequestMapping(value = "/update", method = {RequestMethod.PUT, RequestMethod.POST})
+    @PostMapping("/update")
     public ResponseEntity<Map<String, Object>> update(@RequestBody InternshipEmploymentModel model, @CurrentUser Map<String, Object> currentUser) {
         Map<String, Object> result = new HashMap<>();
         try {
@@ -106,7 +106,7 @@ public class InternshipEmploymentController {
     /**
      * 删除实习就业记录（软删除）
      */
-    @RequestMapping(value = "/delete/{id}", method = {RequestMethod.DELETE, RequestMethod.POST})
+    @PostMapping("/delete/{id}")
     public ResponseEntity<Map<String, Object>> delete(@PathVariable String id,
                                                       @CurrentUser Map<String, Object> currentUser) {
         Map<String, Object> result = new HashMap<>();

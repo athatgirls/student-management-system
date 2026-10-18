@@ -6,7 +6,7 @@
           <h2>成绩导入</h2>
           <p>教秘/管理员上传课程成绩表，系统按学号归档到学生个人学习记录。</p>
         </div>
-        <el-button type="primary" plain :icon="Download" @click="downloadTemplate">
+        <el-button type="primary" plain :icon="Download" :loading="templateLoading" @click="downloadTemplate">
           下载导入模板
         </el-button>
       </div>
@@ -120,13 +120,14 @@
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Download, UploadFilled } from '@element-plus/icons-vue'
-import { importGrades } from '@/api/grade'
-import { downloadExcel, readExcelObjects } from '@/utils/excel'
+import { importGrades, getGradeTemplate } from '@/api/grade'
+import { readExcelObjects } from '@/utils/excel'
 
 const uploadRef = ref()
 const selectedFile = ref(null)
 const parsedRows = ref([])
 const submitLoading = ref(false)
+const templateLoading = ref(false)
 
 const requiredFields = ['studentId', 'semester', 'courseName', 'score']
 const validCount = computed(() => parsedRows.value.filter(row => row.valid).length)
@@ -247,11 +248,21 @@ const submitImport = async () => {
 }
 
 const downloadTemplate = async () => {
-  const rows = [
-    ['学号', '姓名', '学期', '课程名称', '成绩', '学分', '状态'],
-    ['10240001', '张同学', '2025-2026-1', 'Web 前端开发', 92, 3, '已通过']
-  ]
-  await downloadExcel(rows, '成绩导入模板', '成绩导入模板.xlsx')
+  templateLoading.value = true
+  try {
+    const blob = await getGradeTemplate()
+    if (!(blob instanceof Blob) || blob.type.includes('json')) throw new Error('模板下载失败')
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = '成绩导入模板.xlsx'
+    link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  } catch (error) {
+    ElMessage.error(error.message || '模板下载失败，请重试')
+  } finally {
+    templateLoading.value = false
+  }
 }
 </script>
 

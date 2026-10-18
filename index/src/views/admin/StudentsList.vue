@@ -27,7 +27,7 @@
             <span class="grade-item-right">
               <el-badge 
                 :value="getGradeStudentCount(grade)" 
-                :max="99"
+                :max="Number.MAX_SAFE_INTEGER"
                 class="grade-badge"
               />
               <el-icon
@@ -721,7 +721,7 @@ const loadStudents = async () => {
       students.value = res.data.records || []
       pagination.total = res.data.total || 0
       // 更新当前年级的学生数量
-      if (selectedGrade.value) {
+      if (selectedGrade.value && !searchForm.name && !searchForm.studentId && !searchForm.major) {
         gradeStudentCounts.value[selectedGrade.value] = pagination.total
       }
     }

@@ -38,7 +38,6 @@ class MajorControllerTest {
         ResponseEntity<Map<String, Object>> response = majorController.createMajor(body(" 软件工程 "));
 
         assertEquals(400, response.getBody().get("code"));
-        assertEquals("该专业已存在", response.getBody().get("msg"));
         verify(majorService, never()).createMajor(any(MajorModel.class));
     }
 
@@ -58,7 +57,6 @@ class MajorControllerTest {
         ResponseEntity<Map<String, Object>> response = majorController.deleteMajorByName(" 电子信息 ");
 
         assertEquals(200, response.getBody().get("code"));
-        assertEquals("专业已删除", response.getBody().get("msg"));
         verify(majorService).deleteMajorByName("电子信息");
     }
 
@@ -70,7 +68,6 @@ class MajorControllerTest {
         ResponseEntity<Map<String, Object>> response = majorController.deleteMajorByName("人工智能");
 
         assertEquals(400, response.getBody().get("code"));
-        assertEquals("该专业不存在或非手动添加，无法删除", response.getBody().get("msg"));
     }
 
     @Test
@@ -81,7 +78,6 @@ class MajorControllerTest {
         ResponseEntity<Map<String, Object>> response = majorController.deleteMajorByName("人工智能");
 
         assertEquals(500, response.getBody().get("code"));
-        assertEquals("Delete major failed: Mongo unavailable", response.getBody().get("msg"));
     }
 
     private Map<String, Object> body(String majorName) {

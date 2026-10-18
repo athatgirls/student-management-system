@@ -91,7 +91,6 @@
             <el-table-column prop="auditStatus" label="审核状态" width="120">
               <template #default="scope">
                 <el-tag :type="statusMeta(scope.row.auditStatus).type" effect="light" class="status-tag">
-                  <el-icon class="mr4"><component :is="statusMeta(scope.row.auditStatus).icon" /></el-icon>
                   {{ statusMeta(scope.row.auditStatus).text }}
                 </el-tag>
               </template>
@@ -125,7 +124,6 @@
             <el-table-column prop="auditStatus" label="状态" width="160">
               <template #default="scope">
                 <el-tag :type="statusMeta(scope.row.auditStatus).type" effect="light" class="status-tag">
-                  <el-icon class="mr4"><component :is="statusMeta(scope.row.auditStatus).icon" /></el-icon>
                   {{ statusMeta(scope.row.auditStatus).text }}
                 </el-tag>
               </template>
@@ -388,13 +386,13 @@
 
     <!-- 发布任务弹窗 -->
     <el-dialog v-model="taskDialogVisible" title="发布新日常任务" width="800px" destroy-on-close @closed="resetTaskForm">
-      <el-form :model="taskForm" label-width="100px">
+      <el-form ref="taskFormRef" :model="taskForm" :rules="taskRules" label-width="100px">
         <el-form-item label="活动分类" required>
           <el-select v-model="taskForm.activityCategory">
             <el-option label="学术活动" value="academic" /><el-option label="日常活动" value="daily" /><el-option label="日常任务" value="routine" /><el-option label="志愿活动" value="volunteer" />
           </el-select>
         </el-form-item>
-        <el-form-item label="任务标题" required>
+        <el-form-item label="任务标题" prop="title">
           <el-input v-model="taskForm.title" placeholder="请输入任务标题" />
         </el-form-item>
         <el-form-item label="任务描述">
@@ -411,10 +409,10 @@
             </div>
           </div>
         </el-form-item>
-        <el-form-item label="截止日期" required>
+        <el-form-item label="截止日期" prop="deadline">
           <el-date-picker v-model="taskForm.deadline" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" format="YYYY-MM-DD HH:mm" placeholder="选择截止时间" style="width: 100%" />
         </el-form-item>
-        <el-form-item label="任务类型">
+        <el-form-item label="任务类型" prop="type">
           <el-input v-model="taskForm.type" placeholder="请输入任务类型" />
         </el-form-item>
         
@@ -428,6 +426,7 @@
         <el-form-item 
           v-if="taskForm.taskCategory === 'registration'" 
           label="报名人数限制" 
+          prop="maxParticipants"
           required
         >
           <el-input-number 
@@ -603,7 +602,6 @@
         </div>
         <div class="right">
           <el-tag :type="statusMeta(reviewForm.auditStatus).type" effect="dark">
-            <el-icon class="mr4"><component :is="statusMeta(reviewForm.auditStatus).icon" /></el-icon>
             {{ statusMeta(reviewForm.auditStatus).text }}
           </el-tag>
         </div>
@@ -745,7 +743,7 @@
 import { formatDateTime as fmtDateTime } from '@/utils/dateTime'
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Clock, CircleCheck, CircleClose, Link, Plus, Download, View, Delete, InfoFilled } from '@element-plus/icons-vue'
+import { Link, Plus, Download, View, Delete, InfoFilled } from '@element-plus/icons-vue'
 import { 
   getAllDailyTasks, createDailyTask, deleteDailyTask, 
   getDailyTaskStats, exportDailyTaskExcel,
@@ -877,6 +875,19 @@ const taskForm = reactive({
   attachments: []
 })
 const taskAttachmentUploading = ref(false)
+const taskFormRef = ref(null)
+const taskRules = {
+  title: [{ required: true, whitespace: true, message: '请输入任务标题', trigger: 'blur' }],
+  type: [{ required: true, whitespace: true, message: '请输入任务类型', trigger: 'blur' }],
+  deadline: [{ validator: (_, value, callback) => {
+    callback(!value || !Number.isFinite(new Date(value).getTime()) || new Date(value).getTime() <= Date.now()
+      ? new Error('截止日期必须晚于当前时间') : undefined)
+  }, trigger: 'change' }],
+  maxParticipants: [{ validator: (_, value, callback) => {
+    callback(taskForm.taskCategory === 'registration' && (!Number.isInteger(value) || value < 1)
+      ? new Error('请输入有效的报名人数限制') : undefined)
+  }, trigger: 'change' }]
+}
 
 const uploadTaskAttachment = async ({ file, onSuccess, onError }) => {
   if (taskForm.attachments.length >= 5) {
@@ -975,19 +986,24 @@ const loadTasks = async () => {
 
 const handleCreateTask = async () => {
   if (taskAttachmentUploading.value) return ElMessage.warning('请等待文件上传完成')
-  if (!taskForm.title || !taskForm.deadline || !taskForm.type.trim()) {
-    ElMessage.warning('请填写任务标题、任务类型和截止日期')
-    return
+  if (!await taskFormRef.value.validate().catch(() => false)) return
+  const names = taskForm.fields.map(field => field.fieldName.trim())
+  if (names.some(name => !name) || new Set(names).size !== names.length) {
+    return ElMessage.warning('自定义字段名称不能为空或重复')
+  }
+  for (const field of taskForm.fields) {
+    if (field.fieldType === 'select' && !field.optionsText?.trim()) return ElMessage.warning('请填写下拉字段的选项')
+    if (Boolean(field.conditionalField) !== Boolean(field.conditionalValue?.trim())) return ElMessage.warning('请完整填写字段显示条件')
   }
   
   // 处理字段数据：将 optionsText 转换为 options 数组
   const fieldsToSubmit = taskForm.fields.map(field => {
     const fieldData = {
-      fieldName: field.fieldName,
+      fieldName: field.fieldName.trim(),
       fieldType: field.fieldType,
       required: field.required,
       placeholder: field.placeholder || '',
-      notBeforeField: field.fieldType === 'date' ? field.notBeforeField || '' : ''
+      notBeforeField: field.fieldType === 'date' ? (field.notBeforeField || '').trim() : ''
     }
     // 如果是下拉选择类型，处理选项（使用空格分隔）
     if (field.fieldType === 'select' && field.optionsText) {
@@ -995,14 +1011,15 @@ const handleCreateTask = async () => {
     }
     // 添加条件字段配置
     if (field.conditionalField && field.conditionalValue) {
-      fieldData.conditionalField = field.conditionalField
-      fieldData.conditionalValue = field.conditionalValue
+      fieldData.conditionalField = field.conditionalField.trim()
+      fieldData.conditionalValue = field.conditionalValue.trim()
     }
     return fieldData
   }).filter(field => field.fieldName) // 过滤掉空字段名
 
   const taskData = {
     ...taskForm,
+    title: taskForm.title.trim(),
     type: taskForm.type.trim(),
     fields: fieldsToSubmit
   }
@@ -1082,21 +1099,22 @@ const handleExport = async (taskId) => {
 const allRows = reactive({ academic: [], daily: [], honor: [], leave: [] })
 
 const loadBusinessData = async () => {
-  if (moduleKey.value === 'task_mgmt') {
+  const key = moduleKey.value
+  if (key === 'task_mgmt') {
     loadTasks()
     return
   }
   try {
-    if (moduleKey.value === 'leave') {
+    if (key === 'leave') {
       // 请假，使用专门的API
       const res = await getAllLeaveRequests()
       if (res.code === 200) {
         allRows.leave = res.data || []
       }
     } else {
-      const res = await listItems(moduleKey.value)
+      const res = await listItems(key)
       if (res.code === 200) {
-        allRows[moduleKey.value] = res.data
+        allRows[key] = Array.isArray(res.data) ? res.data : []
       }
     }
   } catch (e) {
@@ -1156,11 +1174,11 @@ const onSelectionChange = (val) => (multipleSelection.value = val)
 /** ========= 状态渲染 ========= */
 const statusMeta = (v) => {
   const map = {
-    pending: { text: '待审核', type: 'warning', icon: Clock },
-    approved: { text: '已通过', type: 'success', icon: CircleCheck },
-    rejected: { text: '已驳回', type: 'danger', icon: CircleClose }
+    pending: { text: '待审核', type: 'warning' },
+    approved: { text: '已通过', type: 'success' },
+    rejected: { text: '已驳回', type: 'danger' }
   }
-  return map[v] || { text: v, type: 'info', icon: Clock }
+  return map[v] || { text: v, type: 'info' }
 }
 
 /** ========= 合并的查看+审核 ========= */
@@ -1468,6 +1486,8 @@ const fmtDate = (d) => {
 const onTabChange = () => { 
   searchKey.value = ''
   statusFilter.value = 'all'
+  multipleSelection.value = []
+  reviewVisible.value = false
   loadBusinessData()
 }
 
@@ -1532,7 +1552,6 @@ onMounted(initPage)
 .card-header{display:flex;align-items:center;justify-content:space-between;}
 .card-title{display:flex;align-items:center;}
 .ml8{margin-left:8px;}
-.status-tag .el-icon{vertical-align:middle}
 .mr4{margin-right:4px;}
 
 /* 弹窗放大 + 自适应 */

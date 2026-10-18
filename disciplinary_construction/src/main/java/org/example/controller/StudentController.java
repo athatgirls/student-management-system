@@ -155,7 +155,7 @@ public class StudentController {
     }
 
     // 更新学生信息
-    @PutMapping("/update")
+    @PostMapping("/update")
     public ResponseEntity<Map<String, Object>> updateStudent(@RequestBody StudentModel student) {
         Map<String, Object> result = new HashMap<>();
         try {
@@ -186,7 +186,7 @@ public class StudentController {
     }
 
     // 删除学生（管理员权限）
-    @DeleteMapping("/delete/{id}")
+    @PostMapping("/delete/{id}")
     public ResponseEntity<Map<String, Object>> deleteStudent(@PathVariable String id) {
         Map<String, Object> result = new HashMap<>();
         try {
@@ -455,7 +455,7 @@ public class StudentController {
 
     // 更新个人信息
     // POST supports gateways that restrict PUT; retain PUT for older clients.
-    @RequestMapping(value = "/profile/update", method = {RequestMethod.POST, RequestMethod.PUT})
+    @PostMapping("/profile/update")
     public ResponseEntity<Map<String, Object>> updateUserProfile(@RequestBody org.example.dto.StudentProfileUpdate profile, @CurrentUser Map<String, Object> currentUser) {
         currentUserAccessService.requireCurrentStudent(currentUser);
         Map<String, Object> result = new HashMap<>();
@@ -529,7 +529,7 @@ public class StudentController {
     }
 
     // 批量修改学生状态（按年级）
-    @PutMapping("/batch-update-status")
+    @PostMapping("/batch-update-status")
     public ResponseEntity<Map<String, Object>> batchUpdateStatus(@RequestBody Map<String, Object> requestBody) {
         Map<String, Object> result = new HashMap<>();
         try {
@@ -569,7 +569,7 @@ public class StudentController {
     }
 
     // Prefer POST for campus gateways; retain PUT for existing clients.
-    @RequestMapping(value = "/batch-update-major", method = {RequestMethod.POST, RequestMethod.PUT})
+    @PostMapping("/batch-update-major")
     public ResponseEntity<Map<String, Object>> batchUpdateMajor(@RequestBody Map<String, Object> requestBody) {
         Map<String, Object> result = new HashMap<>();
         try {
@@ -603,7 +603,7 @@ public class StudentController {
     }
 
     // 批量删除学生
-    @DeleteMapping("/batch-delete")
+    @PostMapping("/batch-delete")
     public ResponseEntity<Map<String, Object>> batchDeleteStudents(@RequestBody Map<String, List<String>> requestBody) {
         Map<String, Object> result = new HashMap<>();
         try {
@@ -654,7 +654,7 @@ public class StudentController {
     }
 
     // 管理员重置为固定格式初始密码，首次使用必须修改。
-    @PutMapping("/reset-password")
+    @PostMapping("/reset-password")
     public ResponseEntity<Map<String, Object>> resetPassword(@RequestBody Map<String, String> requestBody) {
         Map<String, Object> result = new HashMap<>();
         try {
@@ -693,7 +693,7 @@ public class StudentController {
 
     // 修改初始密码（不需要登录，用于首次登录时强制修改密码）
     // POST is the primary method; retain PUT for older clients during rollout.
-    @RequestMapping(value = "/change-initial-password", method = {RequestMethod.POST, RequestMethod.PUT})
+    @PostMapping("/change-initial-password")
     public ResponseEntity<Map<String, Object>> changeInitialPassword(@RequestBody Map<String, String> requestBody) {
         loginAttemptLimiter.check("student", requestBody.get("studentId"));
         Map<String, Object> result = new HashMap<>();
@@ -760,7 +760,7 @@ public class StudentController {
     }
 
     // 学生修改自己的密码
-    @PutMapping("/change-password")
+    @PostMapping("/change-password")
     public ResponseEntity<Map<String, Object>> changePassword(@RequestBody Map<String, String> requestBody, @CurrentUser Map<String, Object> currentUser) {
         Map<String, Object> result = new HashMap<>();
         try {

@@ -328,13 +328,15 @@
     </el-dialog>
 
     <!-- 查看详情对话框 -->
-    <el-dialog v-model="showViewDialog" :title="viewDialogTitle" width="700px">
-      <el-descriptions :column="2" border v-if="viewingItem">
+    <el-dialog v-model="showViewDialog" :title="viewDialogTitle" width="min(960px, 95vw)" class="detail-dialog">
+      <el-descriptions class="party-details" :column="2" border v-if="viewingItem">
         <el-descriptions-item
-          v-for="(value, key) in visibleDetail(viewingItem)"
+          v-for="{ key, value, span } in detailEntries"
           :key="key"
           :label="getFieldLabel(key)"
-          :span="key === 'content' || key === 'description' || key === 'serviceDescription' ? 2 : 1"
+          :label-style="{ width: '120px' }"
+          :content-style="{ overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }"
+          :span="span"
         >
           <template v-if="key === 'auditStatus'">
             <el-tag :type="getAuditStatusType(value)" size="small">
@@ -351,6 +353,12 @@
               <el-table-column prop="materialType" label="材料类型" width="120" />
               <el-table-column prop="materialName" label="材料名称" min-width="150" />
               <el-table-column prop="submitDate" label="提交日期" width="120" />
+              <el-table-column label="附件" width="100">
+                <template #default="scope">
+                  <el-button v-if="scope.row.fileUrl" link type="primary" @click="viewMaterial(scope.row)">查看材料</el-button>
+                  <span v-else>未上传</span>
+                </template>
+              </el-table-column>
               <el-table-column prop="status" label="状态" width="100">
                 <template #default="scope">
                   <el-tag :type="getAuditStatusType(scope.row.status)" size="small">
@@ -465,7 +473,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Upload, UploadFilled } from '@element-plus/icons-vue'
 import {
@@ -475,6 +483,36 @@ import {
   volunteerServiceApi
 } from '@/api/party'
 import { readExcelObjects } from '@/utils/excel'
+import { getFileUrl } from '@/utils/imageUrl'
+import request from '@/api/request'
+
+const viewMaterial = async (material) => {
+  const fileUrl = new URL(getFileUrl(material.fileUrl), window.location.origin)
+  if (fileUrl.origin !== window.location.origin) {
+    ElMessage.error('材料地址不属于当前系统')
+    return
+  }
+  const isPdf = /\.pdf$/i.test(fileUrl.pathname)
+  const preview = isPdf ? window.open('', '_blank') : null
+  if (preview) preview.opener = null
+  try {
+    const file = await request.get(fileUrl.href, { responseType: 'blob' })
+    const blob = isPdf ? new Blob([file], { type: 'application/pdf' }) : file
+    const objectUrl = URL.createObjectURL(blob)
+    if (preview) {
+      preview.location.replace(objectUrl)
+    } else {
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = material.materialName || fileUrl.pathname.split('/').pop()
+      link.click()
+    }
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000)
+  } catch (error) {
+    if (preview) preview.close()
+    console.error('查看材料失败:', error)
+  }
+}
 
 // 标签页
 const activeTab = ref('application')
@@ -894,7 +932,16 @@ const formatDateTime = (date) => {
 }
 
 const displayDetailValue = value => ({ pending: '待审核', approved: '已通过', rejected: '已驳回', submitted: '已提交', completed: '已完成' }[value] || value || '-')
-const visibleDetail = row => Object.fromEntries(Object.entries(row || {}).filter(([key, value]) => getFieldLabel(key) !== key && value != null && value !== '' && !['studentId', 'courseType', 'instructor', 'location'].includes(key)))
+const visibleDetail = row => Object.fromEntries(Object.entries(row || {}).filter(([key, value]) => getFieldLabel(key) !== key && value != null && value !== ''))
+const detailEntries = computed(() => {
+  const entries = Object.entries(visibleDetail(viewingItem.value))
+  const wide = ([key, value]) => ['content', 'description', 'serviceDescription', 'submittedMaterials', 'auditComment', 'remark'].includes(key)
+    || Array.isArray(value) || (value && typeof value === 'object')
+  const regular = entries.filter(entry => !wide(entry))
+  // Finish an odd row before rendering full-width content; Element Plus otherwise truncates its span.
+  return regular.map(([key, value], index) => ({ key, value, span: index === regular.length - 1 && regular.length % 2 ? 2 : 1 }))
+    .concat(entries.filter(wide).map(([key, value]) => ({ key, value, span: 2 })))
+})
 
 const getFieldLabel = (key) => {
   const labelMap = {
@@ -923,6 +970,7 @@ const getFieldLabel = (key) => {
     branch: '所属支部',
     auditStatus: '审核状态',
     auditComment: '审核意见',
+    remark: '备注',
     submittedMaterials: '已提交材料',
     createTime: '创建时间',
     updateTime: '更新时间'
@@ -1035,6 +1083,7 @@ onMounted(() => {
 .party-management {
   padding: 20px;
 }
+.party-details :deep(.el-descriptions__table) { table-layout: fixed; }
 
 .page-header-card {
   margin-bottom: 20px;

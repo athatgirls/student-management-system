@@ -21,7 +21,7 @@ export function createMajor(majorData) {
 export function deleteMajorByName(majorName) {
   return request({
     url: '/major/delete-by-name',
-    method: 'delete',
+    method: 'post',
     params: { majorName }
   })
 }

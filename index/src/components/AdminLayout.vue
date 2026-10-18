@@ -65,8 +65,8 @@
               <el-icon><Trophy /></el-icon>
               <span>科创竞赛</span>
               <el-badge 
-                v-if="totalPendingCount > 0" 
-                :value="totalPendingCount" 
+                v-if="innovationPendingCount > 0" 
+                :value="innovationPendingCount" 
                 :max="99"
                 class="menu-badge"
               />
@@ -198,7 +198,9 @@
 
           <div class="header-right">
             <!-- 待审核提醒 -->
-            <el-badge 
+            <el-popover placement="bottom-end" :width="300" trigger="click">
+              <template #reference>
+              <el-badge 
               :value="totalPendingCount" 
               :max="99" 
               :hidden="totalPendingCount === 0"
@@ -208,10 +210,18 @@
                 type="primary" 
                 :icon="DocumentChecked" 
                 circle 
-                @click="goToAudit"
                 title="待审核项目"
               />
             </el-badge>
+              </template>
+              <div class="audit-popover">
+                <strong>待审核事项</strong>
+                <el-empty v-if="!totalPendingCount" description="暂无待审核项目" :image-size="50" />
+                <el-button v-for="item in pendingLinks" :key="item.path" text @click="router.push(item.path)">
+                  <span>{{ item.label }}</span><el-tag size="small" type="danger">{{ item.count }}</el-tag>
+                </el-button>
+              </div>
+            </el-popover>
         
             <el-dropdown @command="handleCommand">
               <span class="user-info">
@@ -244,7 +254,7 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
-import { ElMessageBox, ElMessage } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
 import { Menu } from '@element-plus/icons-vue'
 import request from '@/api/request'
 import {
@@ -280,13 +290,13 @@ const pendingCounts = ref({
 })
 
 // 总待审核数量
-const totalPendingCount = computed(() => {
+const innovationPendingCount = computed(() => {
   return pendingCounts.value.competition + 
          pendingCounts.value.project + 
          pendingCounts.value.paper + 
-         pendingCounts.value.patent +
-         pendingCounts.value.daily
+         pendingCounts.value.patent
 })
+const totalPendingCount = computed(() => innovationPendingCount.value + pendingCounts.value.daily)
 
 const userInfo = computed(() => {
   const user = store.state.user
@@ -386,22 +396,13 @@ const loadPendingStats = async () => {
   }
 }
 
-// 跳转到第一个有待审核的页面
-const goToAudit = () => {
-  if (pendingCounts.value.competition > 0) {
-    router.push('/admin/innovation/competitions/list')
-  } else if (pendingCounts.value.project > 0) {
-    router.push('/admin/innovation/projects/list')
-  } else if (pendingCounts.value.paper > 0) {
-    router.push('/admin/innovation/papers/list')
-  } else if (pendingCounts.value.patent > 0) {
-    router.push('/admin/innovation/patents/list')
-  } else if (pendingCounts.value.daily > 0) {
-    router.push('/admin/daily/dailycontrol')
-  } else {
-    ElMessage.info('暂无待审核项目')
-  }
-}
+const pendingLinks = computed(() => [
+  { label: '竞赛管理', path: '/admin/innovation/competitions/list', count: pendingCounts.value.competition },
+  { label: '项目管理', path: '/admin/innovation/projects/list', count: pendingCounts.value.project },
+  { label: '论文管理', path: '/admin/innovation/papers/list', count: pendingCounts.value.paper },
+  { label: '专利管理', path: '/admin/innovation/patents/list', count: pendingCounts.value.patent },
+  { label: '活动审批列表', path: '/admin/daily/dailycontrol', count: pendingCounts.value.daily }
+].filter(item => item.count > 0))
 
 // 定时器ID
 let refreshTimer = null
@@ -417,6 +418,7 @@ onMounted(() => {
   
   // 监听窗口大小变化
   window.addEventListener('resize', handleResize)
+  window.addEventListener('admin-audit-updated', loadPendingStats)
 })
 
 onUnmounted(() => {
@@ -425,6 +427,7 @@ onUnmounted(() => {
     clearInterval(refreshTimer)
   }
   window.removeEventListener('resize', handleResize)
+  window.removeEventListener('admin-audit-updated', loadPendingStats)
 })
 
 
@@ -493,10 +496,13 @@ const handleCommand = async (command) => {
   margin-left: 8px;
 }
 
-:deep(.el-badge__content) {
-  top: 8px;
-  right: -8px;
+.sidebar-menu :deep(.el-badge__content) {
+  position: static;
+  transform: none;
 }
+.sidebar-menu :deep(.el-badge) { display: inline-flex; align-items: center; }
+.audit-popover .el-button { display: flex; width: 100%; margin: 8px 0 0; }
+.audit-popover .el-button :deep(> span) { width: 100%; display: flex; justify-content: space-between; align-items: center; }
 
 /* 子菜单中的徽章 */
 :deep(.el-sub-menu__title .menu-badge) {

@@ -50,7 +50,7 @@ public class PaperController {
         }
     }
 
-    @RequestMapping(value = "/{id}", method = {RequestMethod.PUT, RequestMethod.POST})
+    @PostMapping("/{id}")
     public ResponseEntity<?> updatePaper(
             @PathVariable String id,
             @RequestBody PaperModel paper,
@@ -79,7 +79,6 @@ public class PaperController {
         return deletePaper(id, currentUser);
     }
 
-    @DeleteMapping("/{id}")
     public ResponseEntity<?> deletePaper(@PathVariable String id,
                                          @CurrentUser Map<String, Object> currentUser) {
         PaperModel existing = paperService.getPaperById(id);
@@ -136,7 +135,7 @@ public class PaperController {
         }
     }
 
-    @RequestMapping(value = "/admin/{id}/audit", method = {RequestMethod.PUT, RequestMethod.POST})
+    @PostMapping("/admin/{id}/audit")
     public ResponseEntity<?> auditPaper(
             @PathVariable String id, 
             @RequestBody Map<String, String> auditData,

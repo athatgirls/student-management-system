@@ -1,5 +1,9 @@
 import request from './request'
 
+export function getGradeTemplate() {
+  return request.get('/grade/template', { responseType: 'blob' })
+}
+
 // 创建年级
 export function createGrade(gradeData) {
   return request({
@@ -43,7 +47,7 @@ export function getGradeRecords(params) {
 export function deleteGrade(id) {
   return request({
     url: `/grade/delete/${id}`,
-    method: 'delete'
+    method: 'post'
   })
 }
 
@@ -51,7 +55,7 @@ export function deleteGrade(id) {
 export function deleteGradeByName(gradeName) {
   return request({
     url: '/grade/delete-by-name',
-    method: 'delete',
+    method: 'post',
     params: { gradeName }
   })
 }

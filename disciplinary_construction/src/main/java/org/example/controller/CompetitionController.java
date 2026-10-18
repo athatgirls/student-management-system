@@ -61,7 +61,7 @@ public class CompetitionController {
     /**
      * 更新竞赛
      */
-    @RequestMapping(value = "/{id}", method = {RequestMethod.PUT, RequestMethod.POST})
+    @PostMapping("/{id}")
     public ResponseEntity<?> updateCompetition(@PathVariable String id, @RequestBody CompetitionModel competition,
                                                @CurrentUser Map<String, Object> currentUser) {
         CompetitionModel existing = competitionService.getCompetitionById(id);
@@ -91,7 +91,6 @@ public class CompetitionController {
         return deleteCompetition(id, currentUser);
     }
 
-    @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteCompetition(@PathVariable String id,
                                                @CurrentUser Map<String, Object> currentUser) {
         CompetitionModel existing = competitionService.getCompetitionById(id);
@@ -166,7 +165,7 @@ public class CompetitionController {
     /**
      * 审核竞赛
      */
-    @RequestMapping(value = "/admin/{id}/audit", method = {RequestMethod.PUT, RequestMethod.POST})
+    @PostMapping("/admin/{id}/audit")
     public ResponseEntity<?> auditCompetition(@PathVariable String id, @RequestBody Map<String, String> auditData,
                                               @CurrentUser Map<String, Object> currentUser) {
         try {

@@ -9,8 +9,8 @@ export const readExcelObjects = async (file) => {
     throw new Error('请选择 Excel 文件')
   }
 
-  const { default: readXlsxFile } = await import('read-excel-file/browser')
-  const data = await readXlsxFile(file)
+   const { readSheet } = await import('read-excel-file/browser')
+   const data = await readSheet(file)
   if (data.length < 1) {
     return []
   }
@@ -38,5 +38,5 @@ export const downloadExcel = async (rows, sheetName, fileName) => {
     type: typeof value === 'number' ? Number : String,
     fontWeight: rowIndex === 0 ? 'bold' : undefined
   })))
-  await writeXlsxFile(data, { fileName, sheet: sheetName })
+   await writeXlsxFile(data, { sheet: sheetName }).toFile(fileName)
 }

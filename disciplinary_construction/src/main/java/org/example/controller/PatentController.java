@@ -50,7 +50,7 @@ public class PatentController {
         }
     }
 
-    @RequestMapping(value = "/{id}", method = {RequestMethod.PUT, RequestMethod.POST})
+    @PostMapping("/{id}")
     public ResponseEntity<?> updatePatent(@PathVariable String id, @RequestBody PatentModel patent,
                                           @CurrentUser Map<String, Object> currentUser) {
         PatentModel existing = patentService.getPatentById(id);
@@ -77,7 +77,6 @@ public class PatentController {
         return deletePatent(id, currentUser);
     }
 
-    @DeleteMapping("/{id}")
     public ResponseEntity<?> deletePatent(@PathVariable String id,
                                           @CurrentUser Map<String, Object> currentUser) {
         PatentModel existing = patentService.getPatentById(id);
@@ -132,7 +131,7 @@ public class PatentController {
         }
     }
 
-    @RequestMapping(value = "/admin/{id}/audit", method = {RequestMethod.PUT, RequestMethod.POST})
+    @PostMapping("/admin/{id}/audit")
     public ResponseEntity<?> auditPatent(@PathVariable String id, @RequestBody Map<String, String> auditData,
                                          @CurrentUser Map<String, Object> currentUser) {
         try {

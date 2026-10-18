@@ -48,6 +48,7 @@ public class DailyTaskServiceImpl implements DailyTaskService {
 
     @Override
     public DailyTaskModel createTask(DailyTaskModel task) {
+        org.example.util.TaskSubmissionValidation.validateDefinition(task);
         task.setId(null);
         taskAttachmentAccessService.validate(task);
         dailyTaskAudienceService.validateAndNormalize(task);
