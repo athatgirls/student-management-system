@@ -156,7 +156,16 @@
                 class="menu-badge"
               />
             </template>
-            <el-menu-item index="/admin/daily/dailycontrol">活动审批列表</el-menu-item>
+            <el-menu-item v-for="item in dailyApprovalMenus" :key="item.path" :index="item.path">
+              <span>{{ item.label }}</span>
+              <el-badge
+                v-if="dailyPendingCounts[item.key] > 0"
+                :value="dailyPendingCounts[item.key]"
+                :max="99"
+                class="item-badge"
+              />
+            </el-menu-item>
+            <el-menu-item index="/admin/daily/tasks">日常任务</el-menu-item>
             <el-menu-item index="/admin/daily/task-completion-analysis">任务完成度分析</el-menu-item>
             <el-menu-item index="/admin/daily/activity-management">活动管理</el-menu-item>
           </el-sub-menu>
@@ -290,6 +299,7 @@ const pendingCounts = ref({
 })
 
 // 总待审核数量
+const dailyPendingCounts = ref({})
 const innovationPendingCount = computed(() => {
   return pendingCounts.value.competition + 
          pendingCounts.value.project + 
@@ -365,6 +375,7 @@ const loadPendingStats = async () => {
     }
     
     if (data) {
+      dailyPendingCounts.value = data.daily || {}
       pendingCounts.value = {
         competition: data.competition?.pending || 0,
         project: data.project?.pending || 0,
@@ -374,6 +385,7 @@ const loadPendingStats = async () => {
       }
       
     } else {
+      dailyPendingCounts.value = {}
       // 设置为 0
       pendingCounts.value = {
         competition: 0,
@@ -385,6 +397,7 @@ const loadPendingStats = async () => {
     }
   } catch (error) {
     console.error('加载待审核统计失败:', error)
+    dailyPendingCounts.value = {}
     // 失败时设置为 0
     pendingCounts.value = {
       competition: 0,
@@ -396,12 +409,19 @@ const loadPendingStats = async () => {
   }
 }
 
+const dailyApprovalMenus = [
+  { label: '学术活动', path: '/admin/daily/academic', key: 'academic' },
+  { label: '志愿活动', path: '/admin/daily/volunteer', key: 'volunteer' },
+  { label: '日常活动', path: '/admin/daily/daily', key: 'dailyActivity' },
+  { label: '请假管理', path: '/admin/daily/leave', key: 'leave' },
+  { label: '荣誉', path: '/admin/daily/honor', key: 'honor' }
+]
 const pendingLinks = computed(() => [
   { label: '竞赛管理', path: '/admin/innovation/competitions/list', count: pendingCounts.value.competition },
   { label: '项目管理', path: '/admin/innovation/projects/list', count: pendingCounts.value.project },
   { label: '论文管理', path: '/admin/innovation/papers/list', count: pendingCounts.value.paper },
   { label: '专利管理', path: '/admin/innovation/patents/list', count: pendingCounts.value.patent },
-  { label: '活动审批列表', path: '/admin/daily/dailycontrol', count: pendingCounts.value.daily }
+  ...dailyApprovalMenus.map(item => ({ ...item, count: dailyPendingCounts.value[item.key] || 0 }))
 ].filter(item => item.count > 0))
 
 // 定时器ID

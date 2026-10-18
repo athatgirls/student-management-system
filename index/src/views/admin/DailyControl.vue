@@ -1,51 +1,29 @@
 /* eslint-disable vue/multi-word-component-names */
 <template>
-  <div class="page-wrap">
-    <!-- Hero -->
-    <section class="hero">
-      <div class="hero-inner container">
-        <div class="hero-stats">
-          <el-card class="stat-card" shadow="never">
-            <div class="stat-title">待审核</div>
-            <div class="stat-value warn">{{ stat.pending }}</div>
-          </el-card>
-          <el-card class="stat-card" shadow="never">
-            <div class="stat-title">已通过</div>
-            <div class="stat-value ok">{{ stat.passed }}</div>
-          </el-card>
-          <el-card class="stat-card" shadow="never">
-            <div class="stat-title">总记录</div>
-            <div class="stat-value">{{ rows.length }}</div>
-          </el-card>
-        </div>
-      </div>
-    </section>
+  <div class="daily-management">
+    <AdminSummaryCards :items="summaryItems" />
 
-    <div class="container">
+    <div class="daily-content">
       <!--  + 状态筛选 + 搜索 -->
-      <div class="toolbar">
-        <el-tabs v-model="moduleKey" type="card" @tab-change="onTabChange">
-          <el-tab-pane label="学术活动" name="academic" />
-          <el-tab-pane label="请假管理" name="leave" />
-          <el-tab-pane label="荣誉" name="honor" />
-          <el-tab-pane label="任务发布与统计" name="task_mgmt" />
-        </el-tabs>
-
-        <div class="toolbar-right">
-          <el-segmented v-model="statusFilter" :options="statusOptions" size="small" />
-          <el-input
+      <el-card v-if="moduleKey !== 'task_mgmt'" class="filter-card" shadow="hover">
+        <div class="toolbar">
+          <span class="card-title">{{ moduleTitle }}</span>
+          <div class="toolbar-right">
+            <el-segmented v-model="statusFilter" :options="statusOptions" size="small" />
+            <el-input
               v-model="searchKey"
-              placeholder="按标题/发起人搜索"
+              :placeholder="moduleKey === 'leave' ? '搜索请假原因、姓名或学号' : '搜索标题、姓名或学号'"
               clearable
               style="width: 240px"
               @keyup.enter="applySearch"
               @clear="applySearch"
-          />
+            />
+          </div>
         </div>
-      </div>
+      </el-card>
 
       <!-- 列表 -->
-      <el-card v-if="moduleKey !== 'task_mgmt'" class="glass" shadow="hover">
+      <el-card v-if="moduleKey !== 'task_mgmt'" shadow="hover">
         <template #header>
           <div class="card-header">
             <div class="card-title">
@@ -140,10 +118,10 @@
       </el-card>
 
       <!-- 任务管理列表 -->
-      <el-card v-else class="glass" shadow="hover">
+      <el-card v-else shadow="hover">
         <template #header>
           <div class="card-header">
-            <div class="card-title">日常任务发布与统计</div>
+            <div class="card-title">日常任务</div>
             <el-button type="primary" :icon="Plus" @click="handleOpenTaskDialog">发布新任务</el-button>
           </div>
         </template>
@@ -741,7 +719,9 @@
 
 <script setup>
 import { formatDateTime as fmtDateTime } from '@/utils/dateTime'
-import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import AdminSummaryCards from '@/components/AdminSummaryCards.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Link, Plus, Download, View, Delete, InfoFilled } from '@element-plus/icons-vue'
 import { 
@@ -769,12 +749,14 @@ const dict = {
 const honorCategories = ['竞赛', '论文', '专利', '奖学金', '社会服务', '其他']
 
 /** =========  ========= */
-const moduleKey = ref('honor') // 默认演示“荣誉”，可改：'academic' | 'daily' | 'honor'
+const route = useRoute()
+const moduleKey = computed(() => route.meta.dailyModule)
 const moduleTitle = computed(() => {
     if (moduleKey.value === 'academic') return '学术活动'
+    if (moduleKey.value === 'daily') return '日常活动'
     if (moduleKey.value === 'leave') return '请假管理'
     if (moduleKey.value === 'honor') return '荣誉'
-    return '任务管理'
+    return '日常任务'
 })
 
 /** ========= 任务管理相关 ========= */
@@ -1147,6 +1129,21 @@ const stat = computed(() => ({
   pending: rows.value.filter(x => x.auditStatus === 'pending').length,
   passed: rows.value.filter(x => x.auditStatus === 'approved').length
 }))
+const summaryItems = computed(() => {
+  if (moduleKey.value === 'task_mgmt') {
+    return [
+      { label: '任务总数', value: dailyTasks.value.length, icon: 'total' },
+      { label: '进行中', value: dailyTasks.value.filter(task => task.active).length, icon: 'approved', tone: 'success' },
+      { label: '已关闭', value: dailyTasks.value.filter(task => !task.active).length, icon: 'closed', tone: 'info' }
+    ]
+  }
+  const records = allRows[moduleKey.value] || []
+  return [
+    { label: '总记录', value: records.length, icon: 'total' },
+    { label: '待审核', value: records.filter(row => row.auditStatus === 'pending').length, icon: 'pending', tone: 'warning' },
+    { label: '已通过', value: records.filter(row => row.auditStatus === 'approved').length, icon: 'approved', tone: 'success' }
+  ]
+})
 
 /** ========= 状态筛选 ========= */
 const statusOptions = [
@@ -1281,6 +1278,7 @@ const submitReview = async () => {
         ElMessage.error(auditRes.msg || '审核提交失败')
         return
       }
+      window.dispatchEvent(new Event('admin-audit-updated'))
       
       // 如果修改了请假状态，调用更新状态API
       if (reviewForm.status && reviewForm.status !== reviewEntity.status) {
@@ -1299,6 +1297,7 @@ const submitReview = async () => {
     } else {
       const res = await auditItem(moduleKey.value, reviewForm)
       if (res.code === 200) {
+        window.dispatchEvent(new Event('admin-audit-updated'))
         ElMessage.success('审核已提交')
         reviewVisible.value = false
         loadBusinessData()
@@ -1483,13 +1482,21 @@ const fmtDate = (d) => {
   const day = String(date.getDate()).padStart(2,'0')
   return `${y}-${m}-${day}`
 }
-const onTabChange = () => { 
+const resetModule = () => {
   searchKey.value = ''
   statusFilter.value = 'all'
   multipleSelection.value = []
   reviewVisible.value = false
+  honorEditVisible.value = false
+  statsVisible.value = false
+  taskDialogVisible.value = false
+  taskCategoryFilter.value = 'all'
+  activityCategoryFilter.value = 'all'
+  restrictionFilter.value = 'all'
+  selectedGradeFilter.value = null
   loadBusinessData()
 }
+watch(moduleKey, resetModule)
 
 // 加载年级列表
 const loadGradeList = async () => {
@@ -1535,22 +1542,12 @@ onMounted(initPage)
 
 <style scoped>
 /* 页面结构 */
-.container{max-width:1600px;margin:0 auto;}
-.page-wrap{min-height:100vh;background:linear-gradient(180deg,#f7f9ff,#ffffff 40%);}
-.hero{padding:28px 0;background: radial-gradient(1200px 220px at 50% -40px,#e8eeff,transparent);}
-.hero-inner{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;}
-.hero-title{font-size:26px;font-weight:700;color:#1f2d3d;}
-.hero-sub{color:#6b7280;margin-top:6px;}
-.hero-stats{display:flex;gap:12px;}
-.stat-card{width:150px;border:1px solid #eef2ff;background:rgba(255,255,255,.7);backdrop-filter: blur(4px);}
-.stat-title{font-size:12px;color:#64748b;}
-.stat-value{font-weight:700;font-size:20px;}
-.stat-value.ok{color:#16a34a}.stat-value.warn{color:#d97706}
-.toolbar{display:flex;align-items:center;justify-content:space-between;margin:14px 0;}
-.toolbar-right{display:flex;align-items:center;gap:10px;}
-.glass{border:1px solid #eef2ff;background:rgba(255,255,255,.8);backdrop-filter: blur(6px);}
-.card-header{display:flex;align-items:center;justify-content:space-between;}
-.card-title{display:flex;align-items:center;}
+.daily-management { padding: 20px; }
+.filter-card { margin-bottom: 20px; }
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.toolbar-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.card-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 16px; color: #303133; }
 .ml8{margin-left:8px;}
 .mr4{margin-right:4px;}
 
@@ -1562,8 +1559,7 @@ onMounted(initPage)
   .review-dialog :deep(.el-dialog){ width:96vw !important; }
 }
 .review-dialog :deep(.el-dialog__header){
-  background: linear-gradient(90deg,#eef2ff,#ffffff);
-  border-bottom:1px solid #eef2ff;
+  border-bottom:1px solid #ebeef5;
 }
 
 /* 弹窗内部样式 */
@@ -1573,7 +1569,7 @@ onMounted(initPage)
 .review-header .dot{margin:0 6px;color:#cbd5e1}
 .review-header .muted{color:#94a3b8}
 
-.section-card{border:1px solid #eef2ff;background:rgba(255,255,255,.95)}
+.section-card{border:1px solid #ebeef5;background:#fff}
 .section-title{font-weight:600}
 .proof-area{margin-top:6px}
 .file-box{display:flex;gap:10px;align-items:center;padding:12px;border:1px dashed #e5e7eb;border-radius:8px;background:#fafafa}
@@ -1587,33 +1583,8 @@ onMounted(initPage)
 
 /* 移动端适配 */
 @media (max-width: 768px) {
-  .hero {
-    padding: 20px 0;
-  }
-
-  .hero-inner {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 15px;
-  }
-
-  .hero-title {
-    font-size: 20px;
-  }
-
-  .hero-sub {
-    font-size: 13px;
-  }
-
-  .hero-stats {
-    flex-wrap: wrap;
-    width: 100%;
-  }
-
-  .stat-card {
-    width: calc(50% - 6px);
-    min-width: 120px;
-  }
+  .daily-management { padding: 10px; }
+  .filter-card { margin-bottom: 15px; }
 
   .toolbar {
     flex-direction: column;
@@ -1624,16 +1595,12 @@ onMounted(initPage)
   .toolbar-right {
     flex-wrap: wrap;
   }
+  .toolbar-right :deep(.el-input) { width: 100% !important; }
 
   .card-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
-  }
-
-  :deep(.el-tabs__item) {
-    padding: 0 12px;
-    font-size: 13px;
   }
 
   :deep(.el-table) {
@@ -1664,27 +1631,6 @@ onMounted(initPage)
 }
 
 @media (max-width: 480px) {
-  .hero-title {
-    font-size: 18px;
-  }
-
-  .hero-sub {
-    font-size: 12px;
-  }
-
-  .stat-card {
-    width: 100%;
-  }
-
-  .stat-value {
-    font-size: 18px;
-  }
-
-  :deep(.el-tabs__item) {
-    padding: 0 8px;
-    font-size: 12px;
-  }
-
   :deep(.el-table) {
     font-size: 11px;
   }

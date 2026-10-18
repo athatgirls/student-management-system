@@ -550,7 +550,7 @@ public class StatisticsController {
             patentStats.put("rejected", (int) patentService.countByAuditStatus("已驳回"));
             stats.put("patent", patentStats);
 
-            // 日常管理统计（包括请假、学术活动、日常活动、荣誉）
+            // 日常管理统计（包括请假、学术活动、志愿活动、日常活动、荣誉）
             Map<String, Integer> dailyStats = new HashMap<>();
             try {
                 // 请假待审核
@@ -561,8 +561,10 @@ public class StatisticsController {
                 int dailyActivityPending = dailyActivityRepository.findByAuditStatus("pending").size();
                 // 荣誉待审核
                 int honorPending = honorRepository.findByAuditStatus("pending").size();
+                int volunteerPending = volunteerServiceService.getPendingVolunteerServices().size();
                 
-                dailyStats.put("pending", leavePending + academicPending + dailyActivityPending + honorPending);
+                dailyStats.put("pending", leavePending + academicPending + dailyActivityPending + honorPending + volunteerPending);
+                dailyStats.put("volunteer", volunteerPending);
                 dailyStats.put("leave", leavePending);
                 dailyStats.put("academic", academicPending);
                 dailyStats.put("dailyActivity", dailyActivityPending);
@@ -570,6 +572,7 @@ public class StatisticsController {
             } catch (Exception e) {
                 log.warn("获取日常管理待审核统计失败", e);
                 dailyStats.put("pending", 0);
+                dailyStats.put("volunteer", 0);
                 dailyStats.put("leave", 0);
                 dailyStats.put("academic", 0);
                 dailyStats.put("dailyActivity", 0);

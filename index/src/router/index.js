@@ -297,10 +297,40 @@ const routes = [
       },
       // ==================== 日常管理 ====================
       {
-        path: '/admin/daily/dailycontrol',
-        name: 'dailycontrol',
+        path: '/admin/daily/academic',
+        name: 'adminDailyAcademic',
         component: () => import('../views/admin/DailyControl.vue'),
-        meta: { title: '活动审批列表' }
+        meta: { title: '学术活动', dailyModule: 'academic' }
+      },
+      {
+        path: '/admin/daily/volunteer',
+        name: 'adminDailyVolunteer',
+        component: () => import('../views/admin/PartyManagement.vue'),
+        meta: { title: '志愿活动', partyTab: 'service' }
+      },
+      {
+        path: '/admin/daily/daily',
+        name: 'adminDailyActivity',
+        component: () => import('../views/admin/DailyControl.vue'),
+        meta: { title: '日常活动', dailyModule: 'daily' }
+      },
+      {
+        path: '/admin/daily/leave',
+        name: 'adminDailyLeave',
+        component: () => import('../views/admin/DailyControl.vue'),
+        meta: { title: '请假管理', dailyModule: 'leave' }
+      },
+      {
+        path: '/admin/daily/honor',
+        name: 'adminDailyHonor',
+        component: () => import('../views/admin/DailyControl.vue'),
+        meta: { title: '荣誉', dailyModule: 'honor' }
+      },
+      {
+        path: '/admin/daily/tasks',
+        name: 'adminDailyTasks',
+        component: () => import('../views/admin/DailyControl.vue'),
+        meta: { title: '日常任务', dailyModule: 'task_mgmt' }
       },
       {
         path: '/admin/daily/task-completion-analysis',

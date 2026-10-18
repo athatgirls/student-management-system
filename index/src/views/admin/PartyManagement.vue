@@ -1,7 +1,8 @@
 <template>
-  <div class="party-management">
+  <div class="party-management" :class="{ 'volunteer-management': isVolunteerPage }">
+    <AdminSummaryCards v-if="isVolunteerPage" :items="volunteerSummary" />
 
-    <el-tabs v-model="activeTab" class="management-tabs" @tab-change="handleTabChange">
+    <el-tabs v-model="activeTab" class="management-tabs" :class="{ 'single-module': isVolunteerPage }" @tab-change="handleTabChange">
       <!-- 入党申请管理 -->
       <el-tab-pane label="入党申请" name="application">
         <el-card>
@@ -236,7 +237,7 @@
         <el-card>
           <template #header>
             <div class="card-header">
-              <span>志愿活动管理</span>
+              <span>{{ isVolunteerPage ? '志愿活动' : '志愿活动管理' }}</span>
               <div class="header-actions">
                 <el-input
                   v-model="serviceSearchKeyword"
@@ -473,7 +474,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import AdminSummaryCards from '@/components/AdminSummaryCards.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Upload, UploadFilled } from '@element-plus/icons-vue'
 import {
@@ -515,7 +518,15 @@ const viewMaterial = async (material) => {
 }
 
 // 标签页
-const activeTab = ref('application')
+const route = useRoute()
+const isVolunteerPage = computed(() => route.meta.partyTab === 'service')
+const activeTab = ref(route.meta.partyTab || 'application')
+const allServices = ref([])
+const volunteerSummary = computed(() => [
+  { label: '总记录', value: allServices.value.length, icon: 'total' },
+  { label: '待审核', value: allServices.value.filter(row => row.auditStatus === '待审核').length, icon: 'pending', tone: 'warning' },
+  { label: '已通过', value: allServices.value.filter(row => ['通过', '已通过', 'approved'].includes(row.auditStatus)).length, icon: 'approved', tone: 'success' }
+])
 
 // 数据
 const applicationList = ref([])
@@ -686,6 +697,7 @@ const loadServices = async () => {
   try {
     const response = await volunteerServiceApi.getAllVolunteerServices()
     let data = response.data || []
+    allServices.value = data
     
     if (serviceSearchKeyword.value) {
       data = data.filter(item =>
@@ -797,6 +809,7 @@ const handleAuditSubmit = async () => {
       await loadCourses()
     } else if (currentAuditType.value === 'service') {
       await volunteerServiceApi.auditVolunteerService(currentAuditItem.value.id, auditData)
+      window.dispatchEvent(new Event('admin-audit-updated'))
       ElMessage.success('审核提交成功')
       await loadServices()
     }
@@ -1075,11 +1088,22 @@ const handleBatchImportApplication = async () => {
 
 // 初始化
 onMounted(() => {
-  loadApplications()
+  handleTabChange(activeTab.value)
+})
+watch(() => route.meta.partyTab, tab => {
+  activeTab.value = tab || 'application'
+  serviceSearchKeyword.value = ''
+  serviceFilterStatus.value = ''
+  showViewDialog.value = false
+  showAuditDialog.value = false
+  handleTabChange(activeTab.value)
 })
 </script>
 
 <style scoped>
+.single-module :deep(.el-tabs__header) { display: none; }
+.management-tabs.single-module { margin-top: 0; }
+.volunteer-management :deep(.el-table) { margin-top: 0; }
 .party-management {
   padding: 20px;
 }
