@@ -1087,18 +1087,22 @@ const loadBusinessData = async () => {
     return
   }
   try {
+    let loaded = false
     if (key === 'leave') {
       // 请假，使用专门的API
       const res = await getAllLeaveRequests()
       if (res.code === 200) {
         allRows.leave = res.data || []
+        loaded = true
       }
     } else {
       const res = await listItems(key)
       if (res.code === 200) {
         allRows[key] = Array.isArray(res.data) ? res.data : []
+        loaded = true
       }
     }
+    if (loaded && key === moduleKey.value) openLinkedReview(key)
   } catch (e) {
     console.error('加载业务数据失败', e)
   }
@@ -1218,6 +1222,19 @@ const openReview = async (row) => {
   })
   reviewVisible.value = true
 }
+
+let openedApprovalId = ''
+const openLinkedReview = key => {
+  const id = route.query.approvalId
+  if (!id || openedApprovalId === `${key}:${id}`) return
+  openedApprovalId = `${key}:${id}`
+  const row = (allRows[key] || []).find(item => String(item.id) === String(id))
+  if (row) openReview(row)
+  else ElMessage.warning('该审批记录已不存在，请查看当前列表')
+}
+watch(() => route.query.approvalId, () => {
+  if (route.query.approvalId) loadBusinessData()
+})
 
 const honorEditVisible = ref(false)
 const honorForm = reactive({})

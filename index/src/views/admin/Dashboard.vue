@@ -172,11 +172,12 @@
               class="approval-item"
             >
               <div class="approval-info">
-                <div class="approval-title">{{ approval.title }}</div>
+                <el-button link type="primary" class="approval-title" @click="openApproval(approval)">{{ approval.title }}</el-button>
                 <div class="approval-desc">{{ approval.description }}</div>
                 <div class="approval-time">{{ approval.time }}</div>
               </div>
               <div class="approval-actions">
+                <el-button size="small" type="primary" plain @click="openApproval(approval)">查看详情</el-button>
                 <el-button size="small" type="success" :loading="auditingIds.includes(approval.id)" @click="handleApprove(approval)">
                   通过
                 </el-button>
@@ -278,6 +279,20 @@ const displayedRecentActivities = computed(() => {
 // 待审批事项
 const pendingApprovals = ref([])
 const taskCompletionAnalysis = ref([])
+const approvalRoutes = {
+  academic: '/admin/daily/academic', daily: '/admin/daily/daily', honor: '/admin/daily/honor',
+  leave: '/admin/daily/leave', volunteerService: '/admin/daily/volunteer',
+  thoughtReport: '/admin/party/management', partyCourse: '/admin/party/management',
+  partyApplication: '/admin/party/management',
+  competition: '/admin/innovation/competitions/list', project: '/admin/innovation/projects/list',
+  paper: '/admin/innovation/papers/list', patent: '/admin/innovation/patents/list'
+}
+const approvalTabs = { thoughtReport: 'report', partyCourse: 'course', partyApplication: 'application', volunteerService: 'service' }
+const openApproval = approval => {
+  const path = approvalRoutes[approval.dataType]
+  if (!path || !approval.dataId) return ElMessage.warning('无法定位该审批事项')
+  router.push({ path, query: { approvalId: approval.dataId, ...(approvalTabs[approval.dataType] && { approvalTab: approvalTabs[approval.dataType] }) } })
+}
 
 // 图表引用
 const majorChart = ref(null)
@@ -472,7 +487,6 @@ const submitApproval = async (approval, approved) => {
     }
     if (res.code !== 200) throw new Error(res.msg || '审批失败')
     ElMessage.success('审批成功')
-    await loadStatistics()
     window.dispatchEvent(new Event('admin-audit-updated'))
   } catch (error) {
     if (error !== 'cancel' && error !== 'close') ElMessage.error(error.message || '审批失败')
@@ -482,6 +496,10 @@ const submitApproval = async (approval, approved) => {
 }
 const handleApprove = approval => submitApproval(approval, true)
 const handleReject = approval => submitApproval(approval, false)
+
+const refreshApprovals = () => loadStatistics()
+const refreshOnFocus = () => loadStatistics()
+let refreshTimer
 
 // 快速操作跳转
 const goToStudents = () => {
@@ -512,10 +530,16 @@ onMounted(() => {
     loadStatistics()
     loadTaskCompletionAnalysis()
   })
+  window.addEventListener('admin-audit-updated', refreshApprovals)
+  window.addEventListener('focus', refreshOnFocus)
+  refreshTimer = window.setInterval(refreshApprovals, 30000)
 })
 const resizeChart = () => chartInstance?.resize()
 onMounted(() => window.addEventListener('resize', resizeChart))
 onUnmounted(() => {
+  window.removeEventListener('admin-audit-updated', refreshApprovals)
+  window.removeEventListener('focus', refreshOnFocus)
+  window.clearInterval(refreshTimer)
   window.removeEventListener('resize', resizeChart)
   chartInstance?.dispose()
 })
@@ -655,6 +679,10 @@ onUnmounted(() => {
   font-weight: bold;
   color: #303133;
   margin-bottom: 4px;
+  padding: 0;
+  height: auto;
+  white-space: normal;
+  text-align: left;
 }
 
 .approval-desc {
@@ -671,6 +699,7 @@ onUnmounted(() => {
 .approval-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .quick-actions {

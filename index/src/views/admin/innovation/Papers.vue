@@ -328,6 +328,8 @@
         </el-descriptions-item>
       </el-descriptions>
       <template #footer>
+        <el-button v-if="currentRow && (!currentRow.auditStatus || currentRow.auditStatus === '待审核')" type="success" @click="detailDialogVisible = false; handleApprove(currentRow)">通过</el-button>
+        <el-button v-if="currentRow && (!currentRow.auditStatus || currentRow.auditStatus === '待审核')" type="danger" @click="detailDialogVisible = false; handleReject(currentRow)">驳回</el-button>
         <el-button @click="detailDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
@@ -335,7 +337,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   DataBoard, Clock, CircleCheck, CircleClose, DocumentChecked,
@@ -361,6 +364,17 @@ const stats = ref({
 
 // 表格数据
 const allData = ref([])
+const route = useRoute()
+let openedApprovalId = ''
+const openLinkedApproval = () => {
+  const id = route.query.approvalId
+  if (!id || openedApprovalId === id) return
+  openedApprovalId = id
+  const row = allData.value.find(item => String(item.id) === String(id))
+  if (row) handleView(row)
+  else ElMessage.warning('该审批记录已不存在，请查看当前列表')
+}
+watch(() => route.query.approvalId, id => { if (id) loadData() })
 const tableData = ref([])
 
 // 搜索表单
@@ -442,6 +456,7 @@ const loadData = async () => {
     calculateStats()
     filterAndPaginate()
     ElMessage.success(`加载成功，共 ${allData.value.length} 条数据`)
+    openLinkedApproval()
   } catch (error) {
     console.error('加载数据失败', error)
     ElMessage.error('加载数据失败')
@@ -572,6 +587,7 @@ const submitAudit = async () => {
     ElMessage.success('审核成功')
     auditDialogVisible.value = false
     await loadData() 
+    window.dispatchEvent(new Event('admin-audit-updated'))
   } catch (error) {
     console.error('审核失败', error)
     ElMessage.error('审核失败')

@@ -39,6 +39,7 @@
             <el-menu-item index="/admin/students/list">学生列表</el-menu-item>
             <el-menu-item index="/admin/students/add">添加学生</el-menu-item>
             <el-menu-item index="/admin/students/grades/import">成绩导入</el-menu-item>
+            <el-menu-item index="/admin/grades">成绩管理</el-menu-item>
             <el-menu-item index="/admin/students/overview">学生全量信息</el-menu-item>
           </el-sub-menu>
           
@@ -140,8 +141,12 @@
             <template #title>
               <el-icon><Flag /></el-icon>
               <span>党员发展与管理</span>
+              <el-badge v-if="pendingCounts.party > 0" :value="pendingCounts.party" :max="99" class="menu-badge" />
             </template>
-            <el-menu-item index="/admin/party/management">综合管理</el-menu-item>
+            <el-menu-item index="/admin/party/management">
+              综合管理
+              <el-badge v-if="pendingCounts.party > 0" :value="pendingCounts.party" :max="99" class="item-badge" />
+            </el-menu-item>
             <el-menu-item index="/admin/party/list">党员列表</el-menu-item>
             <el-menu-item index="/admin/party/add">添加党员</el-menu-item>
           </el-sub-menu>
@@ -297,7 +302,8 @@ const pendingCounts = ref({
   project: 0,
   paper: 0,
   patent: 0,
-  daily: 0
+  daily: 0,
+  party: 0
 })
 
 // 总待审核数量
@@ -308,7 +314,8 @@ const innovationPendingCount = computed(() => {
          pendingCounts.value.paper + 
          pendingCounts.value.patent
 })
-const totalPendingCount = computed(() => innovationPendingCount.value + pendingCounts.value.daily)
+const totalPendingCount = computed(() => innovationPendingCount.value + pendingCounts.value.daily + pendingCounts.value.party)
+const partyPendingCounts = ref({})
 
 const userInfo = computed(() => {
   const user = store.state.user
@@ -378,35 +385,41 @@ const loadPendingStats = async () => {
     
     if (data) {
       dailyPendingCounts.value = data.daily || {}
+      partyPendingCounts.value = data.party || {}
       pendingCounts.value = {
         competition: data.competition?.pending || 0,
         project: data.project?.pending || 0,
         paper: data.paper?.pending || 0,
         patent: data.patent?.pending || 0,
-        daily: data.daily?.pending || 0
+        daily: data.daily?.pending || 0,
+        party: data.party?.pending || 0
       }
       
     } else {
       dailyPendingCounts.value = {}
+      partyPendingCounts.value = {}
       // 设置为 0
       pendingCounts.value = {
         competition: 0,
         project: 0,
         paper: 0,
         patent: 0,
-        daily: 0
+        daily: 0,
+        party: 0
       }
     }
   } catch (error) {
     console.error('加载待审核统计失败:', error)
     dailyPendingCounts.value = {}
+    partyPendingCounts.value = {}
     // 失败时设置为 0
     pendingCounts.value = {
       competition: 0,
       project: 0,
       paper: 0,
       patent: 0,
-      daily: 0
+      daily: 0,
+      party: 0
     }
   }
 }
@@ -423,6 +436,9 @@ const pendingLinks = computed(() => [
   { label: '项目管理', path: '/admin/innovation/projects/list', count: pendingCounts.value.project },
   { label: '论文管理', path: '/admin/innovation/papers/list', count: pendingCounts.value.paper },
   { label: '专利管理', path: '/admin/innovation/patents/list', count: pendingCounts.value.patent },
+  { label: '入党申请', path: '/admin/party/management?approvalTab=application', count: partyPendingCounts.value.application || 0 },
+  { label: '思想汇报', path: '/admin/party/management?approvalTab=report', count: partyPendingCounts.value.report || 0 },
+  { label: '微党课', path: '/admin/party/management?approvalTab=course', count: partyPendingCounts.value.course || 0 },
   ...dailyApprovalMenus.map(item => ({ ...item, count: dailyPendingCounts.value[item.key] || 0 }))
 ].filter(item => item.count > 0))
 
@@ -441,6 +457,7 @@ onMounted(() => {
   // 监听窗口大小变化
   window.addEventListener('resize', handleResize)
   window.addEventListener('admin-audit-updated', loadPendingStats)
+  window.addEventListener('focus', loadPendingStats)
 })
 
 onUnmounted(() => {
@@ -450,6 +467,7 @@ onUnmounted(() => {
   }
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('admin-audit-updated', loadPendingStats)
+  window.removeEventListener('focus', loadPendingStats)
 })
 
 

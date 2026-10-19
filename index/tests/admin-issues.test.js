@@ -29,6 +29,44 @@ test('dashboard approval submits the business ID, decision and rejection reason'
   assert.equal(busy.value.length, 0)
 })
 
+test('dashboard approval links open the matching record in its business page', () => {
+  const destinations = []
+  const { openApproval } = handlers('views/admin/Dashboard.vue', ['approvalRoutes', 'approvalTabs', 'openApproval'], {
+    router: { push: target => destinations.push(target) },
+    ElMessage: { warning: message => assert.fail(message) }
+  })
+  for (const [type, path, tab] of [
+    ['leave', '/admin/daily/leave'],
+    ['partyApplication', '/admin/party/management', 'application'],
+    ['thoughtReport', '/admin/party/management', 'report'],
+    ['partyCourse', '/admin/party/management', 'course'],
+    ['volunteerService', '/admin/daily/volunteer', 'service'],
+    ['competition', '/admin/innovation/competitions/list'],
+    ['project', '/admin/innovation/projects/list'],
+    ['paper', '/admin/innovation/papers/list'],
+    ['patent', '/admin/innovation/patents/list']
+  ]) {
+    openApproval({ dataType: type, dataId: 'record-id' })
+    assert.equal(destinations.at(-1).path, path)
+    assert.equal(destinations.at(-1).query.approvalId, 'record-id')
+    assert.equal(destinations.at(-1).query.approvalTab, tab)
+  }
+})
+
+test('daily approval deep link opens the matching row after data loads', () => {
+  const opened = [], warnings = []
+  const { openLinkedReview } = handlers('views/admin/DailyControl.vue', ['openedApprovalId', 'openLinkedReview'], {
+    route: { query: { approvalId: 'db-id' } },
+    allRows: { leave: [{ id: 'db-id', reason: '事假' }] },
+    openReview: row => opened.push(row.id),
+    ElMessage: { warning: message => warnings.push(message) }
+  })
+  openLinkedReview('leave')
+  openLinkedReview('leave')
+  assert.deepEqual(opened, ['db-id'])
+  assert.deepEqual(warnings, [])
+})
+
 test('competition dictionary combines actual level/status fields before pagination', () => {
   const tableData = { value: [] }
   const pagination = { current: 1, size: 1 }

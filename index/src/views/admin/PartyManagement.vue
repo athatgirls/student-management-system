@@ -377,6 +377,9 @@
           </template>
         </el-descriptions-item>
       </el-descriptions>
+      <template #footer>
+        <el-button v-if="viewingItem?.auditStatus === '待审核'" type="primary" @click="auditViewedItem">审核此记录</el-button>
+      </template>
     </el-dialog>
 
     <el-dialog
@@ -523,7 +526,7 @@ const viewMaterial = async (material) => {
 // 标签页
 const route = useRoute()
 const isVolunteerPage = computed(() => route.meta.partyTab === 'service')
-const activeTab = ref(route.meta.partyTab || 'application')
+const activeTab = ref(route.meta.partyTab || route.query.approvalTab || 'application')
 const allServices = ref([])
 const volunteerSummary = computed(() => [
   { label: '总记录', value: allServices.value.length, icon: 'total' },
@@ -613,16 +616,47 @@ const auditForm = reactive({
 })
 
 // 标签页切换
-const handleTabChange = (tab) => {
-  if (tab === 'application') {
-    loadApplications()
-  } else if (tab === 'report') {
-    loadReports()
-  } else if (tab === 'course') {
-    loadCourses()
-  } else if (tab === 'service') {
-    loadServices()
+let openedApproval = ''
+const handleTabChange = async (tab) => {
+  if (route.query.approvalId && route.query.approvalTab === tab) {
+    // Direct links must not be hidden by filters left over from a previous visit.
+    if (tab === 'application') {
+      applicationSearchKeyword.value = ''
+      applicationFilterStage.value = ''
+      applicationFilterStatus.value = ''
+    } else if (tab === 'report') {
+      reportSearchKeyword.value = ''
+      reportFilterStatus.value = ''
+    } else if (tab === 'course') {
+      courseSearchKeyword.value = ''
+      courseFilterStatus.value = ''
+    } else if (tab === 'service') {
+      serviceSearchKeyword.value = ''
+      serviceFilterStatus.value = ''
+    }
   }
+  let rows
+  if (tab === 'application') {
+    await loadApplications()
+    rows = applicationList.value
+  } else if (tab === 'report') {
+    await loadReports()
+    rows = reportList.value
+  } else if (tab === 'course') {
+    await loadCourses()
+    rows = courseList.value
+  } else if (tab === 'service') {
+    await loadServices()
+    rows = serviceList.value
+  }
+  const id = route.query.approvalId
+  if (!id || route.query.approvalTab !== tab || openedApproval === `${tab}:${id}` || !rows) return
+  openedApproval = `${tab}:${id}`
+  const row = rows.find(item => String(item.id) === String(id))
+  if (!row) return ElMessage.warning('该审批记录已不存在，请查看当前列表')
+  // 先呈现完整材料，随后可在列表中执行审核。
+  const viewers = { application: viewApplication, report: viewReport, course: viewCourse, service: viewService }
+  viewers[tab](row)
 }
 
 // 加载入党申请
@@ -805,6 +839,11 @@ const auditService = (row) => {
   auditForm.auditComment = ''
   showAuditDialog.value = true
 }
+const auditViewedItem = () => {
+  const auditors = { application: auditApplication, report: auditReport, course: auditCourse, service: auditService }
+  showViewDialog.value = false
+  auditors[activeTab.value]?.(viewingItem.value)
+}
 
 // 提交审核
 const handleAuditSubmit = async () => {
@@ -834,11 +873,11 @@ const handleAuditSubmit = async () => {
       await loadCourses()
     } else if (currentAuditType.value === 'service') {
       await volunteerServiceApi.auditVolunteerService(currentAuditItem.value.id, auditData)
-      window.dispatchEvent(new Event('admin-audit-updated'))
       ElMessage.success('审核提交成功')
       await loadServices()
     }
 
+    window.dispatchEvent(new Event('admin-audit-updated'))
     showAuditDialog.value = false
   } catch (error) {
     console.error('审核失败:', error)
@@ -1116,11 +1155,15 @@ onMounted(() => {
   handleTabChange(activeTab.value)
 })
 watch(() => route.meta.partyTab, tab => {
-  activeTab.value = tab || 'application'
+  activeTab.value = tab || route.query.approvalTab || 'application'
   serviceSearchKeyword.value = ''
   serviceFilterStatus.value = ''
   showViewDialog.value = false
   showAuditDialog.value = false
+  handleTabChange(activeTab.value)
+})
+watch(() => [route.query.approvalTab, route.query.approvalId], () => {
+  activeTab.value = route.meta.partyTab || route.query.approvalTab || 'application'
   handleTabChange(activeTab.value)
 })
 </script>
