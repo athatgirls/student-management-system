@@ -24,6 +24,7 @@ const upload = async ({ file, onSuccess, onError }) => {
   uploading.value = true
   emit('uploading', true)
   try {
+    if (!file.size || file.size > 10 * 1024 * 1024) throw new Error('单个文件必须非空且不超过 10MB')
     if (files.value.length >= props.limit) throw new Error(`最多上传 ${props.limit} 个文件，请先移除旧文件`)
     const data = new FormData(); data.append('file', file)
     const res = await uploadFile(data)

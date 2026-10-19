@@ -35,6 +35,15 @@ public class ExceptionHandel {
         return result;
     }
 
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    // Preserve explicit HTTP statuses from resource lookup and validation failures.
+    @SuppressWarnings("unused")
+    public org.springframework.http.ResponseEntity<Map<String, Object>> handleStatusException(
+            org.springframework.web.server.ResponseStatusException exception) {
+        return org.springframework.http.ResponseEntity.status(exception.getStatus())
+                .body(Map.of("code", exception.getStatus().value(), "msg", exception.getReason() == null ? "请求失败" : exception.getReason()));
+    }
+
     @ExceptionHandler(RuntimeException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Map<String, Object> handleRuntimeException(RuntimeException exception) {

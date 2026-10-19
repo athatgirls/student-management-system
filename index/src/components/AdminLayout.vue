@@ -39,6 +39,7 @@
             <el-menu-item index="/admin/students/list">学生列表</el-menu-item>
             <el-menu-item index="/admin/students/add">添加学生</el-menu-item>
             <el-menu-item index="/admin/students/grades/import">成绩导入</el-menu-item>
+            <el-menu-item index="/admin/students/overview">学生全量信息</el-menu-item>
           </el-sub-menu>
           
           <el-sub-menu index="/admin/alumni">
@@ -182,6 +183,7 @@
               管理员管理
             </el-menu-item>
             <el-menu-item index="/admin/profile">个人信息</el-menu-item>
+            <el-menu-item index="/admin/templates">模板管理</el-menu-item>
           </el-sub-menu>
         </el-menu>
       </el-aside>

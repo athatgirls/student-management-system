@@ -16,6 +16,10 @@ const success = (data = null, msg = '预览数据加载成功') => ({
   data
 })
 
+const previewTemplates = []
+const previewTemplateFiles = new Map()
+const previewAppointments = []
+
 const defaultPreviewGrades = ['2024级', '2025级', '2026级']
 const grades = [...defaultPreviewGrades]
 
@@ -545,6 +549,45 @@ function partyResponse(path) {
 
 export function createPreviewResponse(config = {}) {
   const path = normalizeUrl(config)
+  if (path === '/templates/list' || path === '/templates/admin/list') return success(previewTemplates)
+  if (path === '/templates/admin/upload') {
+    const data = config.data
+    const file = data.get('file')
+    const template = { id: `template-${Date.now()}`, title: data.get('title'), description: data.get('description'), originalName: file.name, size: file.size, createTime: new Date().toISOString() }
+    previewTemplates.unshift(template); previewTemplateFiles.set(template.id, file)
+    return success(template)
+  }
+  const deleteTemplate = path.match(/^\/templates\/admin\/([^/]+)\/delete$/)
+  if (deleteTemplate) {
+    const index = previewTemplates.findIndex(row => row.id === deleteTemplate[1])
+    if (index >= 0) previewTemplates.splice(index, 1)
+    previewTemplateFiles.delete(deleteTemplate[1])
+    return success(null)
+  }
+  if (path === '/student-overview') {
+    const params = config.params || {}
+    const admin = (localStorage.getItem('token') || '').includes('admin')
+    const matches = (admin ? students : [students.find(row => row.studentId === previewStudent.studentId) || students[0]]).filter(row =>
+      (!params.keyword || `${row.name} ${row.studentId}`.includes(params.keyword)) && (!params.grade || row.grade === params.grade) && (!params.major || row.major === params.major))
+    const first = Number(params.page || 1) - 1
+    return success({ total: matches.length, students: matches.slice(first * 10, (first + 1) * 10).map(student => {
+      const own = rows => rows.filter(row => [student.id, student.studentId].includes(row.studentId) || row.userId === student.id)
+      return { ...student, grades: own(getPreviewGradeRecords()).map(row => ({ ...row, course: row.course || row.courseName })), papers: own(papers), competitions: own(competitions), patents: own(patents), projects: own(projects), academic: own(academicEvents), daily: own(activityItems), volunteer: own(volunteerServices), honors: own(honors), appointments: own(previewAppointments) }
+    }) })
+  }
+  if (path === '/appointments/create') {
+    const record = { ...parseBody(config.data), id: `appointment-${Date.now()}`, studentId: previewStudent.studentId, studentName: previewStudent.name }
+    previewAppointments.push(record)
+    return success(record)
+  }
+  const appointmentMatch = path.match(/^\/appointments\/([^/]+)\/(update|delete)$/)
+  if (appointmentMatch) {
+    const index = previewAppointments.findIndex(row => row.id === appointmentMatch[1])
+    if (index < 0) return { code: 404, msg: '任职记录不存在' }
+    if (appointmentMatch[2] === 'delete') previewAppointments.splice(index, 1)
+    else previewAppointments[index] = { ...previewAppointments[index], ...parseBody(config.data) }
+    return success(null)
+  }
   const blob = maybeBlob(config)
   if (blob) return blob
 
@@ -729,6 +772,12 @@ export function createPreviewResponse(config = {}) {
 }
 
 export async function previewAdapter(config) {
+  const templateDownload = normalizeUrl(config).match(/^\/templates\/([^/]+)\/download$/)
+  if (templateDownload) {
+    const data = previewTemplateFiles.get(templateDownload[1])
+    if (!data) throw new Error('预览模板不存在')
+    return { data, status: 200, statusText: 'OK', headers: {}, config, request: null }
+  }
   if (normalizeUrl(config) === '/grade/template') {
     const { default: writeExcel } = await import('write-excel-file/browser')
     const rows = [

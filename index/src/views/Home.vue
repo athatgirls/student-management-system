@@ -13,6 +13,8 @@
       </div>
     </el-card>
 
+    <TemplateDownloads style="margin-bottom: 20px" />
+
     <!-- 个人统计卡片 -->
     <el-row :gutter="20">
       <el-col :xs="12" :sm="12" :md="6" :lg="6">
@@ -292,6 +294,7 @@
             </div>
           </template>
           <div class="quick-actions">
+            <el-button type="primary" @click="router.push('/student-overview')" class="quick-action-btn">状况一览表</el-button>
             <el-button type="primary" @click="goToInternship" class="quick-action-btn">
               <el-icon><Briefcase /></el-icon>
               <span class="btn-text">申请实习</span>
@@ -337,6 +340,7 @@ import { getPersonalStats } from '@/api/home'
 import { getActiveDailyTasks, getMyTaskCompletion } from '@/api/daily'
 import { getProfile, getRecentActivities } from '@/api/student'
 import { getMyLeaveRequests } from '@/api/leave'
+import TemplateDownloads from '@/components/TemplateDownloads.vue'
 
 const store = useStore()
 const router = useRouter()

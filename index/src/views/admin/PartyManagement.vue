@@ -104,6 +104,7 @@
             <div class="card-header">
               <span>思想汇报管理</span>
               <div class="header-actions">
+                <el-button type="success" :loading="exporting" :disabled="reportLoading" @click="exportActivities('report')">导出当前列表</el-button>
                 <el-input
                   v-model="reportSearchKeyword"
                   placeholder="搜索标题或学号"
@@ -172,6 +173,7 @@
             <div class="card-header">
               <span>微党课管理</span>
               <div class="header-actions">
+                <el-button type="success" :loading="exporting" :disabled="courseLoading" @click="exportActivities('course')">导出当前列表</el-button>
                 <el-input
                   v-model="courseSearchKeyword"
                   placeholder="搜索标题或学号"
@@ -239,6 +241,7 @@
             <div class="card-header">
               <span>{{ isVolunteerPage ? '志愿活动' : '志愿活动管理' }}</span>
               <div class="header-actions">
+                <el-button type="success" :loading="exporting" :disabled="serviceLoading" @click="exportActivities('service')">导出当前列表</el-button>
                 <el-input
                   v-model="serviceSearchKeyword"
                   placeholder="搜索服务名称或学号"
@@ -485,7 +488,7 @@ import {
   partyCourseApi,
   volunteerServiceApi
 } from '@/api/party'
-import { readExcelObjects } from '@/utils/excel'
+import { readExcelObjects, downloadExcel } from '@/utils/excel'
 import { getFileUrl } from '@/utils/imageUrl'
 import request from '@/api/request'
 
@@ -533,6 +536,25 @@ const applicationList = ref([])
 const reportList = ref([])
 const courseList = ref([])
 const serviceList = ref([])
+const exporting = ref(false)
+const exportActivities = async type => {
+  exporting.value = true
+  try {
+    // Refresh first so the export includes the current search text and status filter.
+    const configs = {
+      report: { load: loadReports, rows: reportList, name: '思想汇报', fields: ['studentId', 'studentName', 'title', 'reportType', 'reportDate', 'auditStatus', 'createTime'] },
+      course: { load: loadCourses, rows: courseList, name: '微党课', fields: ['studentId', 'studentName', 'title', 'courseDate', 'auditStatus', 'createTime'] },
+      service: { load: loadServices, rows: serviceList, name: '志愿活动', fields: ['studentId', 'studentName', 'serviceName', 'serviceType', 'serviceHours', 'serviceDate', 'auditStatus', 'createTime'] }
+    }
+    const config = configs[type]
+    if (!await config.load()) return
+    if (!config.rows.value.length) return ElMessage.warning('当前筛选结果没有可导出的记录')
+    const rows = [config.fields.map(getFieldLabel), ...config.rows.value.map(row => config.fields.map(key => key === 'createTime' ? formatDateTime(row[key]) : row[key] ?? ''))]
+    await downloadExcel(rows, config.name, `${config.name}_${new Date().toISOString().slice(0, 10)}.xlsx`)
+    ElMessage.success(`已导出 ${config.rows.value.length} 条记录`)
+  } catch (e) { ElMessage.error('导出失败，请重试') }
+  finally { exporting.value = false }
+}
 
 // 加载状态
 const applicationLoading = ref(false)
@@ -656,6 +678,7 @@ const loadReports = async () => {
     }
     
     reportList.value = data
+    return true
   } catch (error) {
     console.error('加载思想汇报失败:', error)
     ElMessage.error('加载思想汇报失败')
@@ -683,6 +706,7 @@ const loadCourses = async () => {
     }
     
     courseList.value = data
+    return true
   } catch (error) {
     console.error('加载微党课失败:', error)
     ElMessage.error('加载微党课失败')
@@ -711,6 +735,7 @@ const loadServices = async () => {
     }
     
     serviceList.value = data
+    return true
   } catch (error) {
     console.error('加载志愿活动失败:', error)
     ElMessage.error('加载志愿活动失败')

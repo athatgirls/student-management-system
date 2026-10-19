@@ -20,6 +20,12 @@ const routes = [
     meta: { requiresAuth: true, userType: 'student' },
     children: [
       {
+        path: '/student-overview',
+        name: 'studentOverview',
+        component: () => import('../views/StudentOverview.vue'),
+        meta: { title: '状况一览表' }
+      },
+      {
         path: '/home',
         name: 'home',
         component: () => import('../views/Home.vue'),
@@ -180,6 +186,12 @@ const routes = [
         meta: { title: '管理员仪表板' }
       },
       // ==================== 学生管理 ====================
+      {
+        path: '/admin/students/overview',
+        name: 'adminStudentOverview',
+        component: () => import('../views/StudentOverview.vue'),
+        meta: { title: '学生全量信息' }
+      },
       {
         path: '/admin/students/list',
         name: 'adminStudentsList',
@@ -346,6 +358,12 @@ const routes = [
       },
       
       // ==================== 管理员管理 ====================
+      {
+        path: '/admin/templates',
+        name: 'adminTemplates',
+        component: () => import('../views/admin/TemplateManagement.vue'),
+        meta: { title: '模板管理' }
+      },
       {
         path: '/admin/admins',
         name: 'adminAdmins',

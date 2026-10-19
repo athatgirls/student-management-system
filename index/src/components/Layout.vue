@@ -39,6 +39,7 @@
               </template>
               <el-menu-item index="/profile">个人资料</el-menu-item>
               <el-menu-item index="/profile/study">学习记录</el-menu-item>
+              <el-menu-item index="/student-overview">状况一览表 / 任职记录</el-menu-item>
             </el-sub-menu>
             <el-sub-menu index="/daily">
               <template #title>
