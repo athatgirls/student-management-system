@@ -15,8 +15,8 @@ public class StudyRecordModel {
     private String course;      // 课程名称
     private Integer score;      // 成绩
     private Double credit;      // 学分
+    private String courseType;  // degree: 学位课；non_degree: 非学位课
     private String status;      // 状态 (已通过/未通过)
     private String source;      // student: 学生自填；空值为历史教务导入
     private String attachments; // JSON 文件列表
 }
-

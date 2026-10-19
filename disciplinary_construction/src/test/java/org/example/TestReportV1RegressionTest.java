@@ -81,13 +81,22 @@ class TestReportV1RegressionTest {
         c.setDescription("描述文字"); assertThrows(IllegalArgumentException.class, () -> SubmissionValidation.validate(c));
     }
     private StudyRecordModel study() {
-        StudyRecordModel r = new StudyRecordModel(); r.setCourse("课程"); r.setSemester("2026秋"); r.setScore(85); r.setCredit(2.0); r.setAttachments(FILES); return r;
+        StudyRecordModel r = new StudyRecordModel(); r.setCourse("课程"); r.setSemester("2026秋"); r.setScore(85); r.setCredit(2.0); r.setCourseType("degree"); r.setAttachments(FILES); return r;
     }
     @Test void studentStudyRecordUsesAuthenticatedOwnerAndCannotForgeOfficialStatus() {
         StudyRecordRepository repository = mock(StudyRecordRepository.class); when(repository.save(any())).thenAnswer(i -> i.getArgument(0));
         StudyRecordController c = new StudyRecordController(repository, access()); StudyRecordModel r = study();
         r.setStudentDbId("victim"); r.setStudentId("victim"); r.setSource("official"); r.setStatus("已通过");
         StudyRecordModel saved = c.save(r,user); assertEquals("student-a", saved.getStudentDbId()); assertEquals("2026001", saved.getStudentId()); assertEquals("student",saved.getSource()); assertEquals("学生自填",saved.getStatus());
+    }
+    @Test void studyRecordRequiresCourseTypeAndPositiveCredits() {
+        StudyRecordRepository repository = mock(StudyRecordRepository.class);
+        StudyRecordController controller = new StudyRecordController(repository, access());
+        StudyRecordModel record = study(); record.setCourseType(null);
+        assertThrows(ResponseStatusException.class, () -> controller.save(record, user));
+        record.setCourseType("degree"); record.setCredit(0.0);
+        assertThrows(ResponseStatusException.class, () -> controller.save(record, user));
+        verify(repository, never()).save(any());
     }
     @Test void cannotEditOtherStudentsOrImportedGrades() {
         StudyRecordRepository repository = mock(StudyRecordRepository.class); StudyRecordController c = new StudyRecordController(repository, access());

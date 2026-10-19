@@ -43,6 +43,19 @@ export function getGradeRecords(params) {
   })
 }
 
+// 管理员分页查询成绩
+export function getManagedGradeRecords(params) {
+  return request.get('/grade/manage/records', { params })
+}
+
+export function updateManagedGradeRecord(id, data) {
+  return request.post(`/grade/manage/records/${id}`, data)
+}
+
+export function setGradeCourseType(id, courseType) {
+  return request.post(`/grade/records/${id}/course-type`, { courseType })
+}
+
 // 删除年级
 export function deleteGrade(id) {
   return request({

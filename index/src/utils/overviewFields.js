@@ -11,7 +11,7 @@ export const overviewSections = [
   { key: 'appointments', label: '任职', title: 'position', columns: ['position', 'organization', 'startDate', 'endDate', 'description'] }
 ]
 export const fieldLabels = {
-  semester: '学期', course: '课程名称', score: '成绩', credit: '学分', status: '状态', source: '来源',
+  semester: '学期', course: '课程名称', score: '成绩', credit: '学分', courseType: '课程类别', status: '状态', source: '来源',
   paperTitle: '论文题目', journalName: '会议/期刊名称', journalLevel: '会议/期刊级别', authorRank: '作者排名', coAuthors: '合作作者', doi: 'DOI号',
   publicationStatus: '发表状态', publicationDate: '见刊时间', acceptanceDate: '接收时间',
   competitionName: '竞赛名称', competitionLevel: '竞赛级别', awardLevel: '获奖等级', ranking: '排名', awardDate: '获奖日期', teamMembers: '团队成员', instructorName: '指导老师',
@@ -28,5 +28,5 @@ export const displayValue = (key, value) => {
   if (['createTime', 'updateTime', 'auditTime', 'submissionTime', 'deadline'].includes(key)) return new Date(value).toLocaleString('zh-CN')
   if (Array.isArray(value)) return value.join('、')
   if (typeof value === 'object') return JSON.stringify(value)
-  return ({ pending: '待审核', approved: '已通过', rejected: '已驳回', passed: '已通过', failed: '未通过', student: '学生填写', official: '教务导入', completed: '已完成', submitted: '已提交', task: '日常任务', normal: '普通任务', registration: '报名活动' })[value] || value
+  return ({ degree: '学位课', non_degree: '非学位课', pending: '待审核', approved: '已通过', rejected: '已驳回', passed: '已通过', failed: '未通过', student: '学生填写', official: '教务导入', completed: '已完成', submitted: '已提交', task: '日常任务', normal: '普通任务', registration: '报名活动' })[value] || value
 }

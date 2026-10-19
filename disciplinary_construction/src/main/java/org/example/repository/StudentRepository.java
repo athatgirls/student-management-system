@@ -4,6 +4,7 @@ import org.example.model.StudentModel;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
+import java.util.Collection;
 
 public interface StudentRepository extends MongoRepository<StudentModel, String> {
     List<StudentModel> findByName(String name);
@@ -21,6 +22,7 @@ public interface StudentRepository extends MongoRepository<StudentModel, String>
     long countByMajor(String major);
 
     List<StudentModel> findByGrade(String grade);
+    List<StudentModel> findByGradeIn(Collection<String> grades);
 
     List<StudentModel> findByStatus(String status);
 

@@ -10,5 +10,6 @@ public class StudyRecordImportItem {
     private String courseName;
     private Object score;
     private Object credit;
+    private String courseType;
     private String status;
 }

@@ -201,6 +201,7 @@
         </el-table-column>
         <el-table-column prop="score" label="成绩" width="100" />
         <el-table-column prop="credit" label="学分" width="100" />
+        <el-table-column label="课程类别" width="110"><template #default="{ row }">{{ courseTypeLabels[row.courseType] || '未分类' }}</template></el-table-column>
         <el-table-column label="材料"><template #default="{ row }"><RecordAttachments :model-value="row.attachments || ''" /></template></el-table-column>
         <el-table-column label="操作" width="160"><template #default="{ row }">
           <el-button v-if="row.source === 'student'" link type="primary" @click="editStudy(row)">编辑</el-button>
@@ -222,6 +223,11 @@
         <el-form-item label="课程名称" required><el-input v-model="studyForm.course" /></el-form-item>
         <el-form-item label="成绩" required><el-input-number v-model="studyForm.score" :min="0" :max="100" /></el-form-item>
         <el-form-item label="学分" required><el-input-number v-model="studyForm.credit" :min="0" :precision="1" /></el-form-item>
+        <el-form-item label="课程类别" required>
+          <el-select v-model="studyForm.courseType" placeholder="请选择课程类别" style="width: 100%">
+            <el-option label="学位课" value="degree" /><el-option label="非学位课" value="non_degree" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="证明材料" required><RecordAttachments v-model="studyForm.attachments" editable /></el-form-item>
       </el-form>
       <template #footer><el-button @click="studyDialog = false">取消</el-button><el-button type="primary" :loading="studySaving" @click="saveStudy">保存</el-button></template>
@@ -438,14 +444,16 @@ const studyRecords = ref([])
 const studyDialog = ref(false)
 const studySaving = ref(false)
 const studyForm = reactive({})
+const courseTypeLabels = { degree: '学位课', non_degree: '非学位课' }
 const editStudy = row => {
   Object.keys(studyForm).forEach(k => delete studyForm[k])
-  Object.assign(studyForm, row || { semester: '', course: '', score: 0, credit: 0, attachments: '' })
+  Object.assign(studyForm, row || { semester: '', course: '', score: 0, credit: 0, courseType: '', attachments: '' })
   studyDialog.value = true
 }
 const saveStudy = async () => {
-  if (!studyForm.semester?.trim() || !studyForm.course?.trim() || !JSON.parse(studyForm.attachments || '[]').length) {
-    ElMessage.warning('请填写学期、课程名称并上传证明材料'); return
+  if (!studyForm.semester?.trim() || !studyForm.course?.trim() || !courseTypeLabels[studyForm.courseType] ||
+      !(Number(studyForm.credit) > 0) || !JSON.parse(studyForm.attachments || '[]').length) {
+    ElMessage.warning('请填写学期、课程名称、课程类别、正学分并上传证明材料'); return
   }
   studySaving.value = true
   try {

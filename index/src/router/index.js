@@ -211,6 +211,12 @@ const routes = [
         meta: { title: '成绩导入' }
       },
       {
+        path: '/admin/grades',
+        name: 'adminGradeManagement',
+        component: () => import('../views/admin/GradeManagement.vue'),
+        meta: { title: '成绩管理' }
+      },
+      {
         path: '/admin/students',
         name: 'adminStudents',
         component: () => import('../views/admin/StudentsList.vue'),

@@ -1,7 +1,12 @@
 package org.example;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.controller.GradeController;
 import org.example.model.GradeModel;
+import org.example.model.StudyRecordModel;
+import org.example.model.StudentModel;
+import org.example.repository.StudyRecordRepository;
+import org.example.repository.StudentRepository;
 import org.example.service.GradeService;
 import org.example.service.StudentService;
 import org.junit.jupiter.api.Test;
@@ -10,6 +15,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -17,10 +23,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.springframework.web.server.ResponseStatusException;
+import java.util.Optional;
 
 @ExtendWith(MockitoExtension.class)
 class GradeControllerTest {
@@ -30,6 +39,12 @@ class GradeControllerTest {
 
     @Mock
     private StudentService studentService;
+
+    @Mock
+    private StudyRecordRepository studyRecordRepository;
+
+    @Mock
+    private StudentRepository studentRepository;
 
     @InjectMocks
     private GradeController gradeController;
@@ -76,6 +91,39 @@ class GradeControllerTest {
 
         assertEquals(200, response.getBody().get("code"));
         verify(gradeService).deleteGrade("g1");
+    }
+
+    @Test
+    void onlyAdminCanClassifyExistingRecordWithoutChangingTheGrade() {
+        StudyRecordModel record = new StudyRecordModel();
+        record.setId("record-1"); record.setScore(85); record.setCredit(2.0);
+        when(studyRecordRepository.findById("record-1")).thenReturn(Optional.of(record));
+
+        assertThrows(ResponseStatusException.class, () -> gradeController.setCourseType("record-1",
+                Map.of("courseType", "degree"), Map.of("userType", "student")));
+        assertThrows(ResponseStatusException.class, () -> gradeController.setCourseType("record-1",
+                Map.of("courseType", "unknown"), Map.of("userType", "admin")));
+        assertEquals(200, gradeController.setCourseType("record-1", Map.of("courseType", "degree"),
+                Map.of("userType", "admin")).getBody().get("code"));
+        assertEquals("degree", record.getCourseType());
+        assertEquals(85, record.getScore());
+        verify(studyRecordRepository).save(record);
+    }
+
+    @Test
+    void reimportWithoutCourseTypeKeepsExistingClassification() {
+        StudentModel student = new StudentModel(); student.setId("student-db-id");
+        StudyRecordModel old = new StudyRecordModel(); old.setCourseType("degree");
+        when(studentRepository.findByStudentId("2026001")).thenReturn(student);
+        when(studyRecordRepository.findByStudentIdAndSemesterAndCourse("2026001", "2026秋", "数学"))
+                .thenReturn(Optional.of(old));
+        ReflectionTestUtils.setField(gradeController, "objectMapper", new ObjectMapper());
+
+        String json = "[{\"studentId\":\"2026001\",\"semester\":\"2026秋\",\"courseName\":\"数学\",\"score\":90,\"credit\":2}]";
+        ResponseEntity<Map<String, Object>> result = gradeController.importGrades(json, null, Map.of("userType", "admin"));
+        assertEquals(200, result.getBody().get("code"));
+        assertEquals("degree", old.getCourseType());
+        verify(studyRecordRepository).save(old);
     }
 
     private Map<String, Object> body(String gradeName) {
