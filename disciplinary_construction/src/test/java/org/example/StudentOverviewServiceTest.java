@@ -58,4 +58,40 @@ class StudentOverviewServiceTest {
         assertEquals("讲座内容", ((Map<?, ?>) activity.get("submissionFields")).get("学习心得"));
         assertTrue(((List<?>) summary.get("daily")).isEmpty());
     }
+
+    @Test void attendanceListDistinguishesRegisteredFromAttendedEvenForExistingSubmissions() {
+        StudentRepository students = mock(StudentRepository.class);
+        StudentModel own = new StudentModel(); own.setId("db-a"); own.setStudentId("1001");
+        when(students.findById("db-a")).thenReturn(Optional.of(own));
+        MongoTemplate mongo = mock(MongoTemplate.class);
+        org.example.model.DailyTaskSubmissionModel submission = new org.example.model.DailyTaskSubmissionModel();
+        submission.setId("submission-a"); submission.setTaskId("task-a"); submission.setStudentId("db-a");
+        submission.setStatus("completed"); // Registration alone already uses this status.
+        submission.setContent("{\"报名理由\":\"参加讲座\"}");
+        org.example.model.DailyTaskModel task = new org.example.model.DailyTaskModel();
+        task.setId("task-a"); task.setTitle("讲座"); task.setTaskCategory("registration"); task.setActivityCategory("academic");
+        org.example.model.ActivityModel activity = new org.example.model.ActivityModel();
+        activity.setId("activity-a"); activity.setTaskId("task-a"); activity.setParticipantStudentIds(List.of("db-a"));
+        when(mongo.find(any(Query.class), any(Class.class))).thenAnswer(invocation -> {
+            Class<?> type = invocation.getArgument(1);
+            if (type == org.example.model.DailyTaskSubmissionModel.class) return List.of(submission);
+            if (type == org.example.model.DailyTaskModel.class) return List.of(task);
+            if (type == org.example.model.ActivityModel.class) {
+                String query = ((Query) invocation.getArgument(0)).getQueryObject().toJson();
+                assertTrue(query.contains("participantStudentIds"));
+                assertTrue(query.contains("db-a"));
+                return activity.getParticipantStudentIds().contains("db-a") ? List.of(activity) : Collections.emptyList();
+            }
+            return Collections.emptyList();
+        });
+        StudentOverviewService service = new StudentOverviewService(mongo, students,
+                new CurrentUserAccessService(students), new ObjectMapper());
+        Map<String, Object> user = Map.of("userId", "db-a", "userType", "student");
+        Map<?, ?> attended = (Map<?, ?>) ((List<?>) service.overview(null, null, null, null, 1, 10, user).get("students")).get(0);
+        assertEquals("已完成", ((Map<?, ?>) ((List<?>) attended.get("academic")).get(0)).get("status"));
+
+        activity.setParticipantStudentIds(Collections.emptyList());
+        Map<?, ?> registered = (Map<?, ?>) ((List<?>) service.overview(null, null, null, null, 1, 10, user).get("students")).get(0);
+        assertEquals("已报名", ((Map<?, ?>) ((List<?>) registered.get("academic")).get(0)).get("status"));
+    }
 }

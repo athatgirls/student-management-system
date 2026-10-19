@@ -227,6 +227,13 @@ public class GradeController {
                     continue;
                 }
 
+                Double credit = parseDouble(item.getCredit());
+                if (credit == null || !Double.isFinite(credit) || credit <= 0) {
+                    skippedCount++;
+                    invalidRows.add(String.format("studentId[%s] course[%s] requires positive finite credit", studentId, courseName));
+                    continue;
+                }
+
                 StudentModel student = studentRepository.findByStudentId(studentId);
                 if (student == null) {
                     skippedCount++;
@@ -244,7 +251,7 @@ public class GradeController {
                 studyRecord.setCourse(courseName);
                 studyRecord.setScore(score);
                 studyRecord.setSource("official");
-                studyRecord.setCredit(parseDouble(item.getCredit()));
+                studyRecord.setCredit(credit);
                 studyRecord.setStatus(resolveStatus(score, trim(item.getStatus())));
 
                 studyRecordRepository.save(studyRecord);

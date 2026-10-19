@@ -99,6 +99,13 @@ public class StudentOverviewService {
         Map<String, DailyTaskModel> tasks = mongo.find(Query.query(Criteria.where("_id").in(submissions.stream()
                 .map(DailyTaskSubmissionModel::getTaskId).collect(Collectors.toSet()))), DailyTaskModel.class).stream()
                 .collect(Collectors.toMap(DailyTaskModel::getId, task -> task));
+        Set<String> registrationTaskIds = tasks.values().stream()
+                .filter(task -> "registration".equals(task.getTaskCategory()))
+                .map(DailyTaskModel::getId).collect(Collectors.toSet());
+        Set<String> attendedTaskIds = registrationTaskIds.isEmpty() ? Collections.emptySet() :
+                mongo.find(Query.query(Criteria.where("taskId").in(registrationTaskIds)
+                        .and("participantStudentIds").is(student.getId())), ActivityModel.class).stream()
+                        .map(ActivityModel::getTaskId).collect(Collectors.toSet());
         for (DailyTaskSubmissionModel submission : submissions) {
             DailyTaskModel task = tasks.get(submission.getTaskId());
             if (task == null || "volunteer".equals(task.getActivityCategory())) continue;
@@ -111,7 +118,8 @@ public class StudentOverviewService {
             entry.put("description", task.getDescription()); entry.put("source", "task");
             entry.put("studentId", student.getStudentId()); entry.put("studentName", student.getName());
             entry.put("taskCategory", task.getTaskCategory());
-            entry.put("status", "registration".equals(task.getTaskCategory()) ? "已报名" : submission.getStatus());
+            entry.put("status", "registration".equals(task.getTaskCategory())
+                    ? (attendedTaskIds.contains(task.getId()) ? "已完成" : "已报名") : submission.getStatus());
             entry.put("submissionTime", org.example.util.UtcTimestamps.toWire(submission.getSubmissionTime()));
             entry.put("deadline", task.getDeadline() == null ? null : task.getDeadline().toString());
             entry.put("content", submission.getContent());
@@ -121,7 +129,6 @@ public class StudentOverviewService {
                 if (content != null && content.isObject()) {
                     Map<String, Object> fields = mapper.convertValue(content, new TypeReference<Map<String, Object>>() { });
                     entry.put("submissionFields", fields);
-                    if (fields.containsKey("activityId")) entry.put("status", "已完成");
                 }
             } catch (java.io.IOException | IllegalArgumentException ignored) { /* Legacy free text remains in content. */ }
             activities.add(entry);

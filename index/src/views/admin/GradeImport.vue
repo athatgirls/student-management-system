@@ -170,8 +170,10 @@ const normalizeRow = (row, index) => {
 
   normalized.status = inferStatus(normalized.score, pickValue(row, headerMap.status))
   const missing = requiredFields.filter(field => normalized[field] === '' || normalized[field] === undefined)
-  normalized.valid = missing.length === 0
-  normalized.error = missing.length ? `缺少：${missing.map(fieldNameMap).join('、')}` : ''
+  const credit = Number(normalized.credit)
+  const invalidCredit = normalized.credit === '' || !Number.isFinite(credit) || credit <= 0
+  normalized.valid = missing.length === 0 && !invalidCredit
+  normalized.error = missing.length ? `缺少：${missing.map(fieldNameMap).join('、')}` : invalidCredit ? '学分必须是大于 0 的有效数字' : ''
   return normalized
 }
 
