@@ -262,6 +262,9 @@ onUnmounted(() => {
 }
 
 .sidebar {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
   height: 100vh;
   overflow-y: auto;
   color: #bfcbd9;
