@@ -45,4 +45,26 @@ public class TaskAttachmentAccessService {
                 .anyMatch(task -> Objects.equals(file.getOwnerId(), task.getCreatorId())
                         && audience.matches(task, access.requireCurrentStudent(user)));
     }
+
+    /** Submission proofs remain private to the uploader and administrators. */
+    public void validateSubmission(org.example.model.DailyTaskSubmissionModel submission) {
+        String attachments = submission.getAttachments();
+        if (attachments == null || attachments.isBlank()) return;
+        try {
+            com.fasterxml.jackson.databind.JsonNode nodes = new com.fasterxml.jackson.databind.ObjectMapper().readTree(attachments);
+            if (!nodes.isArray() || nodes.size() > 5) throw new IllegalArgumentException("最多提交 5 个材料文件");
+            String prefix = contextPath + "/uploads/";
+            java.util.Set<String> seen = new java.util.HashSet<>();
+            for (com.fasterxml.jackson.databind.JsonNode node : nodes) {
+                String url = node.path("url").asText("");
+                if (!url.startsWith(prefix) || !url.substring(prefix.length()).matches("[a-zA-Z0-9_-]+\\.(jpg|jpeg|png|pdf|doc|docx)") || !seen.add(url))
+                    throw new IllegalArgumentException("请上传有效的任务材料");
+                UploadedFileModel file = files.findById(url.substring(prefix.length())).orElse(null);
+                if (file == null || submission.getStudentId() == null || !submission.getStudentId().equals(file.getOwnerId()))
+                    throw new IllegalArgumentException("只能提交本人上传的材料");
+            }
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalArgumentException("任务材料格式错误");
+        }
+    }
 }

@@ -33,6 +33,10 @@ public class LeaveRequestController {
             result.put("code", 200);
             result.put("data", created);
             result.put("msg", "请假申请提交成功");
+        } catch (IllegalArgumentException e) {
+            result.put("code", 400);
+            result.put("data", null);
+            result.put("msg", e.getMessage());
         } catch (Exception e) {
             result.put("code", 500);
             result.put("data", null);

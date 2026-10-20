@@ -71,12 +71,10 @@
               <el-table-column prop="competitionLevel" label="竞赛级别" width="120" />
               <el-table-column prop="awardLevel" label="获奖等级" width="120" />
               <el-table-column prop="ranking" label="排名" width="80" />
-              <el-table-column prop="awardDate" label="获奖时间" width="120" />
+              <el-table-column prop="awardDate" label="获奖时间" width="120"><template #default="{ row }">{{ formatDate(row.awardDate) || '-' }}</template></el-table-column>
               <el-table-column prop="auditStatus" label="审核状态" width="100">
                 <template #default="scope">
-                  <el-tag :type="getStatusType(scope.row.auditStatus)">
-                    {{ scope.row.auditStatus || '待审核' }}
-                  </el-tag>
+                  <AuditStatusTag :status="scope.row.auditStatus" />
                 </template>
               </el-table-column>
               <el-table-column label="操作" width="250">
@@ -107,9 +105,7 @@
               <el-table-column prop="publicationStatus" label="发表状态" width="100" />
               <el-table-column prop="auditStatus" label="审核状态" width="100">
                 <template #default="scope">
-                  <el-tag :type="getStatusType(scope.row.auditStatus)">
-                    {{ scope.row.auditStatus || '待审核' }}
-                  </el-tag>
+                  <AuditStatusTag :status="scope.row.auditStatus" />
                 </template>
               </el-table-column>
               <el-table-column label="操作" width="250">
@@ -140,9 +136,7 @@
               <el-table-column prop="patentStatus" label="专利状态" width="100" />
               <el-table-column prop="auditStatus" label="审核状态" width="100">
                 <template #default="scope">
-                  <el-tag :type="getStatusType(scope.row.auditStatus)">
-                    {{ scope.row.auditStatus || '待审核' }}
-                  </el-tag>
+                  <AuditStatusTag :status="scope.row.auditStatus" />
                 </template>
               </el-table-column>
               <el-table-column label="操作" width="250">
@@ -169,13 +163,11 @@
               <el-table-column prop="projectName" label="项目名称" />
               <el-table-column prop="projectLevel" label="项目级别" width="120" />
               <el-table-column prop="ranking" label="排名" width="80" />
-              <el-table-column prop="startDate" label="开始时间" width="120" />
-              <el-table-column prop="endDate" label="结束时间" width="120" />
+              <el-table-column prop="startDate" label="开始时间" width="120"><template #default="{ row }">{{ formatDate(row.startDate) || '-' }}</template></el-table-column>
+              <el-table-column prop="endDate" label="结束时间" width="120"><template #default="{ row }">{{ formatDate(row.endDate) || '-' }}</template></el-table-column>
               <el-table-column prop="auditStatus" label="审核状态" width="100">
                 <template #default="scope">
-                  <el-tag :type="getStatusType(scope.row.auditStatus)">
-                    {{ scope.row.auditStatus || '待审核' }}
-                  </el-tag>
+                  <AuditStatusTag :status="scope.row.auditStatus" />
                 </template>
               </el-table-column>
               <el-table-column label="操作" width="250">
@@ -583,7 +575,7 @@
             <el-descriptions-item label="竞赛级别">{{ currentDetail.competitionLevel }}</el-descriptions-item>
             <el-descriptions-item label="获奖等级">{{ currentDetail.awardLevel }}</el-descriptions-item>
             <el-descriptions-item label="排名">{{ currentDetail.ranking }}</el-descriptions-item>
-            <el-descriptions-item label="获奖时间">{{ currentDetail.awardDate }}</el-descriptions-item>
+            <el-descriptions-item label="获奖时间">{{ formatDate(currentDetail.awardDate) || '-' }}</el-descriptions-item>
             <el-descriptions-item label="指导老师">{{ currentDetail.instructorName }}</el-descriptions-item>
             <el-descriptions-item label="团队成员" :span="2">{{ currentDetail.teamMembers }}</el-descriptions-item>
           </template>
@@ -595,8 +587,8 @@
             <el-descriptions-item label="会议/期刊级别">{{ currentDetail.journalLevel }}</el-descriptions-item>
             <el-descriptions-item label="作者排名">{{ currentDetail.authorRank }}</el-descriptions-item>
             <el-descriptions-item label="发表状态">{{ currentDetail.publicationStatus }}</el-descriptions-item>
-            <el-descriptions-item label="见刊时间" v-if="currentDetail.publicationDate">{{ currentDetail.publicationDate }}</el-descriptions-item>
-            <el-descriptions-item label="接收时间" v-if="currentDetail.acceptanceDate">{{ currentDetail.acceptanceDate }}</el-descriptions-item>
+            <el-descriptions-item label="见刊时间" v-if="currentDetail.publicationDate">{{ formatDate(currentDetail.publicationDate) || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="接收时间" v-if="currentDetail.acceptanceDate">{{ formatDate(currentDetail.acceptanceDate) || '-' }}</el-descriptions-item>
             <el-descriptions-item label="DOI号" v-if="currentDetail.doi">{{ currentDetail.doi }}</el-descriptions-item>
             <el-descriptions-item label="合作作者" :span="2">{{ currentDetail.coAuthors }}</el-descriptions-item>
           </template>
@@ -608,8 +600,8 @@
             <el-descriptions-item label="专利号">{{ currentDetail.patentNumber }}</el-descriptions-item>
             <el-descriptions-item label="发明人排名">{{ currentDetail.inventorRank }}</el-descriptions-item>
             <el-descriptions-item label="专利状态">{{ currentDetail.patentStatus }}</el-descriptions-item>
-            <el-descriptions-item label="授权时间" v-if="currentDetail.authorizationDate">{{ currentDetail.authorizationDate }}</el-descriptions-item>
-            <el-descriptions-item label="受理时间" v-if="currentDetail.applicationDate">{{ currentDetail.applicationDate }}</el-descriptions-item>
+            <el-descriptions-item label="授权时间" v-if="currentDetail.authorizationDate">{{ formatDate(currentDetail.authorizationDate) || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="受理时间" v-if="currentDetail.applicationDate">{{ formatDate(currentDetail.applicationDate) || '-' }}</el-descriptions-item>
             <el-descriptions-item label="合作发明人" :span="2">{{ currentDetail.coInventors }}</el-descriptions-item>
           </template>
 
@@ -618,17 +610,15 @@
             <el-descriptions-item label="项目名称" :span="2">{{ currentDetail.projectName }}</el-descriptions-item>
             <el-descriptions-item label="项目级别">{{ currentDetail.projectLevel }}</el-descriptions-item>
             <el-descriptions-item label="排名">{{ currentDetail.ranking }}</el-descriptions-item>
-            <el-descriptions-item label="开始时间">{{ currentDetail.startDate }}</el-descriptions-item>
-            <el-descriptions-item label="结束时间">{{ currentDetail.endDate }}</el-descriptions-item>
+            <el-descriptions-item label="开始时间">{{ formatDate(currentDetail.startDate) || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="结束时间">{{ formatDate(currentDetail.endDate) || '-' }}</el-descriptions-item>
             <el-descriptions-item label="指导老师">{{ currentDetail.instructorName }}</el-descriptions-item>
             <el-descriptions-item label="团队成员" :span="2">{{ currentDetail.teamMembers }}</el-descriptions-item>
           </template>
 
           <!-- 通用审核信息 -->
           <el-descriptions-item label="审核状态">
-            <el-tag :type="getStatusType(currentDetail.auditStatus)">
-              {{ currentDetail.auditStatus || '待审核' }}
-            </el-tag>
+            <AuditStatusTag :status="currentDetail.auditStatus" />
           </el-descriptions-item>
           <el-descriptions-item label="审核意见" v-if="currentDetail.auditComment">{{ currentDetail.auditComment }}</el-descriptions-item>
           <el-descriptions-item label="创建时间">{{ formatDateTime(currentDetail.createTime) }}</el-descriptions-item>
@@ -661,6 +651,8 @@
 </template>
 
 <script setup>
+import AuditStatusTag from '@/components/AuditStatusTag.vue'
+import { formatDate, formatDateTime } from '@/utils/dateTime'
 import { hasAttachments, orderedDates } from '@/utils/submissionValidation'
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -1093,10 +1085,6 @@ const viewDetail = (item, type) => {
 }
 
 // 格式化时间
-const formatDateTime = (dateTime) => {
-  if (!dateTime) return ''
-  return new Date(dateTime).toLocaleString()
-}
 
 // 解析附件字符串
 const parseAttachments = (attachments) => {
@@ -1117,14 +1105,6 @@ const mergeAttachments = (current, incoming) => {
 import { getFileUrl } from '@/utils/imageUrl'
 
 // 获取状态标签类型
-const getStatusType = (status) => {
-  const statusMap = {
-    '已通过': 'success',
-    '待审核': 'warning',
-    '已拒绝': 'danger'
-  }
-  return statusMap[status] || 'warning'
-}
 
 // 打开对话框方法
 const openCompetitionDialog = () => {

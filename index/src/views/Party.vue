@@ -42,11 +42,11 @@
               <el-descriptions-item label="姓名">{{ memberInfo.name || '-' }}</el-descriptions-item>
               <el-descriptions-item label="性别">{{ memberInfo.gender || '-' }}</el-descriptions-item>
               <el-descriptions-item label="民族">{{ memberInfo.nation || '-' }}</el-descriptions-item>
-              <el-descriptions-item label="出生日期">{{ memberInfo.birth || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="出生日期">{{ formatDate(memberInfo.birth) || '-' }}</el-descriptions-item>
               <el-descriptions-item label="籍贯">{{ memberInfo.nativePlace || '-' }}</el-descriptions-item>
               <el-descriptions-item label="所在班级">{{ memberInfo.className || '-' }}</el-descriptions-item>
               <el-descriptions-item label="所在支部">{{ memberInfo.branch || '-' }}</el-descriptions-item>
-              <el-descriptions-item label="入党时间">{{ memberInfo.joinDate || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="入党时间">{{ formatDate(memberInfo.joinDate) || '-' }}</el-descriptions-item>
               <el-descriptions-item label="是否转正">
                 <el-tag :type="memberInfo.isRegular === '是' ? 'success' : 'warning'">
                   {{ memberInfo.isRegular || '否' }}
@@ -56,9 +56,7 @@
               <el-descriptions-item label="党内职务">{{ memberInfo.position || '-' }}</el-descriptions-item>
               <el-descriptions-item label="奖惩情况" :span="2">{{ memberInfo.rewardsPunishments || '-' }}</el-descriptions-item>
               <el-descriptions-item label="审核状态" :span="2">
-                <el-tag :type="getAuditStatusType(memberInfo.auditStatus)">
-                  {{ memberInfo.auditStatus || '未审核' }}
-                </el-tag>
+                <AuditStatusTag :status="memberInfo.auditStatus" />
                 <span v-if="memberInfo.auditComment" class="audit-comment">（{{ memberInfo.auditComment }}）</span>
               </el-descriptions-item>
             </el-descriptions>
@@ -87,12 +85,10 @@
             <el-descriptions :column="2" border class="member-descriptions">
               <el-descriptions-item label="学号">{{ applicationInfo.studentId || '-' }}</el-descriptions-item>
               <el-descriptions-item label="姓名">{{ applicationInfo.name || '-' }}</el-descriptions-item>
-              <el-descriptions-item label="申请日期">{{ applicationInfo.applicationDate || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="申请日期">{{ formatDate(applicationInfo.applicationDate) || '-' }}</el-descriptions-item>
               <el-descriptions-item label="所属支部">{{ applicationInfo.branch || '-' }}</el-descriptions-item>
               <el-descriptions-item label="审核状态" :span="2">
-                <el-tag :type="getAuditStatusType(applicationInfo.auditStatus)">
-                  {{ applicationInfo.auditStatus || '待审核' }}
-                </el-tag>
+                <AuditStatusTag :status="applicationInfo.auditStatus" />
                 <span v-if="applicationInfo.auditComment" class="audit-comment">（{{ applicationInfo.auditComment }}）</span>
               </el-descriptions-item>
             </el-descriptions>
@@ -107,12 +103,10 @@
             >
               <el-table-column prop="materialType" label="材料类型" width="150" />
               <el-table-column prop="materialName" label="材料名称" min-width="200" />
-              <el-table-column prop="submitDate" label="提交日期" width="120" />
+              <el-table-column prop="submitDate" label="提交日期" width="120"><template #default="{ row }">{{ formatDate(row.submitDate) || '-' }}</template></el-table-column>
               <el-table-column prop="status" label="审核状态" width="100">
                 <template #default="scope">
-                  <el-tag :type="getAuditStatusType(scope.row.status)" size="small">
-                    {{ scope.row.status || '待审核' }}
-                  </el-tag>
+                  <AuditStatusTag :status="scope.row.status" />
                 </template>
               </el-table-column>
               <el-table-column prop="auditComment" label="审核意见" min-width="200" />
@@ -203,7 +197,7 @@
               <el-table :data="reportList" v-loading="reportListLoading" stripe>
                 <el-table-column prop="title" label="标题" min-width="150" />
                 <el-table-column prop="reportType" label="类型" width="100" />
-                <el-table-column prop="reportDate" label="日期" width="120" />
+                <el-table-column prop="reportDate" label="日期" width="120"><template #default="{ row }">{{ formatDate(row.reportDate) || '-' }}</template></el-table-column>
                 <el-table-column label="材料" width="90">
                   <template #default="scope">
                     <el-tag v-if="scope.row.materials && scope.row.materials.length" size="small" type="success">已上传</el-tag>
@@ -212,9 +206,7 @@
                 </el-table-column>
                 <el-table-column prop="auditStatus" label="审核状态" width="100">
                   <template #default="scope">
-                    <el-tag :type="getAuditStatusType(scope.row.auditStatus)" size="small">
-                      {{ scope.row.auditStatus || '待审核' }}
-                    </el-tag>
+                    <AuditStatusTag :status="scope.row.auditStatus" />
                   </template>
                 </el-table-column>
                 <el-table-column prop="createTime" label="提交时间" width="180">
@@ -273,12 +265,10 @@
               </template>
               <el-table :data="courseList" v-loading="courseListLoading" stripe>
                 <el-table-column prop="title" label="微党课/推文题目" min-width="150" />
-                <el-table-column prop="courseDate" label="日期" width="120" />
+                <el-table-column prop="courseDate" label="日期" width="120"><template #default="{ row }">{{ formatDate(row.courseDate) || '-' }}</template></el-table-column>
                 <el-table-column prop="auditStatus" label="审核状态" width="100">
                   <template #default="scope">
-                    <el-tag :type="getAuditStatusType(scope.row.auditStatus)" size="small">
-                      {{ scope.row.auditStatus || '待审核' }}
-                    </el-tag>
+                    <AuditStatusTag :status="scope.row.auditStatus" />
                   </template>
                 </el-table-column>
                 <el-table-column prop="createTime" label="提交时间" width="180">
@@ -354,14 +344,12 @@
                 <el-table-column prop="serviceName" label="服务名称" min-width="150" />
                 <el-table-column prop="serviceType" label="类型" width="120" />
                 <el-table-column prop="serviceHours" label="时长" width="100" />
-                <el-table-column prop="serviceDate" label="日期" width="120" />
+                <el-table-column prop="serviceDate" label="日期" width="120"><template #default="{ row }">{{ formatDate(row.serviceDate) || '-' }}</template></el-table-column>
                 <el-table-column label="来源" width="120"><template #default="scope">{{ scope.row.sourceTaskId ? '任务到场确认' : '学生提交' }}</template></el-table-column>
                 <el-table-column prop="status" label="完成状态" width="100" />
                 <el-table-column prop="auditStatus" label="审核状态" width="100">
                   <template #default="scope">
-                    <el-tag :type="getAuditStatusType(scope.row.auditStatus)" size="small">
-                      {{ scope.row.auditStatus || '待审核' }}
-                    </el-tag>
+                    <AuditStatusTag :status="scope.row.auditStatus" />
                   </template>
                 </el-table-column>
                 <el-table-column prop="createTime" label="提交时间" width="180">
@@ -389,10 +377,8 @@
           :key="key"
           :label="getFieldLabel(key)"
         >
-          <template v-if="key === 'auditStatus'">
-            <el-tag :type="getAuditStatusType(value)" size="small">
-              {{ value || '待审核' }}
-            </el-tag>
+          <template v-if="key === 'auditStatus' || key === 'status'">
+            <AuditStatusTag :status="value" />
           </template>
           <template v-else>
             <template v-if="key === 'materials' && Array.isArray(value)">
@@ -409,7 +395,7 @@
               </el-space>
             </template>
             <template v-else>
-              {{ displayDetailValue(value) }}
+              {{ displayDetailValue(value, key) }}
             </template>
           </template>
         </el-descriptions-item>
@@ -446,6 +432,8 @@
 </template>
 
 <script setup>
+import AuditStatusTag from '@/components/AuditStatusTag.vue'
+import { formatDate, formatDateTime } from '@/utils/dateTime'
 import { PARTY_BRANCHES } from '@/constants/partyBranches'
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -579,42 +567,15 @@ const detailTitle = ref('')
 const currentDetail = ref(null)
 
 // 获取审核状态类型
-const getAuditStatusType = (status) => {
-  if (!status) return 'info'
-  switch (status) {
-    case '待审核':
-    case 'pending':
-      return 'warning'
-    case '通过':
-    case 'approved':
-      return 'success'
-    case '拒绝':
-    case 'rejected':
-      return 'danger'
-    default:
-      return 'info'
-  }
-}
 
 // 格式化日期时间
-const formatDateTime = (dateTime) => {
-  if (!dateTime) return '-'
-  try {
-    const date = new Date(dateTime)
-    return date.toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  } catch (e) {
-    return dateTime
-  }
-}
 
 // 获取字段标签
-const displayDetailValue = value => ({ pending: '待审核', approved: '已通过', rejected: '已驳回', submitted: '已提交', completed: '已完成' }[value] || value || '-')
+const displayDetailValue = (value, key) => {
+  if (['auditTime', 'createTime', 'updateTime'].includes(key)) return formatDateTime(value) || '-'
+  if (['submitDate', 'reportDate', 'courseDate', 'serviceDate', 'applicationDate', 'joinDate', 'birth'].includes(key)) return formatDate(value) || '-'
+  return ({ pending: '待审核', approved: '已通过', rejected: '已驳回', submitted: '已提交', completed: '已完成' }[value] || value || '-')
+}
 const visibleDetail = row => Object.fromEntries(Object.entries(row || {}).filter(([key, value]) => getFieldLabel(key) !== key && value != null && value !== '' && !['studentId', 'courseType', 'instructor', 'location'].includes(key)))
 
 const getFieldLabel = (key) => {

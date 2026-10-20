@@ -15,6 +15,7 @@ public class DailyTaskSubmissionModel {
     private String studentId;       // 学生ID
     private String studentName;     // 学生姓名
     private String content;         // 提交内容 (可以是JSON字符串或其他格式)
+    private String attachments;     // 学生提交的材料 JSON [{url,name}]，与管理员发放文件分开存储
     private LocalDateTime submissionTime;
     private LocalDateTime updateTime;
     private String status;          // 提交状态 (submitted/completed)
