@@ -68,7 +68,9 @@ class StudentBatchMajorControllerTest {
                 .thenReturn(Map.of("userId", "admin", "userType", "admin"));
         MockMvcBuilders.standaloneSetup(studentController).setCustomArgumentResolvers(identity).build()
                 .perform(get("/msi/student/batch-update-major").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"ids\":[\"student-1\"],\"major\":\"人工智能\"}"));
+                        .content("{\"ids\":[\"student-1\"],\"major\":\"人工智能\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(404));
+        verify(studentService).findById("batch-update-major");
         verify(studentService, never()).batchUpdateMajorByIds(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyString());
     }
 

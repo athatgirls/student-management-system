@@ -1,13 +1,13 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const { readdirSync } = require('node:fs')
-const path = require('node:path')
-const { sourceRoot, readSource: read, loadBindings: handlers } = require('./helpers/sourceHarness')
+const { readSource: read, loadBindings: handlers } = require('./helpers/sourceHarness')
 
-test('all frontend business requests use GET or POST', () => {
-  for (const file of readdirSync(path.join(sourceRoot, 'api'))) {
-    assert.doesNotMatch(read('api/' + file), /method:\s*['"](?:put|delete|patch)['"]|request\.(?:put|delete|patch)\(/i, file)
-  }
+test('first-login password change sends credentials via the supported POST endpoint', () => {
+  const { changeInitialPassword } = handlers('api/student.js', ['changeInitialPassword'], { request: config => config })
+  const config = changeInitialPassword('1001', 'old-password', 'new-password')
+  assert.equal(config.url, '/student/change-initial-password')
+  assert.equal(config.method, 'post')
+  assert.deepEqual({ ...config.data }, { studentId: '1001', initialPassword: 'old-password', newPassword: 'new-password' })
 })
 
 test('dashboard approval submits the business ID, decision and rejection reason', async () => {

@@ -49,7 +49,9 @@ class StudentInitialPasswordControllerTest {
         when(identity.resolveArgument(any(), any(), any(), any()))
                 .thenReturn(java.util.Map.of("userId", "admin", "userType", "admin"));
         MockMvcBuilders.standaloneSetup(controller).setCustomArgumentResolvers(identity).build()
-                .perform(get(URL).contentType(MediaType.APPLICATION_JSON).content(BODY));
+                .perform(get(URL).contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(404));
+        verify(studentService).findById("change-initial-password");
         verify(studentService, never()).findByStudentId(anyString());
         verify(studentService, never()).changePassword(anyString(), anyString(), anyString());
     }

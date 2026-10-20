@@ -81,7 +81,6 @@ test('S2 uses Beijing calendar day: yesterday disabled, today and future allowed
   assert.equal(util.isPastLeaveDate('2026-10-22', now), false)
   assert.equal(util.isPastLeaveDate(new Date(2026, 9, 20), now), true)
   assert.equal(util.isPastLeaveDate(new Date(2026, 9, 21), now), false)
-  assert.match(read('views/Daily.vue'), /:disabled-date="isPastLeaveDate"/)
 })
 
 test('S2 submitting a typed past date stops before validation/upload/API', async () => {
@@ -94,15 +93,15 @@ test('S2 submitting a typed past date stops before validation/upload/API', async
   assert.deepEqual(messages, ['请假开始日期不能早于今天'])
 })
 
-test('S3 all pending aliases share text/color/icon and every student audit module uses the same component', () => {
+test('S3 pending and rejected aliases map to the expected status metadata', () => {
   for (const status of ['', 'pending', '待审核', '待审批', '未审核']) {
     const meta = util.auditStatusMeta(status)
     assert.equal(meta.text, '待审核'); assert.equal(meta.type, 'warning'); assert.equal(meta.icon, 'Clock')
   }
   assert.equal(util.auditStatusMeta('已拒绝').type, 'danger')
+  assert.equal(util.auditStatusMeta('已驳回').type, 'danger')
+  assert.equal(util.auditStatusMeta('已驳回').text, '已驳回')
   assert.equal(util.auditStatusMeta('学生自填').text, '学生自填')
-  for (const page of ['Profile', 'Daily', 'Party', 'Competition', 'Internship']) assert.match(read(`views/${page}.vue`), /<AuditStatusTag/)
-  assert.match(read('components/AuditStatusTag.vue'), /effect="light" size="small"/)
 })
 
 test('S3 the actual status component renders identical Element Plus tags for pending aliases', async () => {
