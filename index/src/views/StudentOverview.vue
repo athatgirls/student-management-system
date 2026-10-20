@@ -10,7 +10,7 @@
         <el-input v-model="keyword" placeholder="搜索姓名" clearable @keyup.enter="search" />
         <el-button type="primary" @click="search">查询</el-button>
       </div>
-      <div v-else class="toolbar"><span>左右滑动查看完整信息</span><el-button type="primary" @click="editAppointment()">新增任职记录</el-button></div>
+      <div v-else class="toolbar"><span>左右滑动查看完整信息</span></div>
     </el-card>
     <div class="overview-scroll" role="region" aria-label="状况一览表，可横向滚动" tabindex="0">
       <table class="overview-grid">
