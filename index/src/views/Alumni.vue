@@ -18,11 +18,11 @@
         <el-descriptions-item label="姓名">{{ form.name }}</el-descriptions-item>
         <el-descriptions-item label="学号">{{ form.studentId }}</el-descriptions-item>
         <el-descriptions-item label="入学年份" width="30%">{{
-            alumniData === null ? '未填写' : alumniData.enrollmentDate
+            alumniData === null ? '未填写' : (formatDate(alumniData.enrollmentDate) || '未填写')
           }}
         </el-descriptions-item>
         <el-descriptions-item label="毕业年份">{{
-            alumniData === null ? '未填写' : alumniData.graduationDate
+            alumniData === null ? '未填写' : (formatDate(alumniData.graduationDate) || '未填写')
           }}
         </el-descriptions-item>
         <el-descriptions-item label="就业地区">
@@ -134,6 +134,7 @@
 </template>
 
 <script setup>
+import { formatDate } from '@/utils/dateTime'
 import {onMounted, reactive, ref} from 'vue'
 import {updateAlumni, getMyAlumniInfo, insertAlumni} from '@/api/alumni'
 import {CodeToText, regionData, TextToCode} from '@/utils/china-area-data.js'
@@ -547,4 +548,4 @@ onMounted(() => {
     width: 98vw !important;
   }
 }
-</style> 
+</style>

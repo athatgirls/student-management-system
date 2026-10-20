@@ -208,23 +208,22 @@
         </template></el-table-column>
         <el-table-column prop="status" label="状态" width="100">
           <template #default="scope">
-            <el-tag :type="scope.row.status === '已通过' ? 'success' : 'warning'">
-              {{ scope.row.status }}
-            </el-tag>
+            <AuditStatusTag :status="scope.row.status" />
           </template>
         </el-table-column>
       </el-table>
     </el-card>
     
-    <el-dialog v-model="studyDialog" title="填写学习记录" width="min(560px, 95vw)">
+    <el-dialog v-model="studyDialog" title="填写学习记录" width="min(560px, 95vw)"
+      :close-on-click-modal="!studyUploading && !studySaving" :close-on-press-escape="!studyUploading && !studySaving" :show-close="!studyUploading && !studySaving">
       <el-form label-width="90px">
         <el-form-item label="学期" required><el-input v-model="studyForm.semester" placeholder="例如：2026-2027 第一学期" /></el-form-item>
         <el-form-item label="课程名称" required><el-input v-model="studyForm.course" /></el-form-item>
         <el-form-item label="成绩" required><el-input-number v-model="studyForm.score" :min="0" :max="100" /></el-form-item>
         <el-form-item label="学分" required><el-input-number v-model="studyForm.credit" :min="0" :precision="1" /></el-form-item>
-        <el-form-item label="证明材料" required><RecordAttachments v-model="studyForm.attachments" editable /></el-form-item>
+        <el-form-item label="证明材料" required><RecordAttachments v-model="studyForm.attachments" editable @uploading="studyUploading = $event" /></el-form-item>
       </el-form>
-      <template #footer><el-button @click="studyDialog = false">取消</el-button><el-button type="primary" :loading="studySaving" @click="saveStudy">保存</el-button></template>
+      <template #footer><el-button :disabled="studyUploading || studySaving" @click="studyDialog = false">取消</el-button><el-button type="primary" :disabled="studyUploading" :loading="studySaving" @click="saveStudy">保存</el-button></template>
     </el-dialog>
     <!-- 修改密码对话框 -->
     <el-dialog
@@ -287,6 +286,7 @@ import { ElMessage } from 'element-plus'
 import { getProfile, updateProfile, getStudyRecords, changePassword } from '@/api/student'
 import { POLITICAL_STATUS_OPTIONS } from '@/constants/politicalStatus'
 import RecordAttachments from '@/components/RecordAttachments.vue'
+import AuditStatusTag from '@/components/AuditStatusTag.vue'
 import request from '@/api/request'
 
 const store = useStore()
@@ -437,6 +437,7 @@ watch(() => profileForm.birthDate, (newVal) => {
 const studyRecords = ref([])
 const studyDialog = ref(false)
 const studySaving = ref(false)
+const studyUploading = ref(false)
 const studyForm = reactive({})
 const editStudy = row => {
   Object.keys(studyForm).forEach(k => delete studyForm[k])
@@ -444,6 +445,8 @@ const editStudy = row => {
   studyDialog.value = true
 }
 const saveStudy = async () => {
+  if (studyUploading.value) return ElMessage.warning('请等待材料上传完成')
+  if (studySaving.value) return
   if (!studyForm.semester?.trim() || !studyForm.course?.trim() || !JSON.parse(studyForm.attachments || '[]').length) {
     ElMessage.warning('请填写学期、课程名称并上传证明材料'); return
   }

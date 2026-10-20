@@ -123,7 +123,10 @@ try {
   Check ((Api GET '/daily-tasks/active' $null $other).data.data.id -notcontains $handoutTask.id) 'out-of-scope task hidden'
   $before=(Api GET '/daily-tasks/my-completion' $null $student).data.data
   Check ($before.totalRequired -eq 3 -and $before.completedCount -eq 0) 'homepage completion counts two ordinary fixtures and profile task, excludes registration'
-  $submitted=(Api POST '/daily-tasks/submit' @{taskId=$handoutTask.id;content='测试内容'} $student).data.data
+  $submitted=(Api POST '/daily-tasks/submit' @{taskId=$handoutTask.id;content='测试内容';attachments=$attachments} $student).data.data
+  Check ($submitted.attachments -eq $attachments) 'student task proof persists separately from task handouts'
+  Check ((Api GET "/daily-tasks/my-submission/$($handoutTask.id)" $null $student).data.data.attachments -eq $attachments) 'student task proof is restored when reopening submission'
+  Check ((Api POST '/daily-tasks/submit' @{taskId=$handoutTask.id;content='伪造附件';attachments=(ConvertTo-Json -InputObject @(@{url=$handout;name='伪造.png'}) -Compress)} $student).data.code -eq 400) 'student cannot submit administrator-owned file as own proof'
   Check ($submitted.submissionTime -match 'Z$' -and [Math]::Abs(([DateTimeOffset]::Parse($submitted.submissionTime)-[DateTimeOffset]::UtcNow).TotalSeconds) -lt 60) 'completion timestamp is accurate explicit UTC'
   $after=(Api GET '/daily-tasks/my-completion' $null $student).data.data
   Check ($after.totalRequired -eq 3 -and $after.completedCount -eq 1 -and $after.completionRate -eq 33.33) 'student homepage completion becomes 33.33 percent'
@@ -143,7 +146,9 @@ try {
   $honor=(Api POST '/honors/create' @{title='管理员删除';evidenceUrl=$materialUrl} $student).data.data
   Check ((Api POST "/honors/$($honor.id)/delete" $null $admin).status -eq 200) 'administrator deletes student honor'
   # V2: campus-compatible leave audit, state changes and check-in.
-  $leave=(Api POST '/leave/create' @{reason='测试请假';startDate='2026-10-01';endDate='2026-10-02';studentId='spoof'} $student).data.data
+  $leaveToday=[DateTimeOffset]::UtcNow.ToOffset([TimeSpan]::FromHours(8)).Date
+  Check ((Api POST '/leave/create' @{reason='历史日期测试';startDate=$leaveToday.AddDays(-1).ToString('yyyy-MM-dd');endDate=$leaveToday.ToString('yyyy-MM-dd')} $student).data.code -eq 400) 'past leave start is rejected server-side'
+  $leave=(Api POST '/leave/create' @{reason='测试请假';startDate=$leaveToday.ToString('yyyy-MM-dd');endDate=$leaveToday.AddDays(1).ToString('yyyy-MM-dd');studentId='spoof'} $student).data.data
   Check ([bool]$leave.id -and $leave.studentId -eq 'fixture-100001') 'student leave uses authenticated identity'
   Check ((Api POST "/leave/audit/$($leave.id)" @{auditStatus='approved'} $student).status -eq 403) 'student cannot approve leave'
   $approved=(Api POST "/leave/audit/$($leave.id)" @{auditStatus='approved';auditComment='测试通过';auditorId='spoof';auditorName='spoof'} $admin).data.data

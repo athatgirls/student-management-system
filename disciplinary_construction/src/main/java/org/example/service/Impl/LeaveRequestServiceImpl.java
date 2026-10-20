@@ -25,6 +25,10 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
     
     @Override
     public LeaveRequestModel createLeaveRequest(LeaveRequestModel leaveRequest) {
+        if (leaveRequest.getStartDate() == null || leaveRequest.getEndDate() == null)
+            throw new IllegalArgumentException("请选择请假开始和结束日期");
+        if (leaveRequest.getStartDate().isBefore(LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"))))
+            throw new IllegalArgumentException("请假开始日期不能早于今天");
         org.example.util.SubmissionValidation.dates(leaveRequest.getStartDate(), leaveRequest.getEndDate());
         leaveRequest.setId(null);
         // 必须提供studentId（学号），自动从学生表获取所有信息
