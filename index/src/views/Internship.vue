@@ -160,9 +160,7 @@
         </el-table-column>
         <el-table-column prop="approvalStatus" label="审批状态" width="100">
           <template #default="scope">
-            <el-tag :type="getApprovalStatusType(scope.row.approvalStatus)">
-              {{ scope.row.approvalStatus }}
-            </el-tag>
+            <AuditStatusTag :status="scope.row.approvalStatus" />
           </template>
         </el-table-column>
                  <el-table-column label="操作" width="150" fixed="right">
@@ -481,12 +479,12 @@
         <el-descriptions-item label="结束时间">{{ formatDate(viewData.endDate) }}</el-descriptions-item>
         <el-descriptions-item label="状态">{{ viewData.status }}</el-descriptions-item>
         <el-descriptions-item label="合同类型">{{ viewData.contractType }}</el-descriptions-item>
-        <el-descriptions-item label="审批状态">{{ viewData.approvalStatus }}</el-descriptions-item>
+        <el-descriptions-item label="审批状态"><AuditStatusTag :status="viewData.approvalStatus" /></el-descriptions-item>
         <el-descriptions-item label="审批备注">{{ viewData.approvalRemark }}</el-descriptions-item>
         <el-descriptions-item label="联系人">{{ viewData.contactPerson }}</el-descriptions-item>
         <el-descriptions-item label="联系电话">{{ viewData.contactPhone }}</el-descriptions-item>
         <el-descriptions-item label="联系邮箱">{{ viewData.contactEmail }}</el-descriptions-item>
-        <el-descriptions-item label="创建时间">{{ formatDate(viewData.createTime) }}</el-descriptions-item>
+        <el-descriptions-item label="创建时间">{{ formatDateTime(viewData.createTime) }}</el-descriptions-item>
       </el-descriptions>
 
       <el-divider content-position="left">详细信息</el-divider>
@@ -520,6 +518,8 @@
 </template>
 
 <script setup>
+import AuditStatusTag from '@/components/AuditStatusTag.vue'
+import { formatDate, formatDateTime } from '@/utils/dateTime'
 import request from '@/api/request'
 import { ref, reactive, onMounted, computed, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -932,10 +932,6 @@ const handleCurrentChange = (page) => {
 }
 
 // 格式化日期
-const formatDate = (date) => {
-  if (!date) return ''
-  return new Date(date).toLocaleDateString()
-}
 
 // 获取状态类型
 const getStatusType = (status) => {
@@ -949,17 +945,6 @@ const getStatusType = (status) => {
 }
 
 // 获取审批状态类型
-const getApprovalStatusType = (approvalStatus) => {
-  const statusMap = {
-    '待审批': 'warning',
-    '已通过': 'success',
-    '已拒绝': 'danger',
-    pending: 'warning',
-    approved: 'success',
-    rejected: 'danger'
-  }
-  return statusMap[approvalStatus] || 'info'
-}
 
 onMounted(() => {
   request.get('/employment-intentions/me').then(data => Object.assign(intentForm, Object.fromEntries(Object.entries(data).filter(([,v]) => v != null)))).catch(() => {})

@@ -126,19 +126,15 @@
             </el-table-column>
             <el-table-column prop="status" label="请假状态" width="140">
               <template #default="scope">
-                <el-tag :type="getStatusType(scope.row)" effect="light" class="status-tag" size="default">
+                <AuditStatusTag v-if="scope.row.status === 'pending'" :status="scope.row.status" />
+                <el-tag v-else :type="getStatusType(scope.row)" effect="light" class="status-tag" size="default">
                   {{ getStatusText(scope.row) }}
                 </el-tag>
               </template>
             </el-table-column>
             <el-table-column prop="auditStatus" label="审核状态" width="120">
               <template #default="scope">
-                <el-tag :type="statusMeta(scope.row.auditStatus).type" effect="light" class="status-tag" size="default">
-                  <el-icon class="mr4">
-                    <component :is="statusMeta(scope.row.auditStatus).icon" />
-                  </el-icon>
-                  {{ statusMeta(scope.row.auditStatus).text }}
-                </el-tag>
+                <AuditStatusTag :status="scope.row.auditStatus" />
               </template>
             </el-table-column>
             <el-table-column label="操作" width="180" align="right" fixed="right">
@@ -204,12 +200,7 @@
             </el-table-column>
             <el-table-column prop="auditStatus" label="状态" :width="isMobile ? 100 : 160">
               <template #default="scope">
-                <el-tag :type="statusMeta(scope.row.auditStatus).type" effect="light" class="status-tag" :size="isMobile ? 'small' : 'default'">
-                  <el-icon class="mr4">
-                    <component :is="statusMeta(scope.row.auditStatus).icon" />
-                  </el-icon>
-                  {{ statusMeta(scope.row.auditStatus).text }}
-                </el-tag>
+                <AuditStatusTag :status="scope.row.auditStatus" />
               </template>
             </el-table-column>
             <el-table-column label="操作" :width="isMobile ? 180 : 260" align="right" fixed="right">
@@ -234,8 +225,8 @@
       <el-card v-if="moduleKey === 'volunteer'" class="content-card">
         <template #header>志愿活动记录（与党员发展与管理同步）</template>
         <el-table :data="volunteerHistory">
-          <el-table-column prop="serviceName" label="活动名称" /><el-table-column prop="serviceDate" label="活动日期" />
-          <el-table-column prop="serviceLocation" label="地点" /><el-table-column label="来源"><template #default="{ row }">{{ row.sourceTaskId ? '任务到场确认' : '学生提交' }}</template></el-table-column><el-table-column prop="status" label="完成状态" /><el-table-column prop="auditStatus" label="审核状态" />
+          <el-table-column prop="serviceName" label="活动名称" /><el-table-column prop="serviceDate" label="活动日期"><template #default="{ row }">{{ fmtDate(row.serviceDate) || '-' }}</template></el-table-column>
+          <el-table-column prop="serviceLocation" label="地点" /><el-table-column label="来源"><template #default="{ row }">{{ row.sourceTaskId ? '任务到场确认' : '学生提交' }}</template></el-table-column><el-table-column prop="status" label="完成状态" /><el-table-column prop="auditStatus" label="审核状态"><template #default="{ row }"><AuditStatusTag :status="row.auditStatus" /></template></el-table-column>
         </el-table>
       </el-card>
       <!-- 日常任务列表 (学生端) -->
@@ -435,7 +426,8 @@
     </div>
 
     <!-- 任务提交弹窗 -->
-    <el-dialog v-model="submitDialogVisible" :title="'完成任务：' + currentTask.title" width="700px" destroy-on-close>
+    <el-dialog v-model="submitDialogVisible" :title="'完成任务：' + currentTask.title" width="700px" destroy-on-close
+      :close-on-click-modal="!taskSubmissionUploading && !taskSubmitting" :close-on-press-escape="!taskSubmissionUploading && !taskSubmitting" :show-close="!taskSubmissionUploading && !taskSubmitting">
       <div style="margin-bottom: 15px; color: #666;">
         {{ currentTask.description }}
       </div>
@@ -496,10 +488,13 @@
             placeholder="请按任务要求填写相关信息…" 
           />
         </el-form-item>
+        <el-form-item label="提交材料">
+          <RecordAttachments v-model="submitForm.attachments" editable label="上传任务材料" @uploading="taskSubmissionUploading = $event" />
+        </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="submitDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSubmitTask">提交</el-button>
+        <el-button :disabled="taskSubmissionUploading || taskSubmitting" @click="submitDialogVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="taskSubmissionUploading" :loading="taskSubmitting" @click="handleSubmitTask">提交</el-button>
       </template>
     </el-dialog>
 
@@ -566,6 +561,7 @@
                   style="width:100%"
                   format="YYYY-MM-DD"
                   value-format="YYYY-MM-DD"
+                  :disabled-date="isPastLeaveDate"
                 />
               </el-form-item>
             </el-col>
@@ -578,6 +574,7 @@
                   style="width:100%"
                   format="YYYY-MM-DD"
                   value-format="YYYY-MM-DD"
+                  :disabled-date="disabledLeaveEndDate"
                 />
               </el-form-item>
             </el-col>
@@ -673,13 +670,11 @@
         </div>
         <div class="right">
           <div class="status-tags">
-            <el-tag v-if="moduleKey === 'leave'" :type="getStatusType(detailEntity)" effect="dark" class="status-tag-item">
+            <AuditStatusTag v-if="moduleKey === 'leave' && detailEntity.status === 'pending'" :status="detailEntity.status" />
+            <el-tag v-else-if="moduleKey === 'leave'" :type="getStatusType(detailEntity)" effect="dark" class="status-tag-item">
               {{ getStatusText(detailEntity) }}
             </el-tag>
-            <el-tag :type="statusMeta(detailEntity.auditStatus).type" effect="dark" class="status-tag-item">
-              <el-icon class="mr4"><component :is="statusMeta(detailEntity.auditStatus).icon" /></el-icon>
-              {{ statusMeta(detailEntity.auditStatus).text }}
-            </el-tag>
+            <AuditStatusTag :status="detailEntity.auditStatus" />
           </div>
         </div>
       </div>
@@ -799,7 +794,8 @@
 
 <script setup>
 import RecordAttachments from '@/components/RecordAttachments.vue'
-import { formatDateTime as fmtDateTime } from '@/utils/dateTime'
+import AuditStatusTag from '@/components/AuditStatusTag.vue'
+import { formatDateTime as fmtDateTime, formatDate as fmtDate, isPastLeaveDate } from '@/utils/dateTime'
 import { taskMatchesTab } from '@/utils/taskCategory'
 import { taskDateError, orderedDates, hasAttachments } from '@/utils/submissionValidation'
 import { volunteerServiceApi } from '@/api/party'
@@ -901,8 +897,11 @@ const handleTaskTabChange = () => {
 const submitForm = reactive({
   taskId: '',
   content: '',
+  attachments: '',
   fieldData: {} // 字段化数据
 })
+const taskSubmissionUploading = ref(false)
+const taskSubmitting = ref(false)
 
 // 判断字段是否应该显示（条件显示逻辑）
 const shouldShowField = (field) => {
@@ -1042,6 +1041,7 @@ const openSubmit = async (task) => {
   currentTask.value = processedTask
   submitForm.taskId = processedTask.id
   submitForm.content = ''
+  submitForm.attachments = ''
   submitForm.fieldData = {}
   
   // 如果有字段定义，初始化字段数据
@@ -1065,6 +1065,7 @@ const openSubmit = async (task) => {
   try {
     const res = await getMyDailyTaskSubmission(task.id)
     if (res.code === 200 && res.data) {
+      submitForm.attachments = res.data.attachments || ''
       const previousContent = res.data.content
       // 尝试解析为JSON（字段化数据）
       try {
@@ -1087,6 +1088,8 @@ const openSubmit = async (task) => {
 }
 
 const handleSubmitTask = async () => {
+  if (taskSubmissionUploading.value) return ElMessage.warning('请等待材料上传完成')
+  if (taskSubmitting.value) return
   const dateError = taskDateError((currentTask.value.fields || []).filter(shouldShowField), submitForm.fieldData)
   if (dateError) return ElMessage.warning(dateError)
   // 检查报名型任务是否已满员
@@ -1116,7 +1119,8 @@ const handleSubmitTask = async () => {
   }
   
   try {
-    const res = await submitDailyTask(submitForm)
+    taskSubmitting.value = true
+    const res = await submitDailyTask({ taskId: submitForm.taskId, content: submitForm.content, attachments: submitForm.attachments })
     if (res.code === 200) {
       ElMessage.success(currentTask.value.taskCategory === 'registration' ? '报名成功，导入到场名单后才计入志愿记录' : '提交成功')
       submitDialogVisible.value = false
@@ -1130,8 +1134,10 @@ const handleSubmitTask = async () => {
     if (e.response && e.response.data && e.response.data.msg && e.response.data.msg.includes('报名人数已满')) {
       ElMessage.warning('报名人数已满，无法报名')
     } else {
-    ElMessage.error('提交失败')
+      ElMessage.error('提交失败')
     }
+  } finally {
+    taskSubmitting.value = false
   }
 }
 
@@ -1236,7 +1242,13 @@ const form = reactive({ ...initAcademic })
 const rules = reactive({
   title: [{ required: computed(() => moduleKey.value !== 'leave').value, message: '请填写标题', trigger: 'blur' }],
   type: [{ required: computed(() => moduleKey.value === 'academic').value, message: '请选择类型', trigger: 'change' }],
-  startDate: [{ required: computed(() => moduleKey.value !== 'honor' && moduleKey.value !== 'leave').value, message: '请选择开始时间', trigger: 'change' }],
+  startDate: [{
+    validator: (_rule, value, callback) => {
+      if (moduleKey.value !== 'honor' && !value) return callback(new Error('请选择开始时间'))
+      if (moduleKey.value === 'leave' && isPastLeaveDate(value)) return callback(new Error('请假开始日期不能早于今天'))
+      callback()
+    }, trigger: 'change'
+  }],
   endDate: [
     { required: computed(() => moduleKey.value === 'leave').value, message: '请选择结束时间', trigger: 'change' },
     {
@@ -1278,6 +1290,7 @@ const openCreate = () => {
 }
 
 const submitCreate = async () => {
+  if (moduleKey.value === 'leave' && isPastLeaveDate(form.startDate)) return ElMessage.warning('请假开始日期不能早于今天')
   if (!orderedDates(form.startDate, form.endDate)) return ElMessage.warning('结束时间不能早于开始时间')
   if (moduleKey.value === 'honor') {
     if (!hasAttachments(honorAttachments.value)) return ElMessage.warning('请上传荣誉证明材料')
@@ -1735,15 +1748,8 @@ const proofUrl = computed(() => {
 const fileName = getFileName
 
 // 工具
-const fmtDate = (d) => {
-  if (!d) return ''
-  const date = (d instanceof Date) ? d : new Date(d)
-  if (Number.isNaN(+date)) return String(d)
-  const y = date.getFullYear()
-  const m = String(date.getMonth()+1).padStart(2,'0')
-  const day = String(date.getDate()).padStart(2,'0')
-  return `${y}-${m}-${day}`
-}
+const disabledLeaveEndDate = date => isPastLeaveDate(date)
+  || (form.startDate && `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` < form.startDate)
 const onTabChange = (tabName = moduleKey.value) => { 
   searchKey.value = '' 
   if (route.path !== tabPathMap[tabName]) {

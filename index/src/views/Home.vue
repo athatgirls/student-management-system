@@ -324,6 +324,7 @@
 </template>
 
 <script setup>
+import { formatDate, formatDateTime } from '@/utils/dateTime'
 import { ref, onMounted, computed } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
@@ -603,9 +604,9 @@ const loadTodoList = async () => {
             const endDate = leave.endDate ? new Date(leave.endDate) : null
             let leaveTimeText = ''
             if (startDate && endDate) {
-              leaveTimeText = `${startDate.toLocaleDateString('zh-CN')} 至 ${endDate.toLocaleDateString('zh-CN')}（${leave.days || 0}天）`
+              leaveTimeText = `${formatDate(leave.startDate)} 至 ${formatDate(leave.endDate)}（${leave.days || 0}天）`
             } else if (startDate) {
-              leaveTimeText = startDate.toLocaleDateString('zh-CN')
+              leaveTimeText = formatDate(leave.startDate)
             }
             
             return {
@@ -616,7 +617,7 @@ const loadTodoList = async () => {
               leaveStatus: leave.status, // 请假状态
               leaveData: leave, // 保存完整的请假数据，用于动态判断状态
               leaveTimeText: leaveTimeText,
-              createTime: leave.createTime ? new Date(leave.createTime).toLocaleDateString('zh-CN') : null,
+              createTime: formatDateTime(leave.createTime) || null,
               priority: 0 // 请假记录优先级最高，置顶显示
             }
           })
@@ -634,7 +635,6 @@ const loadTodoList = async () => {
       // 映射任务数据，保留deadline用于排序
       const mappedTasks = res.data.map(task => {
         const deadlineDate = task.deadline ? new Date(task.deadline) : null
-        const createTimeDate = task.createTime ? new Date(task.createTime) : null
         
         return {
           id: task.id,
@@ -642,8 +642,8 @@ const loadTodoList = async () => {
           title: task.title,
           completed: task.completed,
           deadline: deadlineDate,
-          deadlineText: deadlineDate ? deadlineDate.toLocaleDateString('zh-CN') : '长期',
-          createTime: createTimeDate ? createTimeDate.toLocaleDateString('zh-CN') : null,
+          deadlineText: task.deadline ? formatDateTime(task.deadline) : '长期',
+          createTime: formatDateTime(task.createTime) || null,
           taskCategory: task.taskCategory, // 任务类别
           maxParticipants: task.maxParticipants, // 最大报名人数
           currentParticipants: task.currentParticipants, // 当前报名人数
@@ -718,14 +718,7 @@ const loadTaskCompletion = async () => {
 // 更新时间
 const updateTime = () => {
   const now = new Date()
-  currentTime.value = now.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  })
+  currentTime.value = formatDateTime(now)
 }
 
 // 加载个人数据
@@ -794,7 +787,7 @@ const loadRecentActivities = async () => {
         id: 'welcome',
         title: '欢迎使用',
         description: '欢迎进入学科建设管理系统，您的学术成就将在这里被记录。',
-        time: new Date().toLocaleDateString()
+        time: formatDate(new Date())
       }]
     }
   } catch (error) {
@@ -804,7 +797,7 @@ const loadRecentActivities = async () => {
       id: 'welcome',
       title: '欢迎使用',
       description: '欢迎进入学科建设管理系统，您的学术成就将在这里被记录。',
-      time: new Date().toLocaleDateString()
+      time: formatDate(new Date())
     }]
   }
 }
@@ -812,23 +805,7 @@ const loadRecentActivities = async () => {
 // 格式化活动时间
 const formatActivityTime = (timeStr) => {
   if (!timeStr || timeStr === '未知时间') return '未知时间'
-  try {
-    // 处理不同的时间格式
-    const date = new Date(timeStr)
-    if (isNaN(date.getTime())) {
-      // 如果不是有效日期，尝试解析其他格式
-      return timeStr
-    }
-    return date.toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  } catch (e) {
-    return timeStr
-  }
+  return formatDateTime(timeStr) || '未知时间'
 }
 
 // 处理待办事项点击 - 跳转到任务页面并自动打开填写弹窗

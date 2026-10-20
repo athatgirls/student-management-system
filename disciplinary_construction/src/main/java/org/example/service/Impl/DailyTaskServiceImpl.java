@@ -96,6 +96,7 @@ public class DailyTaskServiceImpl implements DailyTaskService {
             throw new AccessDeniedException("您不在该任务的接收范围内");
         }
         org.example.util.TaskSubmissionValidation.validate(task, submission.getContent());
+        taskAttachmentAccessService.validateSubmission(submission);
         
         // 检查是否已经提交过
         Optional<DailyTaskSubmissionModel> existing = submissionRepository.findByTaskIdAndStudentId(
@@ -143,6 +144,7 @@ public class DailyTaskServiceImpl implements DailyTaskService {
         
         if (existing.isPresent()) {
             submission.setId(existing.get().getId());
+            if (submission.getAttachments() == null) submission.setAttachments(existing.get().getAttachments());
         }
         
         DailyTaskSubmissionModel savedSubmission = submissionRepository.save(submission);
