@@ -2,10 +2,11 @@
 export const overviewGroups = [
   { key: 'A', label: 'A（30%）', summaries: [], sections: [{ key: 'grades', label: '学习成绩', minSlots: 0, columns: [] }] },
   {
-    key: 'B', label: 'B（20%）', summaries: ['得分', '比例得分'], sections: [
+    key: 'B', label: 'B（20%）', summaries: [], sections: [
       { key: 'papers', label: '论文', minSlots: 3, columns: [
-        { key: 'paperTitle', label: '论文题目' }, { key: 'journalLevel', label: '期刊级别' },
-        { key: 'authorRank', label: '前三作者排序' }, { key: 'journalName', label: '期刊' }, { key: 'itemScore', label: '得分' }
+        { key: 'paperTitle', label: '论文题目' }, { key: 'journalName', label: '期刊' },
+        { key: 'journalLevel', label: '期刊级别' }, { key: 'firstThreeAuthors', label: '前三作者排序' },
+        { key: 'scoreRatio', label: '得分比例' }, { key: 'paperScore', label: '得分' }
       ] },
       { key: 'patents', label: '专利', minSlots: 2, columns: [
         { key: 'patentTitle', label: '专利名称' }, { key: 'patentStatus', label: '专利阶段' },
@@ -14,7 +15,7 @@ export const overviewGroups = [
     ]
   },
   {
-    key: 'C', label: 'C（35%）', summaries: ['得分', '比例得分'], sections: [
+    key: 'C', label: 'C（35%）', summaries: [], sections: [
       { key: 'projects', label: '项目', minSlots: 2, columns: [
         { key: 'projectName', label: '项目名称' }, { key: 'projectLevel', label: '项目类别' },
         { key: 'ranking', label: '排名' }, { key: 'itemScore', label: '得分' }
@@ -56,5 +57,16 @@ export const buildOverviewGroups = students => overviewGroups.map(group => {
 
 export const overviewValue = (record, key) => {
   if (key === 'itemScore') return '—' // 尚无评分规则，不把成绩或排名误当得分。
+  if (key === 'scoreRatio' || key === 'paperScore') {
+    const value = record[key] === null || record[key] === undefined || record[key] === '' ? '—' : record[key]
+    return record.scorePending ? `${value}（待审核）` : value
+  }
+  if (key === 'firstThreeAuthors') {
+    const rank = Number(record.authorRank)
+    const authors = (record.coAuthors || '').split(/[,，、]/).map(name => name.trim()).filter(Boolean)
+    if (!Number.isInteger(rank) || rank < 1 || !record.studentName || authors.length < Math.min(rank - 1, 3)) return '—'
+    if (rank <= 3) authors.splice(rank - 1, 0, record.studentName)
+    return authors.slice(0, 3).join('、')
+  }
   return record[key]
 }

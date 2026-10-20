@@ -127,57 +127,6 @@
         style="width: 100%"
         :row-class-name="tableRowClassName"
       >
-        <el-table-column type="expand">
-          <template #default="{ row }">
-            <div class="expand-content">
-              <el-descriptions :column="2" border size="small">
-                <el-descriptions-item label="学号">{{ row.studentId }}</el-descriptions-item>
-                <el-descriptions-item label="学生姓名">{{ row.studentName }}</el-descriptions-item>
-                <el-descriptions-item label="论文标题" :span="2">{{ row.paperTitle }}</el-descriptions-item>
-                <el-descriptions-item label="期刊名称" :span="2">{{ row.journalName }}</el-descriptions-item>
-                <el-descriptions-item label="期刊级别">{{ row.journalLevel }}</el-descriptions-item>
-                <el-descriptions-item label="作者排名">{{ row.authorRank }}</el-descriptions-item>
-                <el-descriptions-item label="发表状态">{{ row.publicationStatus }}</el-descriptions-item>
-                <el-descriptions-item label="发表时间">{{ row.publicationDate }}</el-descriptions-item>
-                <el-descriptions-item label="合作作者" :span="2">{{ row.coAuthors || '-' }}</el-descriptions-item>
-                <el-descriptions-item label="DOI" :span="2">{{ row.doi || '-' }}</el-descriptions-item>
-                <el-descriptions-item label="摘要" :span="2">{{ row.abstract || '-' }}</el-descriptions-item>
-                <el-descriptions-item label="提交时间" :span="2">{{ formatDateTime(row.createTime) }}</el-descriptions-item>
-                <el-descriptions-item label="审核意见" :span="2" v-if="row.auditComment">
-                  <el-tag :type="getStatusType(row.auditStatus)" effect="plain">
-                    {{ row.auditComment }}
-                  </el-tag>
-                </el-descriptions-item>
-                <el-descriptions-item label="附件" :span="2" v-if="row.attachments">
-                  <div class="attachment-container">
-                    <div v-for="(file, index) in parseAttachments(row.attachments)" :key="index" class="attachment-item">
-                      <el-image
-                        v-if="isImageFile(file.url)"
-                        :src="getFileUrl(file.url)"
-                        :preview-src-list="getImagePreviewList(row.attachments)"
-                        :initial-index="index"
-                        fit="cover"
-                        style="width: 100px; height: 100px; margin-right: 10px; cursor: pointer;"
-                        :lazy="true"
-                      />
-                      <el-link
-                        v-else
-                        :href="getFileUrl(file.url)"
-                        target="_blank"
-                        type="primary"
-                        style="margin-right: 10px;"
-                      >
-                        <el-icon><Paperclip /></el-icon>
-                        {{ file.name || '下载附件' }}
-                      </el-link>
-                    </div>
-                  </div>
-                </el-descriptions-item>
-              </el-descriptions>
-            </div>
-          </template>
-        </el-table-column>
-
         <el-table-column label="审核状态" width="100" align="center" fixed="left">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.auditStatus)" effect="dark" size="small">
@@ -191,6 +140,12 @@
         <el-table-column prop="journalName" label="期刊名称" width="180" show-overflow-tooltip />
         <el-table-column prop="journalLevel" label="期刊级别" width="100" align="center" />
         <el-table-column prop="authorRank" label="排名" width="70" align="center" />
+        <el-table-column prop="scoreRatio" label="得分比例" width="100" align="center">
+          <template #default="{ row }">{{ row.scoreRatio || '—' }}{{ row.scorePending ? '（待审核）' : '' }}</template>
+        </el-table-column>
+        <el-table-column prop="paperScore" label="得分" width="80" align="center">
+          <template #default="{ row }">{{ row.paperScore ?? '—' }}{{ row.scorePending ? '（待审核）' : '' }}</template>
+        </el-table-column>
         <el-table-column prop="publicationStatus" label="状态" width="100" align="center" />
         <el-table-column label="提交时间" width="180" align="center">
           <template #default="{ row }">
@@ -198,21 +153,8 @@
           </template>
         </el-table-column>
         
-        <el-table-column label="操作" width="250" fixed="right" align="center">
+        <el-table-column label="操作" width="150" fixed="right" align="center" class-name="action-column">
           <template #default="{ row }">
-            <!-- 待审核：显示审核按钮 -->
-            <template v-if="!row.auditStatus || row.auditStatus === '待审核'">
-              <el-button type="success" size="small" @click="handleApprove(row)">
-                <el-icon><Select /></el-icon>
-                通过
-              </el-button>
-              <el-button type="danger" size="small" @click="handleReject(row)">
-                <el-icon><Close /></el-icon>
-                驳回
-              </el-button>
-            </template>
-            
-            <!-- 所有状态：查看和删除 -->
             <el-button type="primary" size="small" link @click="handleView(row)">
               查看
             </el-button>
@@ -279,6 +221,7 @@
       v-model="detailDialogVisible" 
       title="论文详情" 
       width="800px"
+      destroy-on-close
     >
       <el-descriptions :column="2" border v-if="currentRow">
         <el-descriptions-item label="学号">{{ currentRow.studentId }}</el-descriptions-item>
@@ -287,6 +230,17 @@
         <el-descriptions-item label="期刊名称" :span="2">{{ currentRow.journalName }}</el-descriptions-item>
         <el-descriptions-item label="期刊级别">{{ currentRow.journalLevel }}</el-descriptions-item>
         <el-descriptions-item label="作者排名">{{ currentRow.authorRank }}</el-descriptions-item>
+        <el-descriptions-item label="得分比例">
+          <el-select v-model="scoreForm.scoreRatio" placeholder="请选择" clearable style="width: 100%">
+            <el-option v-for="ratio in scoreRatios" :key="ratio" :label="ratio" :value="ratio" />
+          </el-select>
+          <span v-if="currentRow.scorePending">待审核</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="得分">
+          <el-input-number v-model="scoreForm.paperScore" :min="0" :step="0.1" controls-position="right" style="width: 100%" />
+          <el-button link type="primary" @click="scoreForm.paperScore = null">清空得分</el-button>
+          <span v-if="currentRow.scorePending">待审核</span>
+        </el-descriptions-item>
         <el-descriptions-item label="发表状态">{{ currentRow.publicationStatus }}</el-descriptions-item>
         <el-descriptions-item label="发表时间">{{ currentRow.publicationDate }}</el-descriptions-item>
         <el-descriptions-item label="合作作者" :span="2">{{ currentRow.coAuthors || '-' }}</el-descriptions-item>
@@ -302,32 +256,11 @@
           {{ currentRow.auditComment }}
         </el-descriptions-item>
         <el-descriptions-item label="附件" :span="2" v-if="currentRow.attachments">
-          <div class="attachment-container">
-            <div v-for="(file, index) in parseAttachments(currentRow.attachments)" :key="index" class="attachment-item">
-              <el-image
-                v-if="isImageFile(file.url)"
-                :src="getFileUrl(file.url)"
-                :preview-src-list="getImagePreviewList(currentRow.attachments)"
-                :initial-index="index"
-                fit="cover"
-                style="width: 120px; height: 120px; margin-right: 10px; margin-bottom: 10px; cursor: pointer;"
-                :lazy="true"
-              />
-              <el-link
-                v-else
-                :href="getFileUrl(file.url)"
-                target="_blank"
-                type="primary"
-                style="margin-right: 10px; margin-bottom: 10px;"
-              >
-                <el-icon><Paperclip /></el-icon>
-                {{ file.name || '下载附件' }}
-              </el-link>
-            </div>
-          </div>
+          <PrivateAttachments :attachments="currentRow.attachments" />
         </el-descriptions-item>
       </el-descriptions>
       <template #footer>
+        <el-button type="primary" :loading="scoreSaving" @click="saveScore">保存得分</el-button>
         <el-button v-if="currentRow && (!currentRow.auditStatus || currentRow.auditStatus === '待审核')" type="success" @click="detailDialogVisible = false; handleApprove(currentRow)">通过</el-button>
         <el-button v-if="currentRow && (!currentRow.auditStatus || currentRow.auditStatus === '待审核')" type="danger" @click="detailDialogVisible = false; handleReject(currentRow)">驳回</el-button>
         <el-button @click="detailDialogVisible = false">关闭</el-button>
@@ -342,11 +275,11 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   DataBoard, Clock, CircleCheck, CircleClose, DocumentChecked,
-  Search, Select, Close, Paperclip
+  Search
 } from '@element-plus/icons-vue'
-import { getAllPapers, auditPaper, deletePaper } from '@/api/competition'
+import { getAllPapers, auditPaper, deletePaper, updatePaperScore } from '@/api/competition'
 import { useStore } from 'vuex'
-import { getFileUrl, isImage } from '@/utils/imageUrl'
+import PrivateAttachments from '@/components/PrivateAttachments.vue'
 
 const store = useStore()
 const loading = ref(false)
@@ -397,6 +330,29 @@ const auditDialogVisible = ref(false)
 const auditDialogTitle = ref('')
 const detailDialogVisible = ref(false)
 const currentRow = ref({})
+const scoreRatios = ['10:0', '7:3', '6:3:1']
+const scoreSaving = ref(false)
+const scoreForm = reactive({ scoreRatio: '', paperScore: null })
+
+const saveScore = async () => {
+  scoreSaving.value = true
+  try {
+    const saved = await updatePaperScore(currentRow.value.id, {
+      scoreRatio: scoreForm.scoreRatio || null,
+      paperScore: scoreForm.paperScore
+    })
+    const index = allData.value.findIndex(row => row.id === saved.id)
+    const updated = { ...saved, studentName: saved.studentName || currentRow.value.studentName }
+    if (index !== -1) allData.value[index] = updated
+    currentRow.value = updated
+    filterAndPaginate()
+    ElMessage.success('论文得分已保存')
+  } catch (error) {
+    ElMessage.error(error?.response?.data || '保存论文得分失败')
+  } finally {
+    scoreSaving.value = false
+  }
+}
 
 const auditForm = reactive({
   auditStatus: '',
@@ -425,23 +381,6 @@ const getStatusType = (status) => {
 const formatDateTime = (dateTime) => {
   if (!dateTime) return '-'
   return new Date(dateTime).toLocaleString('zh-CN')
-}
-
-// 解析附件字符串（JSON格式）
-const parseAttachments = (attachments) => {
-  if (!attachments) return []
-  try {
-    if (typeof attachments === 'string') {
-      const parsed = JSON.parse(attachments)
-      return Array.isArray(parsed) ? parsed : []
-    } else if (Array.isArray(attachments)) {
-      return attachments
-    }
-    return []
-  } catch (e) {
-    console.error('解析附件失败:', e)
-    return []
-  }
 }
 
 // 加载数据
@@ -527,17 +466,6 @@ const handleSearch = () => {
   filterAndPaginate()
 }
 
-// 使用工具函数
-const isImageFile = isImage
-
-// 获取图片预览列表（仅图片）
-const getImagePreviewList = (attachments) => {
-  const files = parseAttachments(attachments)
-  return files
-    .filter(file => isImageFile(file.url || file))
-    .map(file => getFileUrl(file.url || file))
-}
-
 // 重置
 const handleReset = () => {
   Object.assign(searchForm, {
@@ -599,6 +527,8 @@ const submitAudit = async () => {
 // 查看详情
 const handleView = (row) => {
   currentRow.value = row
+  scoreForm.scoreRatio = row.scoreRatio || ''
+  scoreForm.paperScore = row.paperScore ?? null
   detailDialogVisible.value = true
 }
 
@@ -737,12 +667,6 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
-/* 展开内容 */
-.expand-content {
-  padding: 20px;
-  background-color: #fafafa;
-}
-
 /* 待审核行高亮 */
 :deep(.pending-row) {
   background-color: #fef0f0;
@@ -825,14 +749,5 @@ onMounted(() => {
   }
 }
 
-/* 附件容器样式 */
-.attachment-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.attachment-item {
-  display: inline-block;
-}
+:deep(.action-column .cell) { white-space: nowrap; }
 </style>

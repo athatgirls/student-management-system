@@ -2,8 +2,12 @@
   <div class="student-overview" v-loading="loading">
     <el-card class="overview-toolbar">
       <template #header><div class="toolbar"><strong>{{ isAdmin ? '学生全量信息' : '状况一览表' }}</strong><el-button @click="load">刷新</el-button></div></template>
-      <div v-if="isAdmin" class="toolbar">
-        <el-input v-model="keyword" placeholder="搜索姓名或学号" clearable @keyup.enter="search" />
+      <div v-if="isAdmin" class="toolbar search-toolbar">
+        <el-select v-model="grade" placeholder="全部年级" clearable filterable aria-label="筛选年级">
+          <el-option v-for="item in grades" :key="item" :label="item" :value="item" />
+        </el-select>
+        <el-input v-model="studentIdKeyword" placeholder="搜索学号" clearable @keyup.enter="search" />
+        <el-input v-model="keyword" placeholder="搜索姓名" clearable @keyup.enter="search" />
         <el-button type="primary" @click="search">查询</el-button>
       </div>
       <div v-else class="toolbar"><span>左右滑动查看完整信息</span><el-button type="primary" @click="editAppointment()">新增任职记录</el-button></div>
@@ -50,7 +54,7 @@
         </thead>
         <tbody>
           <tr v-for="(student, index) in students" :key="student.id || student.studentId">
-            <td>{{ isAdmin ? (page - 1) * 10 + index + 1 : index + 1 }}</td>
+            <td>{{ isAdmin ? (page - 1) * pageSize + index + 1 : index + 1 }}</td>
             <td v-for="field in studentFields" :key="field.key">{{ studentField(student, field.key) }}</td>
             <template v-for="group in groups" :key="group.key">
               <template v-if="group.key === 'D'">
@@ -96,17 +100,17 @@
         </tbody>
       </table>
     </div>
-    <el-pagination v-if="isAdmin" v-model:current-page="page" :total="total" :page-size="10" layout="total, prev, pager, next" @current-change="load" />
+    <el-pagination v-if="isAdmin" v-model:current-page="page" v-model:page-size="pageSize" :page-sizes="[10, 20, 50, 100]" :total="total" layout="total, sizes, prev, pager, next" @current-change="load" @size-change="changePageSize" />
     <el-dialog :model-value="!!detail" :title="detailTitle" width="min(900px, 95vw)" @close="detail = null">
       <el-descriptions v-if="detail" :column="1" border>
         <el-descriptions-item v-for="[key, value] in detailEntries" :key="key" :label="fieldLabels[key] || key">{{ displayValue(key, value) }}</el-descriptions-item>
         <el-descriptions-item v-for="(value, key) in detail.submissionFields || {}" :key="'submission-' + key" :label="key">
-          <RecordAttachments v-if="attachmentValue(value)" :model-value="attachmentValue(value)" />
+          <PrivateAttachments v-if="attachmentValue(value)" :attachments="attachmentValue(value)" />
           <template v-else>{{ displayValue(key, value) }}</template>
         </el-descriptions-item>
-        <el-descriptions-item v-if="detail.attachments" label="证明材料"><RecordAttachments :model-value="detail.attachments" /></el-descriptions-item>
-        <el-descriptions-item v-if="detail.evidenceUrl" label="证明材料"><el-link :href="getFileUrl(detail.evidenceUrl)" target="_blank" rel="noopener">查看证明材料</el-link></el-descriptions-item>
-        <el-descriptions-item v-if="detail.attachmentUrl" label="附件材料"><el-link :href="getFileUrl(detail.attachmentUrl)" target="_blank" rel="noopener">查看附件材料</el-link></el-descriptions-item>
+        <el-descriptions-item v-if="detail.attachments" label="证明材料"><PrivateAttachments :attachments="detail.attachments" /></el-descriptions-item>
+        <el-descriptions-item v-if="detail.evidenceUrl" label="证明材料"><PrivateAttachments :attachments="detail.evidenceUrl" /></el-descriptions-item>
+        <el-descriptions-item v-if="detail.attachmentUrl" label="附件材料"><PrivateAttachments :attachments="detail.attachmentUrl" /></el-descriptions-item>
       </el-descriptions>
     </el-dialog>
     <el-dialog v-model="appointmentDialog" :title="appointment.id ? '编辑任职记录' : '新增任职记录'" width="min(600px, 95vw)" :close-on-click-modal="false">
@@ -127,8 +131,9 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/api/request'
+import { getAllGrades } from '@/api/student'
 import RecordAttachments from '@/components/RecordAttachments.vue'
-import { getFileUrl } from '@/utils/imageUrl'
+import PrivateAttachments from '@/components/PrivateAttachments.vue'
 import { fieldLabels, displayValue } from '@/utils/overviewFields'
 import { buildOverviewGroups, getOverviewRecords, getBonusDetails, overviewValue } from '@/utils/overviewLayout'
 import { calculateStudyGrade } from '@/utils/studyGradeScore'
@@ -150,7 +155,11 @@ const numerals = ['一', '二', '三', '四', '五', '六', '七', '八', '九',
 const slotLabel = number => numerals[number - 1] || String(number)
 const loading = ref(false)
 const keyword = ref('')
+const grade = ref('')
+const grades = ref([])
+const studentIdKeyword = ref('')
 const page = ref(1)
+const pageSize = ref(10)
 const total = ref(0)
 const detail = ref(null)
 const detailTitle = ref('详情')
@@ -164,7 +173,7 @@ const attachmentValue = value => {
 const load = async () => {
   loading.value = true
   try {
-    const res = await request.get('/student-overview', { params: isAdmin.value ? { keyword: keyword.value, page: page.value, size: 10 } : {} })
+    const res = await request.get('/student-overview', { params: isAdmin.value ? { keyword: keyword.value.trim(), grade: grade.value, studentIdKeyword: studentIdKeyword.value.trim(), page: page.value, size: pageSize.value } : {} })
     if (res.code !== 200) throw new Error(res.msg)
     students.value = res.data.students; total.value = res.data.total
   } catch (e) { ElMessage.error(e.message || '加载一览表失败') }
@@ -172,6 +181,14 @@ const load = async () => {
 }
 const showDetail = (section, row) => { detail.value = row; detailTitle.value = section.label + '详情' }
 const search = () => { page.value = 1; load() }
+const changePageSize = () => { page.value = 1; load() }
+const loadGrades = async () => {
+  try {
+    const res = await getAllGrades()
+    if (res.code !== 200) throw new Error(res.msg)
+    grades.value = res.data || []
+  } catch (e) { ElMessage.error(e.message || '加载年级失败') }
+}
 const appointmentDialog = ref(false)
 const appointment = ref({})
 const saving = ref(false)
@@ -197,13 +214,15 @@ const removeAppointment = async row => {
     ElMessage.success('删除成功'); await load()
   } catch (e) { if (e !== 'cancel' && e !== 'close') ElMessage.error(e.message || '删除失败') }
 }
-onMounted(load)
+onMounted(() => { load(); if (isAdmin.value) loadGrades() })
 </script>
 <style scoped>
 .student-overview { padding: 20px; min-width: 0; }
 .overview-toolbar { margin-bottom: 16px; }
 .toolbar { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.search-toolbar { justify-content: flex-start; }
 .toolbar .el-input { width: 200px; }
+.toolbar .el-select { width: 160px; }
 .overview-scroll { max-width: 100%; overflow-x: auto; border: 1px solid #dcdfe6; background: #fff; }
 .overview-scroll:focus-visible { outline: 2px solid #409eff; outline-offset: 2px; }
 .overview-grid { table-layout: fixed; border-collapse: collapse; width: max-content; font-size: 13px; color: #303133; }

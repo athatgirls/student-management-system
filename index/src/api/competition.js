@@ -84,6 +84,7 @@ export const updatePaper = (id, data) => {
   return request({
     url: `/papers/${id}`,
     method: 'post',
+    params: { scoreEdit: true },
     data
   })
 }
@@ -196,6 +197,13 @@ export const auditPaper = (data) => {
   })
 }
 
+// 管理员维护论文得分比例与得分
+export const updatePaperScore = (id, data) => request({
+  url: `/papers/admin/${id}/score`,
+  method: 'post',
+  data
+})
+
 // 审核专利
 export const auditPatent = (data) => {
   return request({
@@ -286,6 +294,9 @@ export const searchCompetitions = (params) => {
 
 // 文件上传
 export const uploadFile = (formData) => {
+  if (formData.getAll('file').some(file => file.size > 10 * 1024 * 1024)) {
+    return Promise.reject(new Error('单个文件不能超过 10MB'))
+  }
   return request({
     url: '/upload',
     method: 'post',
@@ -295,4 +306,3 @@ export const uploadFile = (formData) => {
     }
   })
 }
-

@@ -5,7 +5,7 @@
       <template #tip><small>支持 PDF、Word、图片，单个文件不超过 10 MB</small></template>
     </el-upload>
     <div v-for="(file, i) in files" :key="file.url">
-      <el-link :href="getFileUrl(file.url)" target="_blank" rel="noopener">{{ file.name || '查看材料' }}</el-link>
+      <PrivateAttachments :attachments="[file]" />
       <el-button v-if="editable" link type="danger" @click="remove(i)">移除</el-button>
     </div>
   </div>
@@ -14,7 +14,7 @@
 import { computed, ref, defineProps, defineEmits } from 'vue'
 import { ElMessage } from 'element-plus'
 import { uploadFile } from '@/api/competition'
-import { getFileUrl } from '@/utils/imageUrl'
+import PrivateAttachments from '@/components/PrivateAttachments.vue'
 const props = defineProps({ modelValue: { type: String, default: '' }, editable: Boolean, limit: { type: Number, default: 5 }, label: { type: String, default: '上传证明材料' } })
 const emit = defineEmits(['update:modelValue', 'uploading'])
 const uploading = ref(false)

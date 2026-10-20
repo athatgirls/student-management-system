@@ -126,56 +126,6 @@
         style="width: 100%"
         :row-class-name="tableRowClassName"
       >
-        <el-table-column type="expand">
-          <template #default="{ row }">
-            <div class="expand-content">
-              <el-descriptions :column="2" border size="small">
-                <el-descriptions-item label="学号">{{ row.studentId }}</el-descriptions-item>
-                <el-descriptions-item label="学生姓名">{{ row.studentName }}</el-descriptions-item>
-                <el-descriptions-item label="项目名称" :span="2">{{ row.projectName }}</el-descriptions-item>
-                <el-descriptions-item label="项目级别">{{ row.projectLevel }}</el-descriptions-item>
-                <el-descriptions-item label="排名">{{ row.ranking }}</el-descriptions-item>
-                <el-descriptions-item label="开始时间">{{ row.startDate }}</el-descriptions-item>
-                <el-descriptions-item label="结束时间">{{ row.endDate }}</el-descriptions-item>
-                <el-descriptions-item label="指导老师" :span="2">{{ row.instructorName || '-' }}</el-descriptions-item>
-                <el-descriptions-item label="团队成员" :span="2">{{ row.teamMembers || '-' }}</el-descriptions-item>
-                <el-descriptions-item label="项目描述" :span="2">{{ row.description || '-' }}</el-descriptions-item>
-                <el-descriptions-item label="提交时间" :span="2">{{ formatDateTime(row.createTime) }}</el-descriptions-item>
-                <el-descriptions-item label="审核意见" :span="2" v-if="row.auditComment">
-                  <el-tag :type="getStatusType(row.auditStatus)" effect="plain">
-                    {{ row.auditComment }}
-                  </el-tag>
-                </el-descriptions-item>
-                <el-descriptions-item label="附件" :span="2" v-if="row.attachments">
-                  <div class="attachment-container">
-                    <div v-for="(file, index) in parseAttachments(row.attachments)" :key="index" class="attachment-item">
-                      <el-image
-                        v-if="isImageFile(file.url)"
-                        :src="getFileUrl(file.url)"
-                        :preview-src-list="getImagePreviewList(row.attachments)"
-                        :initial-index="index"
-                        fit="cover"
-                        style="width: 100px; height: 100px; margin-right: 10px; cursor: pointer;"
-                        :lazy="true"
-                      />
-                      <el-link
-                        v-else
-                        :href="getFileUrl(file.url)"
-                        target="_blank"
-                        type="primary"
-                        style="margin-right: 10px;"
-                      >
-                        <el-icon><Paperclip /></el-icon>
-                        {{ file.name || '下载附件' }}
-                      </el-link>
-                    </div>
-                  </div>
-                </el-descriptions-item>
-              </el-descriptions>
-            </div>
-          </template>
-        </el-table-column>
-
         <el-table-column label="审核状态" width="100" align="center" fixed="left">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.auditStatus)" effect="dark" size="small">
@@ -280,6 +230,7 @@
       v-model="detailDialogVisible" 
       title="项目详情" 
       width="800px"
+      destroy-on-close
     >
       <el-descriptions :column="2" border v-if="currentRow">
         <el-descriptions-item label="学号">{{ currentRow.studentId }}</el-descriptions-item>
@@ -302,29 +253,7 @@
           {{ currentRow.auditComment }}
         </el-descriptions-item>
         <el-descriptions-item label="附件" :span="2" v-if="currentRow.attachments">
-          <div class="attachment-container">
-            <div v-for="(file, index) in parseAttachments(currentRow.attachments)" :key="index" class="attachment-item">
-              <el-image
-                v-if="isImageFile(file.url)"
-                :src="getFileUrl(file.url)"
-                :preview-src-list="getImagePreviewList(currentRow.attachments)"
-                :initial-index="index"
-                fit="cover"
-                style="width: 120px; height: 120px; margin-right: 10px; margin-bottom: 10px; cursor: pointer;"
-                :lazy="true"
-              />
-              <el-link
-                v-else
-                :href="getFileUrl(file.url)"
-                target="_blank"
-                type="primary"
-                style="margin-right: 10px; margin-bottom: 10px;"
-              >
-                <el-icon><Paperclip /></el-icon>
-                {{ file.name || '下载附件' }}
-              </el-link>
-            </div>
-          </div>
+          <PrivateAttachments :attachments="currentRow.attachments" />
         </el-descriptions-item>
       </el-descriptions>
       <template #footer>
@@ -342,11 +271,11 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   DataBoard, Clock, CircleCheck, CircleClose, DocumentChecked,
-  Search, Select, Close, Paperclip
+  Search, Select, Close
 } from '@element-plus/icons-vue'
 import { getAllProjects, auditProject, deleteProject } from '@/api/competition'
 import { useStore } from 'vuex'
-import { getFileUrl, isImage } from '@/utils/imageUrl'
+import PrivateAttachments from '@/components/PrivateAttachments.vue'
 
 const store = useStore()
 const loading = ref(false)
@@ -425,34 +354,6 @@ const getStatusType = (status) => {
 const formatDateTime = (dateTime) => {
   if (!dateTime) return '-'
   return new Date(dateTime).toLocaleString('zh-CN')
-}
-
-// 解析附件字符串（JSON格式）
-const parseAttachments = (attachments) => {
-  if (!attachments) return []
-  try {
-    if (typeof attachments === 'string') {
-      const parsed = JSON.parse(attachments)
-      return Array.isArray(parsed) ? parsed : []
-    } else if (Array.isArray(attachments)) {
-      return attachments
-    }
-    return []
-  } catch (e) {
-    console.error('解析附件失败:', e)
-    return []
-  }
-}
-
-// 使用工具函数
-const isImageFile = isImage
-
-// 获取图片预览列表（仅图片）
-const getImagePreviewList = (attachments) => {
-  const files = parseAttachments(attachments)
-  return files
-    .filter(file => isImageFile(file.url || file))
-    .map(file => getFileUrl(file.url || file))
 }
 
 // 加载数据
@@ -722,12 +623,6 @@ onMounted(() => {
   background-color: #f5f7fa;
   border-radius: 4px;
   margin-bottom: 20px;
-}
-
-/* 展开内容 */
-.expand-content {
-  padding: 20px;
-  background-color: #fafafa;
 }
 
 /* 待审核行高亮 */

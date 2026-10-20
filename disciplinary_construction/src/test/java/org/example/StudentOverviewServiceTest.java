@@ -7,11 +7,39 @@ import org.example.service.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
+import org.mockito.ArgumentCaptor;
 import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class StudentOverviewServiceTest {
+    @Test void adminFiltersByGradeAndPartialStudentNumberBeforePaginating() {
+        StudentRepository students = mock(StudentRepository.class);
+        MongoTemplate mongo = mock(MongoTemplate.class);
+        when(mongo.count(any(Query.class), eq(StudentModel.class))).thenReturn(37L);
+        when(mongo.find(any(Query.class), eq(StudentModel.class))).thenReturn(Collections.emptyList());
+        StudentOverviewService service = new StudentOverviewService(mongo, students,
+                new CurrentUserAccessService(students), new ObjectMapper());
+
+        Map<String, Object> result = service.overview(null, "张", "2025级", " 10.* ", null, 2, 20,
+                Map.of("userType", "admin"));
+
+        assertEquals(37L, result.get("total"));
+        ArgumentCaptor<Query> counted = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Query> fetched = ArgumentCaptor.forClass(Query.class);
+        verify(mongo).count(counted.capture(), eq(StudentModel.class));
+        verify(mongo).find(fetched.capture(), eq(StudentModel.class));
+        String filter = counted.getValue().getQueryObject().toJson();
+        assertEquals(filter, fetched.getValue().getQueryObject().toJson());
+        assertTrue(filter.contains("2025级"));
+        assertTrue(filter.contains("name"));
+        assertTrue(filter.contains("studentId"));
+        assertTrue(filter.contains("\\\\Q10.*\\\\E"));
+        assertEquals(20, fetched.getValue().getSkip());
+        assertEquals(20, fetched.getValue().getLimit());
+        verify(students, never()).findByStudentId(anyString());
+    }
+
     @Test void studentQueryIgnoresRequestedOtherStudentAndFiltersAllCollections() {
         StudentRepository students = mock(StudentRepository.class);
         StudentModel own = new StudentModel(); own.setId("db-a"); own.setStudentId("1001");
@@ -29,7 +57,7 @@ class StudentOverviewServiceTest {
             return Collections.emptyList();
         });
         Map<String, Object> result = new StudentOverviewService(mongo, students, new CurrentUserAccessService(students), new ObjectMapper())
-                .overview("db-b", null, null, null, 1, 10, Map.of("userId", "db-a", "userType", "student"));
+                .overview("db-b", null, null, null, null, 1, 10, Map.of("userId", "db-a", "userType", "student"));
         assertEquals(1, result.get("total"));
         verify(students, never()).findById("db-b"); verify(students, never()).findByStudentId("db-b");
         verify(mongo, times(11)).find(any(Query.class), any(Class.class));
@@ -51,7 +79,7 @@ class StudentOverviewServiceTest {
             return Collections.emptyList();
         });
         Map<String, Object> result = new StudentOverviewService(mongo, students, new CurrentUserAccessService(students), new ObjectMapper())
-                .overview(null, null, null, null, 1, 10, Map.of("userId", "db-a", "userType", "student"));
+                .overview(null, null, null, null, null, 1, 10, Map.of("userId", "db-a", "userType", "student"));
         Map<?, ?> summary = (Map<?, ?>) ((List<?>) result.get("students")).get(0);
         Map<?, ?> activity = (Map<?, ?>) ((List<?>) summary.get("academic")).get(0);
         assertEquals("学术讲座", activity.get("title"));
@@ -87,11 +115,11 @@ class StudentOverviewServiceTest {
         StudentOverviewService service = new StudentOverviewService(mongo, students,
                 new CurrentUserAccessService(students), new ObjectMapper());
         Map<String, Object> user = Map.of("userId", "db-a", "userType", "student");
-        Map<?, ?> attended = (Map<?, ?>) ((List<?>) service.overview(null, null, null, null, 1, 10, user).get("students")).get(0);
+        Map<?, ?> attended = (Map<?, ?>) ((List<?>) service.overview(null, null, null, null, null, 1, 10, user).get("students")).get(0);
         assertEquals("已完成", ((Map<?, ?>) ((List<?>) attended.get("academic")).get(0)).get("status"));
 
         activity.setParticipantStudentIds(Collections.emptyList());
-        Map<?, ?> registered = (Map<?, ?>) ((List<?>) service.overview(null, null, null, null, 1, 10, user).get("students")).get(0);
+        Map<?, ?> registered = (Map<?, ?>) ((List<?>) service.overview(null, null, null, null, null, 1, 10, user).get("students")).get(0);
         assertEquals("已报名", ((Map<?, ?>) ((List<?>) registered.get("academic")).get(0)).get("status"));
     }
 }

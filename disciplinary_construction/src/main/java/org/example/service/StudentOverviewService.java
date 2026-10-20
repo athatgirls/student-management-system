@@ -23,7 +23,7 @@ public class StudentOverviewService {
         this.mongo = mongo; this.students = students; this.access = access; this.mapper = mapper;
     }
 
-    public Map<String, Object> overview(String studentId, String keyword, String grade, String major, int page, int size, Map<String, Object> user) {
+    public Map<String, Object> overview(String studentId, String keyword, String grade, String studentIdKeyword, String major, int page, int size, Map<String, Object> user) {
         List<StudentModel> selected;
         if (!access.isAdmin(user)) {
             selected = List.of(access.requireCurrentStudent(user));
@@ -38,6 +38,8 @@ public class StudentOverviewService {
                 String literal = java.util.regex.Pattern.quote(keyword.trim());
                 filters.add(new Criteria().orOperator(Criteria.where("name").regex(literal, "i"), Criteria.where("studentId").regex(literal, "i")));
             }
+            if (studentIdKeyword != null && !studentIdKeyword.isBlank())
+                filters.add(Criteria.where("studentId").regex(java.util.regex.Pattern.quote(studentIdKeyword.trim()), "i"));
             if (grade != null && !grade.isBlank()) filters.add(Criteria.where("grade").is(grade));
             if (major != null && !major.isBlank()) filters.add(Criteria.where("major").is(major));
             if (!filters.isEmpty()) criteria.andOperator(filters.toArray(new Criteria[0]));

@@ -35,6 +35,12 @@ public class ExceptionHandel {
         return result;
     }
 
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    @ResponseStatus(HttpStatus.PAYLOAD_TOO_LARGE)
+    public Map<String, Object> handleUploadTooLarge(org.springframework.web.multipart.MaxUploadSizeExceededException exception) {
+        return Map.of("code", 413, "msg", "单个文件不能超过 10MB，请求总量不能超过 50MB");
+    }
+
     @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
     // Preserve explicit HTTP statuses from resource lookup and validation failures.
     @SuppressWarnings("unused")

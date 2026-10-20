@@ -14,8 +14,9 @@ public class StudentOverviewController {
     @GetMapping
     public ResponseResult<Map<String, Object>> overview(@RequestParam(required = false) String studentId,
             @RequestParam(required = false) String keyword, @RequestParam(required = false) String grade,
+            @RequestParam(required = false) String studentIdKeyword,
             @RequestParam(required = false) String major, @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size, @CurrentUser Map<String, Object> user) {
-        return ResponseResult.success(service.overview(studentId, keyword, grade, major, page, size, user));
+        return ResponseResult.success(service.overview(studentId, keyword, grade, studentIdKeyword, major, page, size, user));
     }
 }

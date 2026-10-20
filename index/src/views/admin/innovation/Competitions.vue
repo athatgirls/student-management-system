@@ -126,55 +126,6 @@
         style="width: 100%"
         :row-class-name="tableRowClassName"
       >
-        <el-table-column type="expand">
-          <template #default="{ row }">
-            <div class="expand-content">
-              <el-descriptions :column="2" border size="small">
-                <el-descriptions-item label="学号">{{ row.studentId }}</el-descriptions-item>
-                <el-descriptions-item label="学生姓名">{{ row.studentName }}</el-descriptions-item>
-                <el-descriptions-item label="竞赛名称" :span="2">{{ row.competitionName }}</el-descriptions-item>
-                <el-descriptions-item label="竞赛级别">{{ row.competitionLevel }}</el-descriptions-item>
-                <el-descriptions-item label="获奖等级">{{ row.awardLevel }}</el-descriptions-item>
-                <el-descriptions-item label="排名">{{ row.ranking }}</el-descriptions-item>
-                <el-descriptions-item label="获奖时间">{{ row.awardDate }}</el-descriptions-item>
-                <el-descriptions-item label="指导老师" :span="2">{{ row.instructorName || '-' }}</el-descriptions-item>
-                <el-descriptions-item label="团队成员" :span="2">{{ row.teamMembers || '-' }}</el-descriptions-item>
-                <el-descriptions-item label="提交时间" :span="2">{{ formatDateTime(row.createTime) }}</el-descriptions-item>
-                <el-descriptions-item label="审核意见" :span="2" v-if="row.auditComment">
-                  <el-tag :type="getStatusType(row.auditStatus)" effect="plain">
-                    {{ row.auditComment }}
-                  </el-tag>
-                </el-descriptions-item>
-                <el-descriptions-item label="附件" :span="2" v-if="row.attachments">
-                  <div class="attachment-container">
-                    <div v-for="(file, index) in parseAttachments(row.attachments)" :key="index" class="attachment-item">
-                      <el-image
-                        v-if="isImageFile(file.url || file)"
-                        :src="getFileUrl(file.url)"
-                        :preview-src-list="getImagePreviewList(row.attachments)"
-                        :initial-index="index"
-                        fit="cover"
-                        style="width: 100px; height: 100px; margin-right: 10px; cursor: pointer;"
-                        :lazy="true"
-                      />
-                      <el-link
-                        v-else
-                        :href="getFileUrl(file.url)"
-                        target="_blank"
-                        type="primary"
-                        style="margin-right: 10px;"
-                      >
-                        <el-icon><Paperclip /></el-icon>
-                        {{ file.name || '下载附件' }}
-                      </el-link>
-                    </div>
-                  </div>
-                </el-descriptions-item>
-              </el-descriptions>
-            </div>
-          </template>
-        </el-table-column>
-
         <el-table-column label="审核状态" width="100" align="center" fixed="left">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.auditStatus)" effect="dark" size="small">
@@ -276,6 +227,7 @@
       v-model="detailDialogVisible" 
       title="竞赛详情" 
       width="800px"
+      destroy-on-close
     >
       <el-descriptions :column="2" border v-if="currentRow">
         <el-descriptions-item label="学号">{{ currentRow.studentId }}</el-descriptions-item>
@@ -297,29 +249,7 @@
           {{ currentRow.auditComment }}
         </el-descriptions-item>
         <el-descriptions-item label="证明材料" :span="2" v-if="currentRow.attachments">
-          <div class="attachment-container">
-            <div v-for="(file, index) in parseAttachments(currentRow.attachments)" :key="index" class="attachment-item">
-              <el-image
-                v-if="isImageFile(file.url || file)"
-                :src="getFileUrl(file.url || file)"
-                :preview-src-list="getImagePreviewList(currentRow.attachments)"
-                :initial-index="index"
-                fit="contain"
-                style="width: 200px; height: 200px; margin-right: 10px; margin-bottom: 10px; cursor: pointer; border: 1px solid #e4e7ed; border-radius: 4px;"
-                :lazy="true"
-              />
-              <el-link
-                v-else
-                :href="getFileUrl(file.url || file)"
-                target="_blank"
-                type="primary"
-                style="margin-right: 10px; margin-bottom: 10px;"
-              >
-                <el-icon><Paperclip /></el-icon>
-                {{ file.name || (typeof file === 'string' ? file : '下载附件') }}
-              </el-link>
-            </div>
-          </div>
+          <PrivateAttachments :attachments="currentRow.attachments" />
         </el-descriptions-item>
       </el-descriptions>
       <template #footer>
@@ -337,11 +267,11 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   DataBoard, Clock, CircleCheck, CircleClose, DocumentChecked,
-  Search, Select, Close, Paperclip
+  Search, Select, Close
 } from '@element-plus/icons-vue'
 import { getAllCompetitions, auditCompetition, deleteCompetition } from '@/api/competition'
 import { useStore } from 'vuex'
-import { getFileUrl, isImage } from '@/utils/imageUrl'
+import PrivateAttachments from '@/components/PrivateAttachments.vue'
 
 const store = useStore()
 const loading = ref(false)
@@ -420,51 +350,6 @@ const getStatusType = (status) => {
 const formatDateTime = (dateTime) => {
   if (!dateTime) return '-'
   return new Date(dateTime).toLocaleString('zh-CN')
-}
-
-// 解析附件字符串（JSON格式或单个文件名字符串）
-const parseAttachments = (attachments) => {
-  if (!attachments) return []
-  try {
-    if (typeof attachments === 'string') {
-      // 尝试解析JSON
-      try {
-      const parsed = JSON.parse(attachments)
-        if (Array.isArray(parsed)) {
-          return parsed
-        }
-        // 如果不是数组，可能是单个文件对象
-        return [parsed]
-      } catch {
-        // 如果解析失败，可能是单个文件URL字符串（如文件名）
-        // 检查是否是图片文件
-        if (isImageFile(attachments)) {
-          return [{ url: attachments, name: attachments.split('/').pop() }]
-        }
-        return [{ url: attachments, name: attachments.split('/').pop() }]
-      }
-    } else if (Array.isArray(attachments)) {
-      return attachments
-    } else if (typeof attachments === 'object') {
-      // 单个文件对象
-      return [attachments]
-    }
-    return []
-  } catch (e) {
-    console.error('解析附件失败:', e)
-    return []
-  }
-}
-
-// 使用工具函数
-const isImageFile = isImage
-
-// 获取图片预览列表（仅图片）
-const getImagePreviewList = (attachments) => {
-  const files = parseAttachments(attachments)
-  return files
-    .filter(file => isImageFile(file.url || file))
-    .map(file => getFileUrl(file.url || file))
 }
 
 // 加载数据
@@ -745,12 +630,6 @@ onMounted(() => {
   background-color: #f5f7fa;
   border-radius: 4px;
   margin-bottom: 20px;
-}
-
-/* 展开内容 */
-.expand-content {
-  padding: 20px;
-  background-color: #fafafa;
 }
 
 /* 待审核行高亮 */
