@@ -123,7 +123,7 @@
     </el-row>
 
     <!-- 最新动态和待审批 -->
-    <el-row :gutter="20" style="margin-top: 20px;">
+    <el-row :gutter="20" class="activity-approval-row" style="margin-top: 20px;">
       <el-col :xs="24" :sm="24" :md="12" :lg="12">
         <el-card>
           <template #header>
@@ -131,7 +131,7 @@
               <span>最新动态</span>
             </div>
           </template>
-          <el-timeline v-if="recentActivities.length > 0">
+          <el-timeline v-if="recentActivities.length > 0" class="recent-activities-list">
             <el-timeline-item
               v-for="activity in displayedRecentActivities"
               :key="activity.id"
@@ -656,6 +656,38 @@ onUnmounted(() => {
 .approval-list {
   max-height: 300px;
   overflow-y: auto;
+}
+
+.recent-activities-list {
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+@media (min-width: 992px) {
+  .activity-approval-row > .el-col > .el-card {
+    height: 680px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .activity-approval-row > .el-col > .el-card > :deep(.el-card__body) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .activity-approval-row .recent-activities-list,
+  .activity-approval-row .approval-list {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+  }
+
+  .activity-approval-row .more-actions {
+    flex-shrink: 0;
+  }
 }
 
 .approval-item {

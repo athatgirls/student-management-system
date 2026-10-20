@@ -87,7 +87,7 @@
               <span>我的最近活动</span>
             </div>
           </template>
-          <el-timeline>
+          <el-timeline class="recent-activities-list">
             <el-timeline-item
               v-for="activity in displayedRecentActivities"
               :key="activity.id"
@@ -987,6 +987,39 @@ onMounted(async () => {
 .todo-list {
   max-height: 300px;
   overflow-y: auto;
+}
+
+.recent-activities-list {
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+@media (min-width: 992px) {
+  .main-content-row > .el-col > .el-card {
+    height: 680px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .main-content-row > .el-col > .el-card > :deep(.el-card__body) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .main-content-row .recent-activities-list,
+  .main-content-row .todo-list {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+  }
+
+  .main-content-row .more-actions,
+  .main-content-row .todo-tabs {
+    flex-shrink: 0;
+  }
 }
 
 .todo-item {
