@@ -403,6 +403,17 @@ public class GradeController {
         return ResponseEntity.ok(Map.of("code", 200, "data", data, "msg", "Grade records loaded"));
     }
 
+    @GetMapping("/manage/semesters")
+    public ResponseEntity<Map<String, Object>> getManagedSemesters(@CurrentUser Map<String, Object> user) {
+        if (user == null || !"admin".equals(user.get("userType"))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "仅管理员可查看成绩学期");
+        }
+        List<String> semesters = mongoTemplate.findDistinct(new Query(), "semester", StudyRecordModel.class, String.class)
+                .stream().filter(value -> value != null && !value.trim().isEmpty())
+                .distinct().sorted(String::compareTo).collect(Collectors.toList());
+        return ResponseEntity.ok(Map.of("code", 200, "data", semesters, "msg", "Semesters loaded"));
+    }
+
     @PostMapping("/manage/records/{id}")
     public ResponseEntity<Map<String, Object>> updateManagedRecord(@PathVariable String id,
             @RequestBody Map<String, Object> input, @CurrentUser Map<String, Object> user) {

@@ -48,6 +48,10 @@ export function getManagedGradeRecords(params) {
   return request.get('/grade/manage/records', { params })
 }
 
+export function getManagedGradeSemesters() {
+  return request.get('/grade/manage/semesters')
+}
+
 export function updateManagedGradeRecord(id, data) {
   return request.post(`/grade/manage/records/${id}`, data)
 }

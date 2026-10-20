@@ -17,7 +17,9 @@
         </el-select>
         <el-input v-model="filters.studentId" placeholder="按学号查询" clearable @keyup.enter="search" />
         <el-input v-model="filters.course" placeholder="按课程名称查询" clearable @keyup.enter="search" />
-        <el-input v-model="filters.semester" placeholder="按学期查询" clearable @keyup.enter="search" />
+        <el-select v-model="filters.semester" placeholder="选择学期" clearable filterable>
+          <el-option v-for="item in semesters" :key="item" :label="item" :value="item" />
+        </el-select>
         <el-button type="primary" :loading="loading" @click="search">查询</el-button>
         <el-button @click="reset">重置</el-button>
       </div>
@@ -86,13 +88,14 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getManagedGradeRecords, updateManagedGradeRecord } from '@/api/grade'
+import { getManagedGradeRecords, getManagedGradeSemesters, updateManagedGradeRecord } from '@/api/grade'
 import { getAllGrades } from '@/api/student'
 
 const router = useRouter()
 const filters = reactive({ grade: '', studentId: '', course: '', semester: '' })
 const appliedFilters = reactive({ grade: '', studentId: '', course: '', semester: '' })
 const grades = ref([])
+const semesters = ref([])
 const records = ref([])
 const loading = ref(false)
 const saving = ref(false)
@@ -149,6 +152,16 @@ const changeSize = () => {
   loadRecords()
 }
 
+const loadSemesters = async () => {
+  try {
+    const response = await getManagedGradeSemesters()
+    if (response.code !== 200) throw new Error(response.msg || '学期列表加载失败')
+    semesters.value = response.data || []
+  } catch (error) {
+    ElMessage.error(error.message || '学期列表加载失败')
+  }
+}
+
 const openEdit = row => {
   Object.assign(editForm, {
     id: row.id, studentId: row.studentId, semester: row.semester || '', course: row.course || '',
@@ -174,6 +187,7 @@ const saveEdit = async () => {
     editVisible.value = false
     ElMessage.success('成绩已更新')
     await loadRecords()
+    await loadSemesters()
   } catch (error) {
     ElMessage.error(error.message || '保存失败')
   } finally {
@@ -183,6 +197,7 @@ const saveEdit = async () => {
 
 onMounted(async () => {
   loadRecords()
+  loadSemesters()
   try {
     const response = await getAllGrades()
     if (response.code === 200) grades.value = response.data || []

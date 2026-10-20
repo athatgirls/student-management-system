@@ -47,6 +47,15 @@ class GradeManagementTest {
     }
 
     @Test
+    void semestersAreDistinctSortedAndAdminOnly() {
+        assertThrows(ResponseStatusException.class, () -> controller.getManagedSemesters(Map.of("userType", "student")));
+        when(mongoTemplate.findDistinct(any(Query.class), eq("semester"), eq(StudyRecordModel.class), eq(String.class)))
+                .thenReturn(java.util.Arrays.asList("2026-2027-1", " ", "2025-2026-1", "2026-2027-1"));
+        assertEquals(java.util.Arrays.asList("2025-2026-1", "2026-2027-1"),
+                controller.getManagedSemesters(Map.of("userType", "admin")).getBody().get("data"));
+    }
+
+    @Test
     void gradeCourseAndStudentFiltersAreCombinedBeforePagination() {
         StudentModel student = new StudentModel();
         student.setId("db-1"); student.setStudentId("10240001");
