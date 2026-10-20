@@ -67,8 +67,8 @@
               <el-icon><Trophy /></el-icon>
               <span>科创竞赛</span>
               <el-badge 
-                v-if="innovationPendingCount > 0" 
-                :value="innovationPendingCount" 
+                v-if="innovationPendingCount > 0"
+                :value="innovationPendingCount"
                 :max="99"
                 class="menu-badge"
               />
@@ -98,7 +98,7 @@
             <el-menu-item index="/admin/innovation/projects/list">
               <el-icon><Operation /></el-icon>
               <span>项目管理</span>
-              <el-badge 
+              <el-badge
                 v-if="pendingCounts.project > 0" 
                 :value="pendingCounts.project" 
                 :max="99"
@@ -216,7 +216,7 @@
             <!-- 待审核提醒 -->
             <el-popover placement="bottom-end" :width="300" trigger="click">
               <template #reference>
-              <el-badge 
+              <el-badge
               :value="totalPendingCount" 
               :max="99" 
               :hidden="totalPendingCount === 0"
