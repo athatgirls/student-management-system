@@ -252,7 +252,9 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="年级" prop="grade">
-              <el-input v-model="form.grade" placeholder="请输入年级，例如：2024级" />
+              <el-select v-model="form.grade" placeholder="请选择年级" style="width: 100%">
+                <el-option v-for="grade in gradeList" :key="grade" :label="grade" :value="grade" />
+              </el-select>
             </el-form-item>
           </el-col>
         </el-row>
@@ -582,7 +584,7 @@ const rules = {
     { required: true, message: '请选择专业', trigger: 'change' }
   ],
   grade: [
-    { required: true, message: '请输入年级', trigger: 'blur' }
+    { required: true, message: '请选择年级', trigger: 'change' }
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' }

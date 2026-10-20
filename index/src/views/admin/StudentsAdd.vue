@@ -55,7 +55,9 @@
           </el-col>
           <el-col :xs="24" :sm="24" :md="12" :lg="12">
             <el-form-item label="年级" prop="grade">
-              <el-input v-model="form.grade" placeholder="请输入年级，例如：2024级" />
+              <el-select v-model="form.grade" placeholder="请选择年级" style="width: 100%">
+                <el-option v-for="grade in gradeOptions" :key="grade" :label="grade" :value="grade" />
+              </el-select>
             </el-form-item>
           </el-col>
         </el-row>
@@ -116,7 +118,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { createStudent } from '@/api/student'
+import { createStudent, getAllGrades } from '@/api/student'
 import { getMajors } from '@/api/major'
 import MajorManageDialog from '@/components/MajorManageDialog.vue'
 
@@ -124,6 +126,7 @@ const router = useRouter()
 const formRef = ref()
 const loading = ref(false)
 const majorOptions = ref([])
+const gradeOptions = ref([])
 const showMajorManageDialog = ref(false)
 
 const form = reactive({
@@ -146,7 +149,7 @@ const rules = {
   name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
   gender: [{ required: true, message: '请选择性别', trigger: 'change' }],
   major: [{ required: true, message: '请选择专业', trigger: 'change' }],
-  grade: [{ required: true, message: '请输入年级', trigger: 'blur' }],
+  grade: [{ required: true, message: '请选择年级', trigger: 'change' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
 }
 
@@ -160,6 +163,19 @@ const loadMajors = async () => {
     }
   } catch (error) {
     ElMessage.error('加载专业列表失败')
+  }
+}
+
+const loadGrades = async () => {
+  try {
+    const res = await getAllGrades()
+    if (res.code === 200) {
+      gradeOptions.value = res.data || []
+    } else {
+      ElMessage.error(res.msg || '加载年级列表失败')
+    }
+  } catch (error) {
+    ElMessage.error('加载年级列表失败')
   }
 }
 
@@ -186,7 +202,10 @@ const handleReset = () => {
   formRef.value?.resetFields()
 }
 
-onMounted(loadMajors)
+onMounted(() => {
+  loadMajors()
+  loadGrades()
+})
 </script>
 
 <style scoped>
