@@ -72,6 +72,7 @@
               <el-table-column prop="awardLevel" label="获奖等级" width="120" />
               <el-table-column prop="ranking" label="排名" width="80" />
               <el-table-column prop="awardDate" label="获奖时间" width="120"><template #default="{ row }">{{ formatDate(row.awardDate) || '-' }}</template></el-table-column>
+              <el-table-column label="得分" width="120"><template #default="{ row }">{{ row.score ?? '—' }}{{ row.scorePending ? '（待审核）' : '' }}</template></el-table-column>
               <el-table-column prop="auditStatus" label="审核状态" width="100">
                 <template #default="scope">
                   <AuditStatusTag :status="scope.row.auditStatus" />
@@ -140,6 +141,7 @@
               <el-table-column prop="patentNumber" label="专利号" width="150" />
               <el-table-column prop="inventorRank" label="发明人排名" width="100" />
               <el-table-column prop="patentStatus" label="专利状态" width="100" />
+              <el-table-column label="得分" width="120"><template #default="{ row }">{{ row.score ?? '—' }}{{ row.scorePending ? '（待审核）' : '' }}</template></el-table-column>
               <el-table-column prop="auditStatus" label="审核状态" width="100">
                 <template #default="scope">
                   <AuditStatusTag :status="scope.row.auditStatus" />
@@ -171,6 +173,7 @@
               <el-table-column prop="ranking" label="排名" width="80" />
               <el-table-column prop="startDate" label="开始时间" width="120"><template #default="{ row }">{{ formatDate(row.startDate) || '-' }}</template></el-table-column>
               <el-table-column prop="endDate" label="结束时间" width="120"><template #default="{ row }">{{ formatDate(row.endDate) || '-' }}</template></el-table-column>
+              <el-table-column label="得分" width="120"><template #default="{ row }">{{ row.score ?? '—' }}{{ row.scorePending ? '（待审核）' : '' }}</template></el-table-column>
               <el-table-column prop="auditStatus" label="审核状态" width="100">
                 <template #default="scope">
                   <AuditStatusTag :status="scope.row.auditStatus" />
@@ -273,6 +276,10 @@
           <el-input v-model="competitionForm.instructorName" placeholder="请输入指导老师姓名" />
         </el-form-item>
 
+        <template v-if="isEdit">
+          <el-form-item label="得分"><el-input-number v-model="competitionForm.score" :min="0" :step="1" style="width: 100%" /></el-form-item>
+          <span>修改得分后将由管理员审核，待审核期间显示新值。</span>
+        </template>
         <el-form-item label="证明材料" prop="attachments">
           <el-upload
               class="upload-demo"
@@ -369,7 +376,7 @@
             </el-select>
           </el-form-item>
           <el-form-item label="得分">
-            <el-input-number v-model="paperForm.paperScore" :min="0" :step="0.1" controls-position="right" style="width: 100%" />
+            <el-input-number v-model="paperForm.paperScore" :min="0" :step="1" style="width: 100%" />
             <el-button link type="primary" @click="paperForm.paperScore = null">清空得分</el-button>
           </el-form-item>
           <span>修改得分比例或得分后将由管理员审核，待审核期间显示新值。</span>
@@ -465,6 +472,11 @@
           <el-input v-model="patentForm.coInventors" placeholder="多个发明人用逗号分隔" />
         </el-form-item>
 
+        <template v-if="isEdit">
+          <el-form-item label="得分"><el-input-number v-model="patentForm.score" :min="0" :step="1" style="width: 100%" /></el-form-item>
+          <span>修改得分后将由管理员审核，待审核期间显示新值。</span>
+        </template>
+
         <el-form-item label="证明材料" prop="attachments">
           <el-upload
               class="upload-demo"
@@ -553,6 +565,11 @@
           <el-input v-model="projectForm.instructorName" placeholder="请输入指导老师姓名" />
         </el-form-item>
 
+        <template v-if="isEdit">
+          <el-form-item label="得分"><el-input-number v-model="projectForm.score" :min="0" :step="1" style="width: 100%" /></el-form-item>
+          <span>修改得分后将由管理员审核，待审核期间显示新值。</span>
+        </template>
+
         <el-form-item label="证明材料" prop="attachments">
           <el-upload
               class="upload-demo"
@@ -596,6 +613,7 @@
             <el-descriptions-item label="获奖时间">{{ formatDate(currentDetail.awardDate) || '-' }}</el-descriptions-item>
             <el-descriptions-item label="指导老师">{{ currentDetail.instructorName }}</el-descriptions-item>
             <el-descriptions-item label="团队成员" :span="2">{{ currentDetail.teamMembers }}</el-descriptions-item>
+            <el-descriptions-item label="得分">{{ currentDetail.score ?? '—' }}{{ currentDetail.scorePending ? '（待审核）' : '' }}</el-descriptions-item>
           </template>
 
           <!-- 论文详情 -->
@@ -623,6 +641,7 @@
             <el-descriptions-item label="授权时间" v-if="currentDetail.authorizationDate">{{ formatDate(currentDetail.authorizationDate) || '-' }}</el-descriptions-item>
             <el-descriptions-item label="受理时间" v-if="currentDetail.applicationDate">{{ formatDate(currentDetail.applicationDate) || '-' }}</el-descriptions-item>
             <el-descriptions-item label="合作发明人" :span="2">{{ currentDetail.coInventors }}</el-descriptions-item>
+            <el-descriptions-item label="得分">{{ currentDetail.score ?? '—' }}{{ currentDetail.scorePending ? '（待审核）' : '' }}</el-descriptions-item>
           </template>
 
           <!-- 项目详情 -->
@@ -634,6 +653,7 @@
             <el-descriptions-item label="结束时间">{{ formatDate(currentDetail.endDate) || '-' }}</el-descriptions-item>
             <el-descriptions-item label="指导老师">{{ currentDetail.instructorName }}</el-descriptions-item>
             <el-descriptions-item label="团队成员" :span="2">{{ currentDetail.teamMembers }}</el-descriptions-item>
+            <el-descriptions-item label="得分">{{ currentDetail.score ?? '—' }}{{ currentDetail.scorePending ? '（待审核）' : '' }}</el-descriptions-item>
           </template>
 
           <!-- 通用审核信息 -->
@@ -671,7 +691,7 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   addCompetition, updateCompetition, deleteCompetition, getStudentCompetitions,
   addPaper, updatePaper, deletePaper, getStudentPapers,
-  addPatent, deletePatent, getStudentPatents,
+  addPatent, updatePatent, deletePatent, getStudentPatents,
   addProject, updateProject, deleteProject, getStudentProjects,
   getAllActiveCompetitions,
   searchCompetitionDict,
@@ -775,6 +795,7 @@ const competitionForm = reactive({
   competitionName: '',
   competitionLevel: '',
   awardLevel: '',
+  score: null,
   ranking: null,
   awardDate: '',
   teamMembers: '',
@@ -809,6 +830,7 @@ const patentForm = reactive({
   authorizationDate: '',
   applicationDate: '',
   inventorRank: null,
+  score: null,
   coInventors: '',
   attachments: ''
 })
@@ -819,6 +841,7 @@ const projectForm = reactive({
   projectName: '',
   projectLevel: '',
   ranking: null,
+  score: null,
   startDate: '',
   endDate: '',
   teamMembers: '',
@@ -876,15 +899,12 @@ const beforeUpload = (file) => {
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   ]
-  const isAllowedType = allowedTypes.includes(file.type)
-  const isLimitSize = file.size <= 10 * 1024 * 1024
-
-  if (!isAllowedType) {
+  if (!allowedTypes.includes(file.type)) {
     ElMessage.error('只能上传 jpg/png/pdf/doc/docx 格式的文件!')
     return false
   }
-  if (!isLimitSize) {
-    ElMessage.error('文件大小不能超过 10MB!')
+  if (!file.size || file.size > 10 * 1024 * 1024) {
+    ElMessage.error('文件必须非空且不能超过 10MB!')
     return false
   }
   return true
@@ -895,6 +915,7 @@ const handleCustomUpload = async (options, type = 'competition') => {
   const { file, onSuccess, onError } = options
   
   try {
+    if (!beforeUpload(file)) throw new Error('文件校验未通过')
     // 创建FormData
     const formData = new FormData()
     formData.append('file', file)
@@ -1115,10 +1136,7 @@ const mergeAttachments = (current, incoming) => {
   return JSON.stringify([...existing, ...incoming])
 }
 
-// 导入图片URL工具函数
 import PrivateAttachments from '@/components/PrivateAttachments.vue'
-
-// 获取状态标签类型
 
 // 打开对话框方法
 const openCompetitionDialog = () => {
@@ -1156,7 +1174,7 @@ const editItem = (item, type) => {
 
   switch (type) {
     case 'competition':
-      Object.assign(competitionForm, item)
+      Object.assign(competitionForm, { ...item, score: item.score ?? null })
       competitionDialog.value = true
       break
     case 'paper':
@@ -1164,11 +1182,11 @@ const editItem = (item, type) => {
       paperDialog.value = true
       break
     case 'patent':
-      Object.assign(patentForm, item)
+      Object.assign(patentForm, { ...item, score: item.score ?? null })
       patentDialog.value = true
       break
     case 'project':
-      Object.assign(projectForm, item)
+      Object.assign(projectForm, { ...item, score: item.score ?? null })
       projectDialog.value = true
       break
   }
@@ -1219,7 +1237,7 @@ const submitCompetition = async () => {
     if (isEdit.value) {
       data.id = currentEditId.value
       await updateCompetition(currentEditId.value, data)
-      ElMessage.success('更新成功')
+      ElMessage.success('更新成功，得分修改待管理员审核')
     } else {
       await addCompetition(data)
       ElMessage.success('添加成功')
@@ -1271,8 +1289,8 @@ const submitPatent = async () => {
 
     if (isEdit.value) {
       data.id = currentEditId.value
-      await updateProject(currentEditId.value, data)
-      ElMessage.success('更新成功')
+      await updatePatent(currentEditId.value, data)
+      ElMessage.success('更新成功，得分修改待管理员审核')
     } else {
       await addPatent(data)
       ElMessage.success('添加成功')
@@ -1299,7 +1317,7 @@ const submitProject = async () => {
     if (isEdit.value) {
       data.id = currentEditId.value
       await updateProject(currentEditId.value, data)
-      ElMessage.success('更新成功')
+      ElMessage.success('更新成功，得分修改待管理员审核')
     } else {
       await addProject(data)
       ElMessage.success('添加成功')
@@ -1323,6 +1341,7 @@ const resetCompetitionForm = () => {
     competitionName: '',
     competitionLevel: '',
     awardLevel: '',
+    score: null,
     ranking: null,
     awardDate: '',
     teamMembers: '',
@@ -1363,6 +1382,7 @@ const resetPatentForm = () => {
     authorizationDate: '',
     applicationDate: '',
     inventorRank: null,
+    score: null,
     coInventors: '',
     attachments: ''
   })
@@ -1376,6 +1396,7 @@ const resetProjectForm = () => {
     projectName: '',
     projectLevel: '',
     ranking: null,
+    score: null,
     startDate: '',
     endDate: '',
     teamMembers: '',

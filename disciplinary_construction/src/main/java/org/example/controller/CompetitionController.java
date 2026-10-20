@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.math.BigDecimal;
+import org.springframework.security.access.AccessDeniedException;
 
 @RestController
 @RequestMapping("/msi/competitions")
@@ -48,6 +50,9 @@ public class CompetitionController {
                                             @CurrentUser Map<String, Object> currentUser) {
         competition.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
         competition.setStudentName((String) currentUser.get("username"));
+        competition.setScore(null);
+        competition.setScorePending(false);
+        competition.setPreviousScore(null);
         try {
             org.example.util.SubmissionValidation.validate(competition);
             resetCompetitionAudit(competition);
@@ -63,7 +68,8 @@ public class CompetitionController {
      */
     @PostMapping("/{id}")
     public ResponseEntity<?> updateCompetition(@PathVariable String id, @RequestBody CompetitionModel competition,
-                                               @CurrentUser Map<String, Object> currentUser) {
+                                                @RequestParam(defaultValue = "false") boolean scoreEdit,
+                                                @CurrentUser Map<String, Object> currentUser) {
         CompetitionModel existing = competitionService.getCompetitionById(id);
         if (existing == null) {
             return ResponseEntity.notFound().build();
@@ -74,6 +80,12 @@ public class CompetitionController {
             competition.setStudentId(existing.getStudentId());
             competition.setStudentName(existing.getStudentName());
             org.example.util.SubmissionValidation.validate(competition);
+            if (scoreEdit && competition.getScore() != null && competition.getScore().signum() < 0)
+                return ResponseEntity.badRequest().body("得分不能为负数");
+            boolean changed = scoreEdit && !sameScore(competition.getScore(), existing.getScore());
+            competition.setPreviousScore(changed && !existing.isScorePending() ? existing.getScore() : existing.getPreviousScore());
+            competition.setScorePending(existing.isScorePending() || changed);
+            if (!scoreEdit) competition.setScore(existing.getScore());
             resetCompetitionAudit(competition);
             CompetitionModel updated = competitionService.updateCompetition(competition);
             return ResponseEntity.ok(updated);
@@ -149,6 +161,19 @@ public class CompetitionController {
 
     // ==================== 管理员端接口 ====================
 
+    @PostMapping("/admin/{id}/score")
+    public ResponseEntity<?> updateCompetitionScore(@PathVariable String id, @RequestBody ScoreUpdate input,
+                                                     @CurrentUser Map<String, Object> currentUser) {
+        if (!currentUserAccessService.isAdmin(currentUser)) throw new AccessDeniedException("仅管理员可维护竞赛得分");
+        CompetitionModel competition = competitionService.getCompetitionById(id);
+        if (competition == null) return ResponseEntity.notFound().build();
+        if (input.getScore() != null && input.getScore().signum() < 0) return ResponseEntity.badRequest().body("得分不能为负数");
+        competition.setScore(input.getScore());
+        competition.setScorePending(false);
+        competition.setPreviousScore(null);
+        return ResponseEntity.ok(competitionService.saveCompetition(competition));
+    }
+
     /**
      * 获取所有竞赛数据（管理员）
      */
@@ -178,6 +203,11 @@ public class CompetitionController {
             if (competition == null) {
                 return ResponseEntity.badRequest().body("竞赛不存在");
             }
+            if (competition.isScorePending() && ("已驳回".equals(auditStatus) || "已通过".equals(auditStatus))) {
+                if ("已驳回".equals(auditStatus)) competition.setScore(competition.getPreviousScore());
+                competition.setScorePending(false);
+                competition.setPreviousScore(null);
+            }
             
             competition.setAuditStatus(auditStatus);
             competition.setAuditComment(auditComment);
@@ -197,5 +227,15 @@ public class CompetitionController {
         competition.setAuditComment(null);
         competition.setAuditorId(null);
         competition.setAuditorName(null);
+    }
+
+    private boolean sameScore(BigDecimal left, BigDecimal right) {
+        return left == null ? right == null : right != null && left.compareTo(right) == 0;
+    }
+
+    public static class ScoreUpdate {
+        private BigDecimal score;
+        public BigDecimal getScore() { return score; }
+        public void setScore(BigDecimal score) { this.score = score; }
     }
 }

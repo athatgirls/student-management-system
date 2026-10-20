@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.math.BigDecimal;
+import org.springframework.security.access.AccessDeniedException;
 
 @RestController
 @RequestMapping("/msi/projects")
@@ -40,6 +42,9 @@ public class ProjectController {
                                         @CurrentUser Map<String, Object> currentUser) {
         project.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
         project.setStudentName((String) currentUser.get("username"));
+        project.setScore(null);
+        project.setScorePending(false);
+        project.setPreviousScore(null);
         try {
             org.example.util.SubmissionValidation.validate(project);
             resetProjectAudit(project);
@@ -52,7 +57,8 @@ public class ProjectController {
 
     @PostMapping("/{id}")
     public ResponseEntity<?> updateProject(@PathVariable String id, @RequestBody ProjectModel project,
-                                           @CurrentUser Map<String, Object> currentUser) {
+                                            @RequestParam(defaultValue = "false") boolean scoreEdit,
+                                            @CurrentUser Map<String, Object> currentUser) {
         ProjectModel existing = projectService.getProjectById(id);
         if (existing == null) {
             return ResponseEntity.notFound().build();
@@ -63,6 +69,12 @@ public class ProjectController {
             project.setStudentId(existing.getStudentId());
             project.setStudentName(existing.getStudentName());
             org.example.util.SubmissionValidation.validate(project);
+            if (scoreEdit && project.getScore() != null && project.getScore().signum() < 0)
+                return ResponseEntity.badRequest().body("得分不能为负数");
+            boolean changed = scoreEdit && !sameScore(project.getScore(), existing.getScore());
+            project.setPreviousScore(changed && !existing.isScorePending() ? existing.getScore() : existing.getPreviousScore());
+            project.setScorePending(existing.isScorePending() || changed);
+            if (!scoreEdit) project.setScore(existing.getScore());
             resetProjectAudit(project);
             ProjectModel updated = projectService.saveProject(project);
             return ResponseEntity.ok(updated);
@@ -122,6 +134,19 @@ public class ProjectController {
 
     // ==================== 管理员端接口 ====================
 
+    @PostMapping("/admin/{id}/score")
+    public ResponseEntity<?> updateProjectScore(@PathVariable String id, @RequestBody ScoreUpdate input,
+                                                 @CurrentUser Map<String, Object> currentUser) {
+        if (!currentUserAccessService.isAdmin(currentUser)) throw new AccessDeniedException("仅管理员可维护项目得分");
+        ProjectModel project = projectService.getProjectById(id);
+        if (project == null) return ResponseEntity.notFound().build();
+        if (input.getScore() != null && input.getScore().signum() < 0) return ResponseEntity.badRequest().body("得分不能为负数");
+        project.setScore(input.getScore());
+        project.setScorePending(false);
+        project.setPreviousScore(null);
+        return ResponseEntity.ok(projectService.saveProject(project));
+    }
+
     @GetMapping("/admin/all")
     public ResponseEntity<?> getAllProjects() {
         try {
@@ -145,6 +170,11 @@ public class ProjectController {
             if (project == null) {
                 return ResponseEntity.badRequest().body("项目不存在");
             }
+            if (project.isScorePending() && ("已驳回".equals(auditStatus) || "已通过".equals(auditStatus))) {
+                if ("已驳回".equals(auditStatus)) project.setScore(project.getPreviousScore());
+                project.setScorePending(false);
+                project.setPreviousScore(null);
+            }
             
             project.setAuditStatus(auditStatus);
             project.setAuditComment(auditComment);
@@ -164,5 +194,15 @@ public class ProjectController {
         project.setAuditComment(null);
         project.setAuditorId(null);
         project.setAuditorName(null);
+    }
+
+    private boolean sameScore(BigDecimal left, BigDecimal right) {
+        return left == null ? right == null : right != null && left.compareTo(right) == 0;
+    }
+
+    public static class ScoreUpdate {
+        private BigDecimal score;
+        public BigDecimal getScore() { return score; }
+        public void setScore(BigDecimal score) { this.score = score; }
     }
 }

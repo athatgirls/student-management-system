@@ -75,6 +75,7 @@ export const updateCompetition = (id, data) => {
   return request({
     url: `/competitions/${id}`,
     method: 'post',
+    params: { scoreEdit: true },
     data
   })
 }
@@ -94,6 +95,7 @@ export const updatePatent = (id, data) => {
   return request({
     url: `/patents/${id}`,
     method: 'post',
+    params: { scoreEdit: true },
     data
   })
 }
@@ -103,6 +105,7 @@ export const updateProject = (id, data) => {
   return request({
     url: `/projects/${id}`,
     method: 'post',
+    params: { scoreEdit: true },
     data
   })
 }
@@ -202,6 +205,18 @@ export const updatePaperScore = (id, data) => request({
   url: `/papers/admin/${id}/score`,
   method: 'post',
   data
+})
+
+export const updateCompetitionScore = (id, data) => request({
+  url: `/competitions/admin/${id}/score`, method: 'post', data
+})
+
+export const updatePatentScore = (id, data) => request({
+  url: `/patents/admin/${id}/score`, method: 'post', data
+})
+
+export const updateProjectScore = (id, data) => request({
+  url: `/projects/admin/${id}/score`, method: 'post', data
 })
 
 // 审核专利

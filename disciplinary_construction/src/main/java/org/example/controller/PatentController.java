@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.math.BigDecimal;
+import org.springframework.security.access.AccessDeniedException;
 
 @RestController
 @RequestMapping("/msi/patents")
@@ -40,6 +42,9 @@ public class PatentController {
                                        @CurrentUser Map<String, Object> currentUser) {
         patent.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
         patent.setStudentName((String) currentUser.get("username"));
+        patent.setScore(null);
+        patent.setScorePending(false);
+        patent.setPreviousScore(null);
         try {
             org.example.util.SubmissionValidation.validate(patent);
             resetPatentAudit(patent);
@@ -52,7 +57,8 @@ public class PatentController {
 
     @PostMapping("/{id}")
     public ResponseEntity<?> updatePatent(@PathVariable String id, @RequestBody PatentModel patent,
-                                          @CurrentUser Map<String, Object> currentUser) {
+                                           @RequestParam(defaultValue = "false") boolean scoreEdit,
+                                           @CurrentUser Map<String, Object> currentUser) {
         PatentModel existing = patentService.getPatentById(id);
         if (existing == null) {
             return ResponseEntity.notFound().build();
@@ -63,6 +69,12 @@ public class PatentController {
             patent.setStudentId(existing.getStudentId());
             patent.setStudentName(existing.getStudentName());
             org.example.util.SubmissionValidation.validate(patent);
+            if (scoreEdit && patent.getScore() != null && patent.getScore().signum() < 0)
+                return ResponseEntity.badRequest().body("得分不能为负数");
+            boolean changed = scoreEdit && !sameScore(patent.getScore(), existing.getScore());
+            patent.setPreviousScore(changed && !existing.isScorePending() ? existing.getScore() : existing.getPreviousScore());
+            patent.setScorePending(existing.isScorePending() || changed);
+            if (!scoreEdit) patent.setScore(existing.getScore());
             resetPatentAudit(patent);
             PatentModel updated = patentService.savePatent(patent);
             return ResponseEntity.ok(updated);
@@ -121,6 +133,19 @@ public class PatentController {
 
     // ==================== 管理员端接口 ====================
 
+    @PostMapping("/admin/{id}/score")
+    public ResponseEntity<?> updatePatentScore(@PathVariable String id, @RequestBody ScoreUpdate input,
+                                                @CurrentUser Map<String, Object> currentUser) {
+        if (!currentUserAccessService.isAdmin(currentUser)) throw new AccessDeniedException("仅管理员可维护专利得分");
+        PatentModel patent = patentService.getPatentById(id);
+        if (patent == null) return ResponseEntity.notFound().build();
+        if (input.getScore() != null && input.getScore().signum() < 0) return ResponseEntity.badRequest().body("得分不能为负数");
+        patent.setScore(input.getScore());
+        patent.setScorePending(false);
+        patent.setPreviousScore(null);
+        return ResponseEntity.ok(patentService.savePatent(patent));
+    }
+
     @GetMapping("/admin/all")
     public ResponseEntity<?> getAllPatents() {
         try {
@@ -144,6 +169,11 @@ public class PatentController {
             if (patent == null) {
                 return ResponseEntity.badRequest().body("专利不存在");
             }
+            if (patent.isScorePending() && ("已驳回".equals(auditStatus) || "已通过".equals(auditStatus))) {
+                if ("已驳回".equals(auditStatus)) patent.setScore(patent.getPreviousScore());
+                patent.setScorePending(false);
+                patent.setPreviousScore(null);
+            }
             
             patent.setAuditStatus(auditStatus);
             patent.setAuditComment(auditComment);
@@ -163,5 +193,15 @@ public class PatentController {
         patent.setAuditComment(null);
         patent.setAuditorId(null);
         patent.setAuditorName(null);
+    }
+
+    private boolean sameScore(BigDecimal left, BigDecimal right) {
+        return left == null ? right == null : right != null && left.compareTo(right) == 0;
+    }
+
+    public static class ScoreUpdate {
+        private BigDecimal score;
+        public BigDecimal getScore() { return score; }
+        public void setScore(BigDecimal score) { this.score = score; }
     }
 }

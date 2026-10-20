@@ -20,7 +20,6 @@ test('overview groups keep the A/B/C/D weights and minimum numbered record slots
   assert.equal(groups[3].width, 3)
   assert.equal(groups[1].width, 3 * 6 + 2 * 4)
   assert.equal(groups[2].width, 2 * 4 + 2 * 4)
-  assert.equal(overviewGroups.length, 4)
 })
 
 test('extra papers, patents, projects and competitions add columns without dropping records', () => {
@@ -36,7 +35,7 @@ test('extra papers, patents, projects and competitions add columns without dropp
   assert.equal(getOverviewRecords(student, 'papers')[3].paperTitle, '论文3')
 })
 
-test('D activities combine academic, daily and volunteer records; unknown scores stay uncomputed', () => {
+test('D activities combine academic, daily and volunteer records', () => {
   const student = {
     academic: [{ title: '讲座' }], daily: [{ title: '班会' }], volunteer: [{ serviceName: '志愿服务', serviceHours: 2 }],
     honors: [{ title: '三好学生' }], appointments: [{ position: '班长', organization: '一班' }]
@@ -45,8 +44,16 @@ test('D activities combine academic, daily and volunteer records; unknown scores
   assert.equal(records.map(record => record.overviewType).join(','), '学术活动,日常活动,志愿活动')
   assert.equal(getBonusDetails(student).map(item => item.category).join(','), '活动,活动,活动,荣誉,任职')
   assert.equal(getBonusDetails(student)[4].text, '班长（一班）')
-  assert.equal(overviewValue({ score: 100 }, 'itemScore'), '—')
-  assert.equal(buildOverviewGroups([student])[3].width, 3)
+})
+
+test('patent, project and competition scores display like paper scores', () => {
+  assert.equal(overviewValue({}, 'itemScore'), '—')
+  assert.equal(overviewValue({ score: null }, 'itemScore'), '—')
+  assert.equal(overviewValue({ score: '' }, 'itemScore'), '—')
+  assert.equal(overviewValue({ score: 8.5 }, 'itemScore'), 8.5)
+  assert.equal(overviewValue({ score: 0 }, 'itemScore'), 0)
+  assert.equal(overviewValue({ score: 8.5, scorePending: true }, 'itemScore'), '8.5（待审核）')
+  assert.equal(overviewValue({ score: 0, scorePending: true }, 'itemScore'), '0（待审核）')
 })
 
 test('paper overview shows the first three authors by name in signature order', () => {

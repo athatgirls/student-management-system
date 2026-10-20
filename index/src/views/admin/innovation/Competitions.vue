@@ -139,6 +139,7 @@
         <el-table-column prop="competitionLevel" label="级别" width="120" align="center" />
         <el-table-column prop="awardLevel" label="获奖" width="100" align="center" />
         <el-table-column prop="ranking" label="排名" width="70" align="center" />
+        <el-table-column label="得分" width="120" align="center"><template #default="{ row }">{{ row.score ?? '—' }}{{ row.scorePending ? '（待审核）' : '' }}</template></el-table-column>
         <el-table-column prop="awardDate" label="获奖时间" width="120" align="center" />
         <el-table-column label="提交时间" width="180" align="center">
           <template #default="{ row }">
@@ -236,6 +237,10 @@
         <el-descriptions-item label="竞赛级别">{{ currentRow.competitionLevel }}</el-descriptions-item>
         <el-descriptions-item label="获奖等级">{{ currentRow.awardLevel }}</el-descriptions-item>
         <el-descriptions-item label="排名">{{ currentRow.ranking }}</el-descriptions-item>
+        <el-descriptions-item label="得分">
+          <el-input-number v-model="scoreForm.score" :min="0" :step="1" style="width: 100%" />
+          <span v-if="currentRow.scorePending">待审核</span>
+        </el-descriptions-item>
         <el-descriptions-item label="获奖时间">{{ currentRow.awardDate }}</el-descriptions-item>
         <el-descriptions-item label="指导老师" :span="2">{{ currentRow.instructorName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="团队成员" :span="2">{{ currentRow.teamMembers || '-' }}</el-descriptions-item>
@@ -253,6 +258,7 @@
         </el-descriptions-item>
       </el-descriptions>
       <template #footer>
+        <el-button type="primary" :loading="scoreSaving" @click="saveScore">保存得分</el-button>
         <el-button v-if="currentRow && (!currentRow.auditStatus || currentRow.auditStatus === '待审核')" type="success" @click="detailDialogVisible = false; handleApprove(currentRow)">通过</el-button>
         <el-button v-if="currentRow && (!currentRow.auditStatus || currentRow.auditStatus === '待审核')" type="danger" @click="detailDialogVisible = false; handleReject(currentRow)">驳回</el-button>
         <el-button @click="detailDialogVisible = false">关闭</el-button>
@@ -269,7 +275,7 @@ import {
   DataBoard, Clock, CircleCheck, CircleClose, DocumentChecked,
   Search, Select, Close
 } from '@element-plus/icons-vue'
-import { getAllCompetitions, auditCompetition, deleteCompetition } from '@/api/competition'
+import { getAllCompetitions, auditCompetition, deleteCompetition, updateCompetitionScore } from '@/api/competition'
 import { useStore } from 'vuex'
 import PrivateAttachments from '@/components/PrivateAttachments.vue'
 
@@ -322,6 +328,24 @@ const auditDialogVisible = ref(false)
 const auditDialogTitle = ref('')
 const detailDialogVisible = ref(false)
 const currentRow = ref({})
+const scoreForm = reactive({ score: null })
+const scoreSaving = ref(false)
+const saveScore = async () => {
+  scoreSaving.value = true
+  try {
+    const saved = await updateCompetitionScore(currentRow.value.id, { score: scoreForm.score })
+    const updated = { ...saved, studentName: saved.studentName || currentRow.value.studentName }
+    const index = allData.value.findIndex(row => row.id === saved.id)
+    if (index !== -1) allData.value[index] = updated
+    currentRow.value = updated
+    filterAndPaginate()
+    ElMessage.success('竞赛得分已保存')
+  } catch (error) {
+    ElMessage.error(error?.response?.data || '保存竞赛得分失败')
+  } finally {
+    scoreSaving.value = false
+  }
+}
 
 const auditForm = reactive({
   auditStatus: '',
@@ -494,6 +518,7 @@ const submitAudit = async () => {
 // 查看详情
 const handleView = (row) => {
   currentRow.value = row
+  scoreForm.score = row.score ?? null
   detailDialogVisible.value = true
 }
 

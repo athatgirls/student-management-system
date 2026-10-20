@@ -237,8 +237,7 @@
           <span v-if="currentRow.scorePending">待审核</span>
         </el-descriptions-item>
         <el-descriptions-item label="得分">
-          <el-input-number v-model="scoreForm.paperScore" :min="0" :step="0.1" controls-position="right" style="width: 100%" />
-          <el-button link type="primary" @click="scoreForm.paperScore = null">清空得分</el-button>
+          <el-input-number v-model="scoreForm.paperScore" :min="0" :step="1" style="width: 100%" />
           <span v-if="currentRow.scorePending">待审核</span>
         </el-descriptions-item>
         <el-descriptions-item label="发表状态">{{ currentRow.publicationStatus }}</el-descriptions-item>

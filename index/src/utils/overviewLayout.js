@@ -56,7 +56,10 @@ export const buildOverviewGroups = students => overviewGroups.map(group => {
 })
 
 export const overviewValue = (record, key) => {
-  if (key === 'itemScore') return '—' // 尚无评分规则，不把成绩或排名误当得分。
+  if (key === 'itemScore') {
+    const value = record.score === null || record.score === undefined || record.score === '' ? '—' : record.score
+    return record.scorePending ? `${value}（待审核）` : value
+  }
   if (key === 'scoreRatio' || key === 'paperScore') {
     const value = record[key] === null || record[key] === undefined || record[key] === '' ? '—' : record[key]
     return record.scorePending ? `${value}（待审核）` : value
