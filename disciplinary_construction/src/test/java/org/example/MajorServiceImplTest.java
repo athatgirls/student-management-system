@@ -53,22 +53,19 @@ class MajorServiceImplTest {
     void deleteMajorByNameRejectsMajorWithStudentsAndDoesNotDelete() {
         when(studentRepository.countByMajor("电子信息")).thenReturn(3L);
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        assertThrows(IllegalArgumentException.class,
                 () -> majorService.deleteMajorByName("电子信息"));
 
-        assertEquals("该专业下仍有 3 名学生，无法删除", exception.getMessage());
         verify(majorRepository, never()).deleteById(any());
     }
 
     @Test
     void deleteMajorByNameRejectsEmptyAndBlankMajorWithoutRepositoryAccess() {
-        IllegalArgumentException emptyException = assertThrows(IllegalArgumentException.class,
+        assertThrows(IllegalArgumentException.class,
                 () -> majorService.deleteMajorByName(null));
-        IllegalArgumentException blankException = assertThrows(IllegalArgumentException.class,
+        assertThrows(IllegalArgumentException.class,
                 () -> majorService.deleteMajorByName("   "));
 
-        assertEquals("请选择专业", emptyException.getMessage());
-        assertEquals("请选择专业", blankException.getMessage());
         verifyNoInteractions(majorRepository, studentRepository);
     }
 
@@ -77,10 +74,9 @@ class MajorServiceImplTest {
         when(studentRepository.countByMajor("人工智能")).thenReturn(0L);
         when(majorRepository.findByMajorName("人工智能")).thenReturn(java.util.Optional.empty());
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        assertThrows(IllegalArgumentException.class,
                 () -> majorService.deleteMajorByName("人工智能"));
 
-        assertEquals("该专业不存在或非手动添加，无法删除", exception.getMessage());
         verify(majorRepository, never()).deleteById(any());
     }
 

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -62,6 +63,25 @@ public class StatisticsController {
     private org.example.service.VisitStatisticsService visitStatisticsService;
     @Autowired
     private LeaveRequestRepository leaveRequestRepository;
+
+    private void addPending(List<Map<String, Object>> approvals, String type, String label,
+                            String id, String title, LocalDateTime time, DateTimeFormatter formatter) {
+        Map<String, Object> approval = new HashMap<>();
+        approval.put("id", type + "_" + id);
+        approval.put("dataId", id);
+        approval.put("dataType", type);
+        approval.put("type", label);
+        approval.put("title", label + "：" + (title == null ? "" : title));
+        approval.put("description", "待审核的" + label + "记录");
+        approval.put("time", (time == null ? LocalDateTime.now() : time).format(formatter));
+        approvals.add(approval);
+    }
+
+    private <T> List<T> latestPending(List<T> items, Function<T, String> time, int limit) {
+        return items.stream()
+                .sorted(Comparator.comparing(time, Comparator.nullsFirst(Comparator.naturalOrder())).reversed())
+                .limit(limit).collect(Collectors.toList());
+    }
 
     /**
      * 获取仪表盘统计数据
@@ -346,11 +366,25 @@ public class StatisticsController {
             
             // 待审批事项 (聚合所有待审核的记录)
             List<Map<String, Object>> pendingApprovals = new ArrayList<>();
+
+            // 科创记录与日常、党建记录使用同一个待审批入口。
+            try {
+                latestPending(competitionService.getPendingCompetitions(), item -> item.getCreateTime() == null ? null : item.getCreateTime().toString(), 10).forEach(item ->
+                        addPending(pendingApprovals, "competition", "竞赛", item.getId(), item.getCompetitionName(), item.getCreateTime(), formatter));
+                latestPending(projectService.getPendingProjects(), item -> item.getCreateTime() == null ? null : item.getCreateTime().toString(), 10).forEach(item ->
+                        addPending(pendingApprovals, "project", "项目", item.getId(), item.getProjectName(), item.getCreateTime(), formatter));
+                latestPending(paperService.getPendingPapers(), item -> item.getCreateTime() == null ? null : item.getCreateTime().toString(), 10).forEach(item ->
+                        addPending(pendingApprovals, "paper", "论文", item.getId(), item.getPaperTitle(), item.getCreateTime(), formatter));
+                latestPending(patentService.getPendingPatents(), item -> item.getCreateTime() == null ? null : item.getCreateTime().toString(), 10).forEach(item ->
+                        addPending(pendingApprovals, "patent", "专利", item.getId(), item.getPatentTitle(), item.getCreateTime(), formatter));
+            } catch (Exception e) {
+                log.warn("获取科创待审核失败", e);
+            }
             
             // 1. 学术活动待审核
             try {
                 List<AcademicEventModel> pendingAcademic = academicEventRepository.findByAuditStatus("pending");
-                for (AcademicEventModel item : pendingAcademic.stream().limit(5).collect(Collectors.toList())) {
+                for (AcademicEventModel item : latestPending(pendingAcademic, row -> row.getCreateTime() == null ? null : row.getCreateTime().toString(), 10)) {
                     Map<String, Object> approval = new HashMap<>();
                     approval.put("id", "academic_" + item.getId());
                     approval.put("type", "学术活动");
@@ -368,7 +402,7 @@ public class StatisticsController {
             // 2. 日常活动待审核
             try {
                 List<DailyActivityModel> pendingDaily = dailyActivityRepository.findByAuditStatus("pending");
-                for (DailyActivityModel item : pendingDaily.stream().limit(5).collect(Collectors.toList())) {
+                for (DailyActivityModel item : latestPending(pendingDaily, row -> row.getCreateTime() == null ? null : row.getCreateTime().toString(), 10)) {
                     Map<String, Object> approval = new HashMap<>();
                     approval.put("id", "daily_" + item.getId());
                     approval.put("type", "日常活动");
@@ -386,7 +420,7 @@ public class StatisticsController {
             // 3. 荣誉待审核
             try {
                 List<HonorModel> pendingHonors = honorRepository.findByAuditStatus("pending");
-                for (HonorModel item : pendingHonors.stream().limit(5).collect(Collectors.toList())) {
+                for (HonorModel item : latestPending(pendingHonors, row -> row.getCreateTime() == null ? null : row.getCreateTime().toString(), 10)) {
                     Map<String, Object> approval = new HashMap<>();
                     approval.put("id", "honor_" + item.getId());
                     approval.put("type", "荣誉");
@@ -404,7 +438,7 @@ public class StatisticsController {
             // 4. 思想汇报待审核
             try {
                 List<ThoughtReportModel> pendingReports = thoughtReportService.getPendingThoughtReports();
-                for (ThoughtReportModel item : pendingReports.stream().limit(5).collect(Collectors.toList())) {
+                for (ThoughtReportModel item : latestPending(pendingReports, row -> row.getCreateTime() == null ? null : row.getCreateTime().toString(), 10)) {
                     Map<String, Object> approval = new HashMap<>();
                     approval.put("id", "report_" + item.getId());
                     approval.put("type", "思想汇报");
@@ -422,7 +456,7 @@ public class StatisticsController {
             // 5. 微党课待审核
             try {
                 List<PartyCourseModel> pendingCourses = partyCourseService.getPendingPartyCourses();
-                for (PartyCourseModel item : pendingCourses.stream().limit(5).collect(Collectors.toList())) {
+                for (PartyCourseModel item : latestPending(pendingCourses, row -> row.getCreateTime() == null ? null : row.getCreateTime().toString(), 10)) {
                     Map<String, Object> approval = new HashMap<>();
                     approval.put("id", "course_" + item.getId());
                     approval.put("type", "微党课");
@@ -440,7 +474,7 @@ public class StatisticsController {
             // 6. 志愿服务待审核
             try {
                 List<VolunteerServiceModel> pendingServices = volunteerServiceService.getPendingVolunteerServices();
-                for (VolunteerServiceModel item : pendingServices.stream().limit(5).collect(Collectors.toList())) {
+                for (VolunteerServiceModel item : latestPending(pendingServices, row -> row.getCreateTime() == null ? null : row.getCreateTime().toString(), 10)) {
                     Map<String, Object> approval = new HashMap<>();
                     approval.put("id", "service_" + item.getId());
                     approval.put("type", "志愿服务");
@@ -458,7 +492,7 @@ public class StatisticsController {
             // 7. 入党申请待审核
             try {
                 List<PartyApplicationModel> pendingApplications = partyApplicationRepository.findByAuditStatus("待审核");
-                for (PartyApplicationModel item : pendingApplications.stream().limit(5).collect(Collectors.toList())) {
+                for (PartyApplicationModel item : latestPending(pendingApplications, PartyApplicationModel::getApplicationDate, 10)) {
                     Map<String, Object> approval = new HashMap<>();
                     approval.put("id", "application_" + item.getId());
                     approval.put("type", "入党申请");
@@ -476,7 +510,7 @@ public class StatisticsController {
             // 8. 请假待审核
             try {
                 List<LeaveRequestModel> pendingLeaves = leaveRequestRepository.findByAuditStatus("pending");
-                for (LeaveRequestModel item : pendingLeaves.stream().limit(5).collect(Collectors.toList())) {
+                for (LeaveRequestModel item : latestPending(pendingLeaves, row -> row.getCreateTime() == null ? null : row.getCreateTime().toString(), 10)) {
                     Map<String, Object> approval = new HashMap<>();
                     approval.put("id", "leave_" + item.getId());
                     approval.put("type", "请假申请");
@@ -497,11 +531,7 @@ public class StatisticsController {
                 String timeB = (String) b.get("time");
                 return timeB.compareTo(timeA);
             });
-            if (pendingApprovals.size() > 10) {
-                pendingApprovals = pendingApprovals.subList(0, 10);
-            }
-            
-            result.put("pendingApprovals", pendingApprovals);
+            result.put("pendingApprovals", pendingApprovals.subList(0, Math.min(pendingApprovals.size(), 10)));
 
             result.put("code", 200);
         } catch (Exception e) {
@@ -550,7 +580,7 @@ public class StatisticsController {
             patentStats.put("rejected", (int) patentService.countByAuditStatus("已驳回"));
             stats.put("patent", patentStats);
 
-            // 日常管理统计（包括请假、学术活动、日常活动、荣誉）
+            // 日常管理统计（包括请假、学术活动、志愿活动、日常活动、荣誉）
             Map<String, Integer> dailyStats = new HashMap<>();
             try {
                 // 请假待审核
@@ -561,8 +591,10 @@ public class StatisticsController {
                 int dailyActivityPending = dailyActivityRepository.findByAuditStatus("pending").size();
                 // 荣誉待审核
                 int honorPending = honorRepository.findByAuditStatus("pending").size();
+                int volunteerPending = volunteerServiceService.getPendingVolunteerServices().size();
                 
-                dailyStats.put("pending", leavePending + academicPending + dailyActivityPending + honorPending);
+                dailyStats.put("pending", leavePending + academicPending + dailyActivityPending + honorPending + volunteerPending);
+                dailyStats.put("volunteer", volunteerPending);
                 dailyStats.put("leave", leavePending);
                 dailyStats.put("academic", academicPending);
                 dailyStats.put("dailyActivity", dailyActivityPending);
@@ -570,12 +602,28 @@ public class StatisticsController {
             } catch (Exception e) {
                 log.warn("获取日常管理待审核统计失败", e);
                 dailyStats.put("pending", 0);
+                dailyStats.put("volunteer", 0);
                 dailyStats.put("leave", 0);
                 dailyStats.put("academic", 0);
                 dailyStats.put("dailyActivity", 0);
                 dailyStats.put("honor", 0);
             }
             stats.put("daily", dailyStats);
+
+            Map<String, Integer> partyStats = new HashMap<>();
+            try {
+                partyStats.put("application", partyApplicationRepository.findByAuditStatus("待审核").size());
+                partyStats.put("report", thoughtReportService.getPendingThoughtReports().size());
+                partyStats.put("course", partyCourseService.getPendingPartyCourses().size());
+            } catch (Exception e) {
+                log.warn("获取党建待审核统计失败", e);
+                partyStats.put("application", 0);
+                partyStats.put("report", 0);
+                partyStats.put("course", 0);
+            }
+            // 志愿活动属于日常管理，不再重复计入党建总数。
+            partyStats.put("pending", partyStats.get("application") + partyStats.get("report") + partyStats.get("course"));
+            stats.put("party", partyStats);
 
             log.info("统计结果: {}", stats);
             return ResponseEntity.ok(stats);  // ✅ 直接返回 Map

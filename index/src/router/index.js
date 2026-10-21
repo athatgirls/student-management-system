@@ -20,6 +20,12 @@ const routes = [
     meta: { requiresAuth: true, userType: 'student' },
     children: [
       {
+        path: '/student-overview',
+        name: 'studentOverview',
+        component: () => import('../views/StudentOverview.vue'),
+        meta: { title: '状况一览表' }
+      },
+      {
         path: '/home',
         name: 'home',
         component: () => import('../views/Home.vue'),
@@ -181,6 +187,12 @@ const routes = [
       },
       // ==================== 学生管理 ====================
       {
+        path: '/admin/students/overview',
+        name: 'adminStudentOverview',
+        component: () => import('../views/StudentOverview.vue'),
+        meta: { title: '学生全量信息' }
+      },
+      {
         path: '/admin/students/list',
         name: 'adminStudentsList',
         component: () => import('../views/admin/StudentsList.vue'),
@@ -197,6 +209,12 @@ const routes = [
         name: 'adminGradeImport',
         component: () => import('../views/admin/GradeImport.vue'),
         meta: { title: '成绩导入' }
+      },
+      {
+        path: '/admin/grades',
+        name: 'adminGradeManagement',
+        component: () => import('../views/admin/GradeManagement.vue'),
+        meta: { title: '成绩管理' }
       },
       {
         path: '/admin/students',
@@ -297,10 +315,40 @@ const routes = [
       },
       // ==================== 日常管理 ====================
       {
-        path: '/admin/daily/dailycontrol',
-        name: 'dailycontrol',
+        path: '/admin/daily/academic',
+        name: 'adminDailyAcademic',
         component: () => import('../views/admin/DailyControl.vue'),
-        meta: { title: '活动审批列表' }
+        meta: { title: '学术活动', dailyModule: 'academic' }
+      },
+      {
+        path: '/admin/daily/volunteer',
+        name: 'adminDailyVolunteer',
+        component: () => import('../views/admin/PartyManagement.vue'),
+        meta: { title: '志愿活动', partyTab: 'service' }
+      },
+      {
+        path: '/admin/daily/daily',
+        name: 'adminDailyActivity',
+        component: () => import('../views/admin/DailyControl.vue'),
+        meta: { title: '日常活动', dailyModule: 'daily' }
+      },
+      {
+        path: '/admin/daily/leave',
+        name: 'adminDailyLeave',
+        component: () => import('../views/admin/DailyControl.vue'),
+        meta: { title: '请假管理', dailyModule: 'leave' }
+      },
+      {
+        path: '/admin/daily/honor',
+        name: 'adminDailyHonor',
+        component: () => import('../views/admin/DailyControl.vue'),
+        meta: { title: '荣誉', dailyModule: 'honor' }
+      },
+      {
+        path: '/admin/daily/tasks',
+        name: 'adminDailyTasks',
+        component: () => import('../views/admin/DailyControl.vue'),
+        meta: { title: '日常任务', dailyModule: 'task_mgmt' }
       },
       {
         path: '/admin/daily/task-completion-analysis',
@@ -316,6 +364,12 @@ const routes = [
       },
       
       // ==================== 管理员管理 ====================
+      {
+        path: '/admin/templates',
+        name: 'adminTemplates',
+        component: () => import('../views/admin/TemplateManagement.vue'),
+        meta: { title: '模板管理' }
+      },
       {
         path: '/admin/admins',
         name: 'adminAdmins',

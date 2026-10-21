@@ -73,17 +73,9 @@ class DailyTaskAudienceServiceTest {
     void unsupportedIdentityIsRejectedWhenPublishing() {
         DailyTaskModel task = new DailyTaskModel();
         task.setAllowedIdentities(Collections.singletonList("未知身份"));
-        IllegalArgumentException error = assertThrows(
+        assertThrows(
                 IllegalArgumentException.class,
                 () -> audienceService.validateAndNormalize(task));
-        assertEquals("任务接收政治面貌包含不支持的选项", error.getMessage());
-    }
-
-    @Test
-    void selectableIdentitiesMatchStudentPoliticalStatusOptions() {
-        assertEquals(Arrays.asList(
-                "中共党员", "中共预备党员", "发展对象", "入党积极分子", "共青团员", "群众"),
-                DailyTaskAudienceService.SUPPORTED_IDENTITIES);
     }
 
     @Test

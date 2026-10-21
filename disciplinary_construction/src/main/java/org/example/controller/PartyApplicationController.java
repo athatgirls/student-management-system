@@ -40,7 +40,7 @@ public class PartyApplicationController {
     }
 
     @Operation(summary = "更新申请入党信息")
-    @RequestMapping(value = "/update", method = {RequestMethod.PUT, RequestMethod.POST})
+    @PostMapping("/update")
     public ResponseResult<PartyApplicationModel> updatePartyApplication(@RequestBody PartyApplicationModel application,
                                                                         @CurrentUser Map<String, Object> currentUser) {
         PartyApplicationModel existing = partyApplicationService.getById(application.getId());
@@ -57,7 +57,7 @@ public class PartyApplicationController {
     }
 
     @Operation(summary = "删除申请入党信息")
-    @RequestMapping(value = "/delete/{id}", method = {RequestMethod.DELETE, RequestMethod.POST})
+    @PostMapping("/delete/{id}")
     public ResponseResult<String> deletePartyApplication(@PathVariable String id,
                                                          @CurrentUser Map<String, Object> currentUser) {
         PartyApplicationModel existing = partyApplicationService.getById(id);

@@ -12,9 +12,16 @@ import org.example.repository.StudyRecordRepository;
 import org.example.service.GradeService;
 import org.example.service.StudentService;
 import org.example.util.StudentGradePolicy;
+import org.example.util.StudyCourseType;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,6 +36,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @RestController
@@ -45,10 +55,35 @@ public class GradeController {
     private StudyRecordRepository studyRecordRepository;
 
     @Autowired
+    private MongoTemplate mongoTemplate;
+
+    @Autowired
     private StudentRepository studentRepository;
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @GetMapping("/template")
+    public ResponseEntity<byte[]> downloadTemplate() throws java.io.IOException {
+        try (org.apache.poi.xssf.usermodel.XSSFWorkbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
+             java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream()) {
+            org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("成绩导入模板");
+            String[][] rows = {
+                {"学号", "姓名", "学期", "课程名称", "成绩", "学分", "课程类别", "状态"},
+                {"10240001", "张同学", "2025-2026-1", "Web 前端开发", "92", "3", "学位课", "已通过"}
+            };
+            for (int i = 0; i < rows.length; i++) {
+                org.apache.poi.ss.usermodel.Row row = sheet.createRow(i);
+                for (int j = 0; j < rows[i].length; j++) row.createCell(j).setCellValue(rows[i][j]);
+            }
+            for (int i = 0; i < rows[0].length; i++) sheet.setColumnWidth(i, 22 * 256);
+            workbook.write(output);
+            return ResponseEntity.ok()
+                    .header("Content-Disposition", "attachment; filename=grade-import-template.xlsx")
+                    .contentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .body(output.toByteArray());
+        }
+    }
 
     @PostMapping("/create")
     public ResponseEntity<Map<String, Object>> createGrade(@RequestBody Map<String, Object> requestBody) {
@@ -106,7 +141,7 @@ public class GradeController {
         return ResponseEntity.ok(result);
     }
 
-    @DeleteMapping("/delete/{id}")
+    @PostMapping("/delete/{id}")
     public ResponseEntity<Map<String, Object>> deleteGrade(@PathVariable String id) {
         Map<String, Object> result = new HashMap<>();
         try {
@@ -122,7 +157,7 @@ public class GradeController {
         return ResponseEntity.ok(result);
     }
 
-    @DeleteMapping("/delete-by-name")
+    @PostMapping("/delete-by-name")
     public ResponseEntity<Map<String, Object>> deleteGradeByName(@RequestParam("gradeName") String gradeName) {
         Map<String, Object> result = new HashMap<>();
         try {
@@ -206,6 +241,13 @@ public class GradeController {
                     continue;
                 }
 
+                Double credit = parseDouble(item.getCredit());
+                if (credit == null || !Double.isFinite(credit) || credit <= 0) {
+                    skippedCount++;
+                    invalidRows.add(String.format("studentId[%s] course[%s] requires positive finite credit", studentId, courseName));
+                    continue;
+                }
+
                 StudentModel student = studentRepository.findByStudentId(studentId);
                 if (student == null) {
                     skippedCount++;
@@ -217,13 +259,29 @@ public class GradeController {
                         .findByStudentIdAndSemesterAndCourse(studentId, semester, courseName);
 
                 StudyRecordModel studyRecord = existing.orElseGet(StudyRecordModel::new);
+                String type = trim(item.getCourseType());
+                if ("学位课".equals(type)) type = StudyCourseType.DEGREE;
+                if ("非学位课".equals(type)) type = StudyCourseType.NON_DEGREE;
+                if (type.isEmpty() && !existing.isPresent()) {
+                    skippedCount++;
+                    invalidRows.add(String.format("studentId[%s] course[%s] is missing course type", studentId, courseName));
+                    continue;
+                }
+                if (!type.isEmpty()) {
+                    try { studyRecord.setCourseType(StudyCourseType.requireValid(type)); }
+                    catch (IllegalArgumentException e) {
+                        skippedCount++;
+                        invalidRows.add(String.format("studentId[%s] course[%s] has invalid course type", studentId, courseName));
+                        continue;
+                    }
+                }
                 studyRecord.setStudentId(studentId);
                 studyRecord.setStudentDbId(student.getId());
                 studyRecord.setSemester(semester);
                 studyRecord.setCourse(courseName);
                 studyRecord.setScore(score);
                 studyRecord.setSource("official");
-                studyRecord.setCredit(parseDouble(item.getCredit()));
+                studyRecord.setCredit(credit);
                 studyRecord.setStatus(resolveStatus(score, trim(item.getStatus())));
 
                 studyRecordRepository.save(studyRecord);
@@ -297,6 +355,117 @@ public class GradeController {
             result.put("msg", "Load grade records failed: " + e.getMessage());
         }
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/manage/records")
+    public ResponseEntity<Map<String, Object>> getManagedRecords(
+            @RequestParam(required = false) String studentId,
+            @RequestParam(required = false) String semester,
+            @RequestParam(required = false) String grade,
+            @RequestParam(required = false) String course,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @CurrentUser Map<String, Object> user) {
+        if (user == null || !"admin".equals(user.get("userType"))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "仅管理员可查看成绩管理列表");
+        }
+        if (page < 1 || size < 1 || size > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "分页参数无效");
+        }
+
+        Query query = new Query();
+        String cleanStudentId = trim(studentId);
+        String cleanSemester = trim(semester);
+        String cleanCourse = trim(course);
+        String cleanGrade = StudentGradePolicy.normalize(grade);
+        if (!cleanStudentId.isEmpty()) query.addCriteria(Criteria.where("studentId").is(cleanStudentId));
+        if (!cleanSemester.isEmpty()) query.addCriteria(Criteria.where("semester").is(cleanSemester));
+        if (!cleanCourse.isEmpty()) query.addCriteria(Criteria.where("course").regex(Pattern.quote(cleanCourse), "i"));
+        if (cleanGrade != null && !cleanGrade.isEmpty()) {
+            Set<String> grades = new HashSet<>();
+            grades.add(cleanGrade);
+            if (cleanGrade.endsWith("级")) grades.add(cleanGrade.substring(0, cleanGrade.length() - 1));
+            List<StudentModel> students = studentRepository.findByGradeIn(grades);
+            Set<String> studentIds = students.stream().map(StudentModel::getStudentId)
+                    .filter(id -> id != null && !id.isEmpty()).collect(Collectors.toSet());
+            Set<String> dbIds = students.stream().map(StudentModel::getId)
+                    .filter(id -> id != null && !id.isEmpty()).collect(Collectors.toSet());
+            query.addCriteria(new Criteria().orOperator(
+                    Criteria.where("studentId").in(studentIds), Criteria.where("studentDbId").in(dbIds)));
+        }
+        PageRequest pageable = PageRequest.of(page - 1, size,
+                Sort.by(Sort.Direction.DESC, "semester").and(Sort.by("studentId", "id")));
+        long total = mongoTemplate.count(query, StudyRecordModel.class);
+        query.with(pageable);
+        Map<String, Object> data = new HashMap<>();
+        data.put("records", mongoTemplate.find(query, StudyRecordModel.class));
+        data.put("total", total);
+        return ResponseEntity.ok(Map.of("code", 200, "data", data, "msg", "Grade records loaded"));
+    }
+
+    @GetMapping("/manage/semesters")
+    public ResponseEntity<Map<String, Object>> getManagedSemesters(@CurrentUser Map<String, Object> user) {
+        if (user == null || !"admin".equals(user.get("userType"))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "仅管理员可查看成绩学期");
+        }
+        List<String> semesters = mongoTemplate.findDistinct(new Query(), "semester", StudyRecordModel.class, String.class)
+                .stream().filter(value -> value != null && !value.trim().isEmpty())
+                .distinct().sorted(String::compareTo).collect(Collectors.toList());
+        return ResponseEntity.ok(Map.of("code", 200, "data", semesters, "msg", "Semesters loaded"));
+    }
+
+    @PostMapping("/manage/records/{id}")
+    public ResponseEntity<Map<String, Object>> updateManagedRecord(@PathVariable String id,
+            @RequestBody Map<String, Object> input, @CurrentUser Map<String, Object> user) {
+        if (user == null || !"admin".equals(user.get("userType"))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "仅管理员可编辑成绩");
+        }
+        StudyRecordModel record = studyRecordRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "成绩记录不存在"));
+        String semester = trim((String) input.get("semester"));
+        String course = trim((String) input.get("course"));
+        if (semester.isEmpty() || semester.length() > 100 || course.isEmpty() || course.length() > 200) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "学期或课程名称无效");
+        }
+        Object scoreValue = input.get("score");
+        Integer score = scoreValue != null && scoreValue.toString().matches("\\d+")
+                ? parseInteger(scoreValue) : null;
+        Double credit = parseDouble(input.get("credit"));
+        if (score == null || score < 0 || score > 100 || credit == null || !Double.isFinite(credit) || credit <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "成绩须为 0–100 的整数，学分须大于 0");
+        }
+        String courseType;
+        try { courseType = StudyCourseType.requireValid((String) input.get("courseType")); }
+        catch (IllegalArgumentException | ClassCastException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "课程类别无效");
+        }
+        studyRecordRepository.findByStudentIdAndSemesterAndCourse(record.getStudentId(), semester, course)
+                .filter(other -> !other.getId().equals(id))
+                .ifPresent(other -> { throw new ResponseStatusException(HttpStatus.CONFLICT, "该学生在此学期已有同名课程"); });
+
+        record.setSemester(semester);
+        record.setCourse(course);
+        record.setScore(score);
+        record.setCredit(credit);
+        record.setCourseType(courseType);
+        record.setStatus(resolveStatus(score, ""));
+        return ResponseEntity.ok(Map.of("code", 200, "data", studyRecordRepository.save(record), "msg", "成绩已更新"));
+    }
+
+    @PostMapping("/records/{id}/course-type")
+    public ResponseEntity<Map<String, Object>> setCourseType(@PathVariable String id,
+            @RequestBody Map<String, String> input, @CurrentUser Map<String, Object> user) {
+        if (user == null || !"admin".equals(user.get("userType"))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "仅管理员可标记课程类别");
+        }
+        String type;
+        try { type = StudyCourseType.requireValid(input.get("courseType")); }
+        catch (IllegalArgumentException e) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage()); }
+        StudyRecordModel record = studyRecordRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "课程记录不存在"));
+        record.setCourseType(type);
+        studyRecordRepository.save(record);
+        return ResponseEntity.ok(Map.of("code", 200, "data", record));
     }
 
     private String trim(String value) {

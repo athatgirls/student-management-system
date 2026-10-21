@@ -1,5 +1,9 @@
 import request from './request'
 
+export function getGradeTemplate() {
+  return request.get('/grade/template', { responseType: 'blob' })
+}
+
 // 创建年级
 export function createGrade(gradeData) {
   return request({
@@ -39,11 +43,28 @@ export function getGradeRecords(params) {
   })
 }
 
+// 管理员分页查询成绩
+export function getManagedGradeRecords(params) {
+  return request.get('/grade/manage/records', { params })
+}
+
+export function getManagedGradeSemesters() {
+  return request.get('/grade/manage/semesters')
+}
+
+export function updateManagedGradeRecord(id, data) {
+  return request.post(`/grade/manage/records/${id}`, data)
+}
+
+export function setGradeCourseType(id, courseType) {
+  return request.post(`/grade/records/${id}/course-type`, { courseType })
+}
+
 // 删除年级
 export function deleteGrade(id) {
   return request({
     url: `/grade/delete/${id}`,
-    method: 'delete'
+    method: 'post'
   })
 }
 
@@ -51,7 +72,7 @@ export function deleteGrade(id) {
 export function deleteGradeByName(gradeName) {
   return request({
     url: '/grade/delete-by-name',
-    method: 'delete',
+    method: 'post',
     params: { gradeName }
   })
 }

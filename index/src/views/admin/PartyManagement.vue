@@ -1,7 +1,8 @@
 <template>
-  <div class="party-management">
+  <div class="party-management" :class="{ 'volunteer-management': isVolunteerPage }">
+    <AdminSummaryCards v-if="isVolunteerPage" :items="volunteerSummary" />
 
-    <el-tabs v-model="activeTab" class="management-tabs" @tab-change="handleTabChange">
+    <el-tabs v-model="activeTab" class="management-tabs" :class="{ 'single-module': isVolunteerPage }" @tab-change="handleTabChange">
       <!-- 入党申请管理 -->
       <el-tab-pane label="入党申请" name="application">
         <el-card>
@@ -103,6 +104,7 @@
             <div class="card-header">
               <span>思想汇报管理</span>
               <div class="header-actions">
+                <el-button type="success" :loading="exporting" :disabled="reportLoading" @click="exportActivities('report')">导出当前列表</el-button>
                 <el-input
                   v-model="reportSearchKeyword"
                   placeholder="搜索标题或学号"
@@ -171,6 +173,7 @@
             <div class="card-header">
               <span>微党课管理</span>
               <div class="header-actions">
+                <el-button type="success" :loading="exporting" :disabled="courseLoading" @click="exportActivities('course')">导出当前列表</el-button>
                 <el-input
                   v-model="courseSearchKeyword"
                   placeholder="搜索标题或学号"
@@ -236,8 +239,9 @@
         <el-card>
           <template #header>
             <div class="card-header">
-              <span>志愿活动管理</span>
+              <span>{{ isVolunteerPage ? '志愿活动' : '志愿活动管理' }}</span>
               <div class="header-actions">
+                <el-button type="success" :loading="exporting" :disabled="serviceLoading" @click="exportActivities('service')">导出当前列表</el-button>
                 <el-input
                   v-model="serviceSearchKeyword"
                   placeholder="搜索服务名称或学号"
@@ -328,13 +332,15 @@
     </el-dialog>
 
     <!-- 查看详情对话框 -->
-    <el-dialog v-model="showViewDialog" :title="viewDialogTitle" width="700px">
-      <el-descriptions :column="2" border v-if="viewingItem">
+    <el-dialog v-model="showViewDialog" :title="viewDialogTitle" width="min(960px, 95vw)" class="detail-dialog">
+      <el-descriptions class="party-details" :column="2" border v-if="viewingItem">
         <el-descriptions-item
-          v-for="(value, key) in visibleDetail(viewingItem)"
+          v-for="{ key, value, span } in detailEntries"
           :key="key"
           :label="getFieldLabel(key)"
-          :span="key === 'content' || key === 'description' || key === 'serviceDescription' ? 2 : 1"
+          :label-style="{ width: '120px' }"
+          :content-style="{ overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }"
+          :span="span"
         >
           <template v-if="key === 'auditStatus'">
             <el-tag :type="getAuditStatusType(value)" size="small">
@@ -351,6 +357,12 @@
               <el-table-column prop="materialType" label="材料类型" width="120" />
               <el-table-column prop="materialName" label="材料名称" min-width="150" />
               <el-table-column prop="submitDate" label="提交日期" width="120" />
+              <el-table-column label="附件" width="100">
+                <template #default="scope">
+                  <el-button v-if="scope.row.fileUrl" link type="primary" @click="viewMaterial(scope.row)">查看材料</el-button>
+                  <span v-else>未上传</span>
+                </template>
+              </el-table-column>
               <el-table-column prop="status" label="状态" width="100">
                 <template #default="scope">
                   <el-tag :type="getAuditStatusType(scope.row.status)" size="small">
@@ -365,6 +377,9 @@
           </template>
         </el-descriptions-item>
       </el-descriptions>
+      <template #footer>
+        <el-button v-if="viewingItem?.auditStatus === '待审核'" type="primary" @click="auditViewedItem">审核此记录</el-button>
+      </template>
     </el-dialog>
 
     <el-dialog
@@ -465,7 +480,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import AdminSummaryCards from '@/components/AdminSummaryCards.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Upload, UploadFilled } from '@element-plus/icons-vue'
 import {
@@ -474,16 +491,73 @@ import {
   partyCourseApi,
   volunteerServiceApi
 } from '@/api/party'
-import { readExcelObjects } from '@/utils/excel'
+import { readExcelObjects, downloadExcel } from '@/utils/excel'
+import { getFileUrl } from '@/utils/imageUrl'
+import request from '@/api/request'
+
+const viewMaterial = async (material) => {
+  const fileUrl = new URL(getFileUrl(material.fileUrl), window.location.origin)
+  if (fileUrl.origin !== window.location.origin) {
+    ElMessage.error('材料地址不属于当前系统')
+    return
+  }
+  const isPdf = /\.pdf$/i.test(fileUrl.pathname)
+  const preview = isPdf ? window.open('', '_blank') : null
+  if (preview) preview.opener = null
+  try {
+    const file = await request.get(fileUrl.href, { responseType: 'blob' })
+    const blob = isPdf ? new Blob([file], { type: 'application/pdf' }) : file
+    const objectUrl = URL.createObjectURL(blob)
+    if (preview) {
+      preview.location.replace(objectUrl)
+    } else {
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = material.materialName || fileUrl.pathname.split('/').pop()
+      link.click()
+    }
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000)
+  } catch (error) {
+    if (preview) preview.close()
+    console.error('查看材料失败:', error)
+  }
+}
 
 // 标签页
-const activeTab = ref('application')
+const route = useRoute()
+const isVolunteerPage = computed(() => route.meta.partyTab === 'service')
+const activeTab = ref(route.meta.partyTab || route.query.approvalTab || 'application')
+const allServices = ref([])
+const volunteerSummary = computed(() => [
+  { label: '总记录', value: allServices.value.length, icon: 'total' },
+  { label: '待审核', value: allServices.value.filter(row => row.auditStatus === '待审核').length, icon: 'pending', tone: 'warning' },
+  { label: '已通过', value: allServices.value.filter(row => ['通过', '已通过', 'approved'].includes(row.auditStatus)).length, icon: 'approved', tone: 'success' }
+])
 
 // 数据
 const applicationList = ref([])
 const reportList = ref([])
 const courseList = ref([])
 const serviceList = ref([])
+const exporting = ref(false)
+const exportActivities = async type => {
+  exporting.value = true
+  try {
+    // Refresh first so the export includes the current search text and status filter.
+    const configs = {
+      report: { load: loadReports, rows: reportList, name: '思想汇报', fields: ['studentId', 'studentName', 'title', 'reportType', 'reportDate', 'auditStatus', 'createTime'] },
+      course: { load: loadCourses, rows: courseList, name: '微党课', fields: ['studentId', 'studentName', 'title', 'courseDate', 'auditStatus', 'createTime'] },
+      service: { load: loadServices, rows: serviceList, name: '志愿活动', fields: ['studentId', 'studentName', 'serviceName', 'serviceType', 'serviceHours', 'serviceDate', 'auditStatus', 'createTime'] }
+    }
+    const config = configs[type]
+    if (!await config.load()) return
+    if (!config.rows.value.length) return ElMessage.warning('当前筛选结果没有可导出的记录')
+    const rows = [config.fields.map(getFieldLabel), ...config.rows.value.map(row => config.fields.map(key => key === 'createTime' ? formatDateTime(row[key]) : row[key] ?? ''))]
+    await downloadExcel(rows, config.name, `${config.name}_${new Date().toISOString().slice(0, 10)}.xlsx`)
+    ElMessage.success(`已导出 ${config.rows.value.length} 条记录`)
+  } catch (e) { ElMessage.error('导出失败，请重试') }
+  finally { exporting.value = false }
+}
 
 // 加载状态
 const applicationLoading = ref(false)
@@ -542,16 +616,47 @@ const auditForm = reactive({
 })
 
 // 标签页切换
-const handleTabChange = (tab) => {
-  if (tab === 'application') {
-    loadApplications()
-  } else if (tab === 'report') {
-    loadReports()
-  } else if (tab === 'course') {
-    loadCourses()
-  } else if (tab === 'service') {
-    loadServices()
+let openedApproval = ''
+const handleTabChange = async (tab) => {
+  if (route.query.approvalId && route.query.approvalTab === tab) {
+    // Direct links must not be hidden by filters left over from a previous visit.
+    if (tab === 'application') {
+      applicationSearchKeyword.value = ''
+      applicationFilterStage.value = ''
+      applicationFilterStatus.value = ''
+    } else if (tab === 'report') {
+      reportSearchKeyword.value = ''
+      reportFilterStatus.value = ''
+    } else if (tab === 'course') {
+      courseSearchKeyword.value = ''
+      courseFilterStatus.value = ''
+    } else if (tab === 'service') {
+      serviceSearchKeyword.value = ''
+      serviceFilterStatus.value = ''
+    }
   }
+  let rows
+  if (tab === 'application') {
+    await loadApplications()
+    rows = applicationList.value
+  } else if (tab === 'report') {
+    await loadReports()
+    rows = reportList.value
+  } else if (tab === 'course') {
+    await loadCourses()
+    rows = courseList.value
+  } else if (tab === 'service') {
+    await loadServices()
+    rows = serviceList.value
+  }
+  const id = route.query.approvalId
+  if (!id || route.query.approvalTab !== tab || openedApproval === `${tab}:${id}` || !rows) return
+  openedApproval = `${tab}:${id}`
+  const row = rows.find(item => String(item.id) === String(id))
+  if (!row) return ElMessage.warning('该审批记录已不存在，请查看当前列表')
+  // 先呈现完整材料，随后可在列表中执行审核。
+  const viewers = { application: viewApplication, report: viewReport, course: viewCourse, service: viewService }
+  viewers[tab](row)
 }
 
 // 加载入党申请
@@ -607,6 +712,7 @@ const loadReports = async () => {
     }
     
     reportList.value = data
+    return true
   } catch (error) {
     console.error('加载思想汇报失败:', error)
     ElMessage.error('加载思想汇报失败')
@@ -634,6 +740,7 @@ const loadCourses = async () => {
     }
     
     courseList.value = data
+    return true
   } catch (error) {
     console.error('加载微党课失败:', error)
     ElMessage.error('加载微党课失败')
@@ -648,6 +755,7 @@ const loadServices = async () => {
   try {
     const response = await volunteerServiceApi.getAllVolunteerServices()
     let data = response.data || []
+    allServices.value = data
     
     if (serviceSearchKeyword.value) {
       data = data.filter(item =>
@@ -661,6 +769,7 @@ const loadServices = async () => {
     }
     
     serviceList.value = data
+    return true
   } catch (error) {
     console.error('加载志愿活动失败:', error)
     ElMessage.error('加载志愿活动失败')
@@ -730,6 +839,11 @@ const auditService = (row) => {
   auditForm.auditComment = ''
   showAuditDialog.value = true
 }
+const auditViewedItem = () => {
+  const auditors = { application: auditApplication, report: auditReport, course: auditCourse, service: auditService }
+  showViewDialog.value = false
+  auditors[activeTab.value]?.(viewingItem.value)
+}
 
 // 提交审核
 const handleAuditSubmit = async () => {
@@ -763,6 +877,7 @@ const handleAuditSubmit = async () => {
       await loadServices()
     }
 
+    window.dispatchEvent(new Event('admin-audit-updated'))
     showAuditDialog.value = false
   } catch (error) {
     console.error('审核失败:', error)
@@ -894,7 +1009,16 @@ const formatDateTime = (date) => {
 }
 
 const displayDetailValue = value => ({ pending: '待审核', approved: '已通过', rejected: '已驳回', submitted: '已提交', completed: '已完成' }[value] || value || '-')
-const visibleDetail = row => Object.fromEntries(Object.entries(row || {}).filter(([key, value]) => getFieldLabel(key) !== key && value != null && value !== '' && !['studentId', 'courseType', 'instructor', 'location'].includes(key)))
+const visibleDetail = row => Object.fromEntries(Object.entries(row || {}).filter(([key, value]) => getFieldLabel(key) !== key && value != null && value !== ''))
+const detailEntries = computed(() => {
+  const entries = Object.entries(visibleDetail(viewingItem.value))
+  const wide = ([key, value]) => ['content', 'description', 'serviceDescription', 'submittedMaterials', 'auditComment', 'remark'].includes(key)
+    || Array.isArray(value) || (value && typeof value === 'object')
+  const regular = entries.filter(entry => !wide(entry))
+  // Finish an odd row before rendering full-width content; Element Plus otherwise truncates its span.
+  return regular.map(([key, value], index) => ({ key, value, span: index === regular.length - 1 && regular.length % 2 ? 2 : 1 }))
+    .concat(entries.filter(wide).map(([key, value]) => ({ key, value, span: 2 })))
+})
 
 const getFieldLabel = (key) => {
   const labelMap = {
@@ -923,6 +1047,7 @@ const getFieldLabel = (key) => {
     branch: '所属支部',
     auditStatus: '审核状态',
     auditComment: '审核意见',
+    remark: '备注',
     submittedMaterials: '已提交材料',
     createTime: '创建时间',
     updateTime: '更新时间'
@@ -1027,14 +1152,30 @@ const handleBatchImportApplication = async () => {
 
 // 初始化
 onMounted(() => {
-  loadApplications()
+  handleTabChange(activeTab.value)
+})
+watch(() => route.meta.partyTab, tab => {
+  activeTab.value = tab || route.query.approvalTab || 'application'
+  serviceSearchKeyword.value = ''
+  serviceFilterStatus.value = ''
+  showViewDialog.value = false
+  showAuditDialog.value = false
+  handleTabChange(activeTab.value)
+})
+watch(() => [route.query.approvalTab, route.query.approvalId], () => {
+  activeTab.value = route.meta.partyTab || route.query.approvalTab || 'application'
+  handleTabChange(activeTab.value)
 })
 </script>
 
 <style scoped>
+.single-module :deep(.el-tabs__header) { display: none; }
+.management-tabs.single-module { margin-top: 0; }
+.volunteer-management :deep(.el-table) { margin-top: 0; }
 .party-management {
   padding: 20px;
 }
+.party-details :deep(.el-descriptions__table) { table-layout: fixed; }
 
 .page-header-card {
   margin-bottom: 20px;

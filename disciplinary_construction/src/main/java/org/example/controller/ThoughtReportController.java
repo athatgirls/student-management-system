@@ -35,7 +35,7 @@ public class ThoughtReportController {
     }
 
     @Operation(summary = "更新思想汇报")
-    @RequestMapping(value = "/update", method = {RequestMethod.PUT, RequestMethod.POST})
+    @PostMapping("/update")
     public ResponseResult<ThoughtReportModel> updateThoughtReport(@RequestBody ThoughtReportModel thoughtReport, @CurrentUser Map<String, Object> currentUser) {
         ThoughtReportModel existing = thoughtReportService.getThoughtReportById(thoughtReport.getId());
         if (existing != null) {
@@ -49,7 +49,7 @@ public class ThoughtReportController {
     }
 
     @Operation(summary = "删除思想汇报")
-    @RequestMapping(value = "/delete/{id}", method = {RequestMethod.DELETE, RequestMethod.POST})
+    @PostMapping("/delete/{id}")
     public ResponseResult<String> deleteThoughtReport(@PathVariable String id,
                                                       @CurrentUser Map<String, Object> currentUser) {
         ThoughtReportModel existing = thoughtReportService.getThoughtReportById(id);

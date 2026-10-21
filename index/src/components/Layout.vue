@@ -39,6 +39,7 @@
               </template>
               <el-menu-item index="/profile">个人资料</el-menu-item>
               <el-menu-item index="/profile/study">学习记录</el-menu-item>
+              <el-menu-item index="/student-overview">状况一览表</el-menu-item>
             </el-sub-menu>
             <el-sub-menu index="/daily">
               <template #title>
@@ -261,6 +262,9 @@ onUnmounted(() => {
 }
 
 .sidebar {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
   height: 100vh;
   overflow-y: auto;
   color: #bfcbd9;

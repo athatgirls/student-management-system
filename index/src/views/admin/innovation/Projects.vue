@@ -126,56 +126,6 @@
         style="width: 100%"
         :row-class-name="tableRowClassName"
       >
-        <el-table-column type="expand">
-          <template #default="{ row }">
-            <div class="expand-content">
-              <el-descriptions :column="2" border size="small">
-                <el-descriptions-item label="学号">{{ row.studentId }}</el-descriptions-item>
-                <el-descriptions-item label="学生姓名">{{ row.studentName }}</el-descriptions-item>
-                <el-descriptions-item label="项目名称" :span="2">{{ row.projectName }}</el-descriptions-item>
-                <el-descriptions-item label="项目级别">{{ row.projectLevel }}</el-descriptions-item>
-                <el-descriptions-item label="排名">{{ row.ranking }}</el-descriptions-item>
-                <el-descriptions-item label="开始时间">{{ row.startDate }}</el-descriptions-item>
-                <el-descriptions-item label="结束时间">{{ row.endDate }}</el-descriptions-item>
-                <el-descriptions-item label="指导老师" :span="2">{{ row.instructorName || '-' }}</el-descriptions-item>
-                <el-descriptions-item label="团队成员" :span="2">{{ row.teamMembers || '-' }}</el-descriptions-item>
-                <el-descriptions-item label="项目描述" :span="2">{{ row.description || '-' }}</el-descriptions-item>
-                <el-descriptions-item label="提交时间" :span="2">{{ formatDateTime(row.createTime) }}</el-descriptions-item>
-                <el-descriptions-item label="审核意见" :span="2" v-if="row.auditComment">
-                  <el-tag :type="getStatusType(row.auditStatus)" effect="plain">
-                    {{ row.auditComment }}
-                  </el-tag>
-                </el-descriptions-item>
-                <el-descriptions-item label="附件" :span="2" v-if="row.attachments">
-                  <div class="attachment-container">
-                    <div v-for="(file, index) in parseAttachments(row.attachments)" :key="index" class="attachment-item">
-                      <el-image
-                        v-if="isImageFile(file.url)"
-                        :src="getFileUrl(file.url)"
-                        :preview-src-list="getImagePreviewList(row.attachments)"
-                        :initial-index="index"
-                        fit="cover"
-                        style="width: 100px; height: 100px; margin-right: 10px; cursor: pointer;"
-                        :lazy="true"
-                      />
-                      <el-link
-                        v-else
-                        :href="getFileUrl(file.url)"
-                        target="_blank"
-                        type="primary"
-                        style="margin-right: 10px;"
-                      >
-                        <el-icon><Paperclip /></el-icon>
-                        {{ file.name || '下载附件' }}
-                      </el-link>
-                    </div>
-                  </div>
-                </el-descriptions-item>
-              </el-descriptions>
-            </div>
-          </template>
-        </el-table-column>
-
         <el-table-column label="审核状态" width="100" align="center" fixed="left">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.auditStatus)" effect="dark" size="small">
@@ -188,6 +138,7 @@
         <el-table-column prop="projectName" label="项目名称" min-width="200" show-overflow-tooltip />
         <el-table-column prop="projectLevel" label="级别" width="120" align="center" />
         <el-table-column prop="ranking" label="排名" width="70" align="center" />
+        <el-table-column label="得分" width="120" align="center"><template #default="{ row }">{{ row.score ?? '—' }}{{ row.scorePending ? '（待审核）' : '' }}</template></el-table-column>
         <el-table-column label="项目周期" width="240" align="center">
           <template #default="{ row }">
             {{ row.startDate }} ~ {{ row.endDate }}
@@ -280,6 +231,7 @@
       v-model="detailDialogVisible" 
       title="项目详情" 
       width="800px"
+      destroy-on-close
     >
       <el-descriptions :column="2" border v-if="currentRow">
         <el-descriptions-item label="学号">{{ currentRow.studentId }}</el-descriptions-item>
@@ -287,6 +239,10 @@
         <el-descriptions-item label="项目名称" :span="2">{{ currentRow.projectName }}</el-descriptions-item>
         <el-descriptions-item label="项目级别">{{ currentRow.projectLevel }}</el-descriptions-item>
         <el-descriptions-item label="排名">{{ currentRow.ranking }}</el-descriptions-item>
+        <el-descriptions-item label="得分">
+          <el-input-number v-model="scoreForm.score" :min="0" :step="1" style="width: 100%" />
+          <span v-if="currentRow.scorePending">待审核</span>
+        </el-descriptions-item>
         <el-descriptions-item label="开始时间">{{ currentRow.startDate }}</el-descriptions-item>
         <el-descriptions-item label="结束时间">{{ currentRow.endDate }}</el-descriptions-item>
         <el-descriptions-item label="指导老师" :span="2">{{ currentRow.instructorName || '-' }}</el-descriptions-item>
@@ -302,32 +258,13 @@
           {{ currentRow.auditComment }}
         </el-descriptions-item>
         <el-descriptions-item label="附件" :span="2" v-if="currentRow.attachments">
-          <div class="attachment-container">
-            <div v-for="(file, index) in parseAttachments(currentRow.attachments)" :key="index" class="attachment-item">
-              <el-image
-                v-if="isImageFile(file.url)"
-                :src="getFileUrl(file.url)"
-                :preview-src-list="getImagePreviewList(currentRow.attachments)"
-                :initial-index="index"
-                fit="cover"
-                style="width: 120px; height: 120px; margin-right: 10px; margin-bottom: 10px; cursor: pointer;"
-                :lazy="true"
-              />
-              <el-link
-                v-else
-                :href="getFileUrl(file.url)"
-                target="_blank"
-                type="primary"
-                style="margin-right: 10px; margin-bottom: 10px;"
-              >
-                <el-icon><Paperclip /></el-icon>
-                {{ file.name || '下载附件' }}
-              </el-link>
-            </div>
-          </div>
+          <PrivateAttachments :attachments="currentRow.attachments" />
         </el-descriptions-item>
       </el-descriptions>
       <template #footer>
+        <el-button type="primary" :loading="scoreSaving" @click="saveScore">保存得分</el-button>
+        <el-button v-if="currentRow && (!currentRow.auditStatus || currentRow.auditStatus === '待审核')" type="success" @click="detailDialogVisible = false; handleApprove(currentRow)">通过</el-button>
+        <el-button v-if="currentRow && (!currentRow.auditStatus || currentRow.auditStatus === '待审核')" type="danger" @click="detailDialogVisible = false; handleReject(currentRow)">驳回</el-button>
         <el-button @click="detailDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
@@ -335,15 +272,16 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   DataBoard, Clock, CircleCheck, CircleClose, DocumentChecked,
-  Search, Select, Close, Paperclip
+  Search, Select, Close
 } from '@element-plus/icons-vue'
-import { getAllProjects, auditProject, deleteProject } from '@/api/competition'
+import { getAllProjects, auditProject, deleteProject, updateProjectScore } from '@/api/competition'
 import { useStore } from 'vuex'
-import { getFileUrl, isImage } from '@/utils/imageUrl'
+import PrivateAttachments from '@/components/PrivateAttachments.vue'
 
 const store = useStore()
 const loading = ref(false)
@@ -361,6 +299,17 @@ const stats = ref({
 
 // 表格数据
 const allData = ref([])
+const route = useRoute()
+let openedApprovalId = ''
+const openLinkedApproval = () => {
+  const id = route.query.approvalId
+  if (!id || openedApprovalId === id) return
+  openedApprovalId = id
+  const row = allData.value.find(item => String(item.id) === String(id))
+  if (row) handleView(row)
+  else ElMessage.warning('该审批记录已不存在，请查看当前列表')
+}
+watch(() => route.query.approvalId, id => { if (id) loadData() })
 const tableData = ref([])
 
 // 搜索表单
@@ -383,6 +332,24 @@ const auditDialogVisible = ref(false)
 const auditDialogTitle = ref('')
 const detailDialogVisible = ref(false)
 const currentRow = ref({})
+const scoreForm = reactive({ score: null })
+const scoreSaving = ref(false)
+const saveScore = async () => {
+  scoreSaving.value = true
+  try {
+    const saved = await updateProjectScore(currentRow.value.id, { score: scoreForm.score })
+    const updated = { ...saved, studentName: saved.studentName || currentRow.value.studentName }
+    const index = allData.value.findIndex(row => row.id === saved.id)
+    if (index !== -1) allData.value[index] = updated
+    currentRow.value = updated
+    filterAndPaginate()
+    ElMessage.success('项目得分已保存')
+  } catch (error) {
+    ElMessage.error(error?.response?.data || '保存项目得分失败')
+  } finally {
+    scoreSaving.value = false
+  }
+}
 
 const auditForm = reactive({
   auditStatus: '',
@@ -413,34 +380,6 @@ const formatDateTime = (dateTime) => {
   return new Date(dateTime).toLocaleString('zh-CN')
 }
 
-// 解析附件字符串（JSON格式）
-const parseAttachments = (attachments) => {
-  if (!attachments) return []
-  try {
-    if (typeof attachments === 'string') {
-      const parsed = JSON.parse(attachments)
-      return Array.isArray(parsed) ? parsed : []
-    } else if (Array.isArray(attachments)) {
-      return attachments
-    }
-    return []
-  } catch (e) {
-    console.error('解析附件失败:', e)
-    return []
-  }
-}
-
-// 使用工具函数
-const isImageFile = isImage
-
-// 获取图片预览列表（仅图片）
-const getImagePreviewList = (attachments) => {
-  const files = parseAttachments(attachments)
-  return files
-    .filter(file => isImageFile(file.url || file))
-    .map(file => getFileUrl(file.url || file))
-}
-
 // 加载数据
 const loadData = async () => {
   loading.value = true
@@ -453,6 +392,7 @@ const loadData = async () => {
     calculateStats()
     filterAndPaginate()
     ElMessage.success(`加载成功，共 ${allData.value.length} 条数据`)
+    openLinkedApproval()
   } catch (error) {
     console.error('加载数据失败', error)
     ElMessage.error('加载数据失败')
@@ -559,6 +499,7 @@ const submitAudit = async () => {
     ElMessage.success('审核成功')
     auditDialogVisible.value = false
     await loadData()
+    window.dispatchEvent(new Event('admin-audit-updated'))
   } catch (error) {
     console.error('审核失败', error)
     ElMessage.error('审核失败')
@@ -570,6 +511,7 @@ const submitAudit = async () => {
 // 查看详情
 const handleView = (row) => {
   currentRow.value = row
+  scoreForm.score = row.score ?? null
   detailDialogVisible.value = true
 }
 
@@ -706,12 +648,6 @@ onMounted(() => {
   background-color: #f5f7fa;
   border-radius: 4px;
   margin-bottom: 20px;
-}
-
-/* 展开内容 */
-.expand-content {
-  padding: 20px;
-  background-color: #fafafa;
 }
 
 /* 待审核行高亮 */

@@ -27,11 +27,11 @@ public class OnlineUserServiceImpl implements OnlineUserService {
         try {
             String key = ONLINE_USER_KEY_PREFIX + userType + ":" + userId;
             // 设置用户在线，30分钟过期
-            redisTemplate.opsForValue().set(key, System.currentTimeMillis(), ONLINE_TIMEOUT_MINUTES, TimeUnit.MINUTES);
+            redisTemplate.opsForValue().set(key, String.valueOf(System.currentTimeMillis()), ONLINE_TIMEOUT_MINUTES, TimeUnit.MINUTES);
             log.debug("记录用户在线成功: userId={}, userType={}, key={}", userId, userType, key);
         } catch (Exception e) {
-            // Redis连接失败时静默处理，不影响JWT认证
-            log.warn("记录用户在线失败（Redis可能未启动）: {}", e.getMessage());
+            // 在线状态记录失败时不影响JWT认证
+            log.warn("记录用户在线失败: {}", e.getMessage());
         }
     }
     
@@ -66,4 +66,3 @@ public class OnlineUserServiceImpl implements OnlineUserService {
         // 如果需要，可以检查并删除过期的key
     }
 }
-

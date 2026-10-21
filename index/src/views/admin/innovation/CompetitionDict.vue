@@ -19,10 +19,7 @@
           <el-col :xs="24" :sm="12" :md="6" :lg="6">
             <el-form-item label="竞赛级别">
               <el-select v-model="searchForm.level" placeholder="请选择" clearable style="width: 100%">
-                <el-option label="国家级" value="国家级" />
-                <el-option label="省级" value="省级" />
-                <el-option label="市级" value="市级" />
-                <el-option label="校级" value="校级" />
+                <el-option v-for="level in levelOptions" :key="level" :label="level" :value="level" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -36,8 +33,8 @@
           </el-col>
           <el-col :xs="24" :sm="24" :md="6" :lg="6">
             <el-form-item>
-              <el-button type="primary" :icon="Search" @click="handleSearch" style="width: 100%; margin-bottom: 10px;">查询</el-button>
-              <el-button :icon="Refresh" @click="handleReset" style="width: 100%;">重置</el-button>
+              <el-button type="primary" :icon="Search" @click="handleSearch">查询</el-button>
+              <el-button :icon="Refresh" @click="handleReset">重置</el-button>
             </el-form-item>
           </el-col>
         </el-row>
@@ -49,7 +46,7 @@
         <el-table-column prop="competitionName" label="竞赛名称" min-width="200" show-overflow-tooltip />
         <el-table-column prop="competitionLevel" label="竞赛级别" width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="getLevelType(row.competitionLevel)">{{ row.competitionLevel }}</el-tag>
+            <el-tag type="info">{{ row.competitionLevel }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="competitionStatus" label="状态" width="100" align="center">
@@ -105,19 +102,16 @@
         :rules="rules"
         label-width="100px"
       >
-        <el-form-item label="竞赛名称" prop="name">
-          <el-input v-model="form.name" placeholder="请输入竞赛名称" />
+        <el-form-item label="竞赛名称" prop="competitionName">
+          <el-input v-model="form.competitionName" placeholder="请输入竞赛名称" />
         </el-form-item>
-        <el-form-item label="竞赛级别" prop="level">
-          <el-select v-model="form.level" placeholder="请选择竞赛级别" style="width: 100%">
-            <el-option label="国家级" value="国家级" />
-            <el-option label="省级" value="省级" />
-            <el-option label="市级" value="市级" />
-            <el-option label="校级" value="校级" />
+        <el-form-item label="竞赛级别" prop="competitionLevel">
+          <el-select v-model="form.competitionLevel" placeholder="请选择竞赛级别" style="width: 100%">
+            <el-option v-for="level in levelOptions" :key="level" :label="level" :value="level" />
           </el-select>
         </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-radio-group v-model="form.status">
+        <el-form-item label="状态" prop="competitionStatus">
+          <el-radio-group v-model="form.competitionStatus">
             <el-radio label="启用">启用</el-radio>
             <el-radio label="禁用">禁用</el-radio>
           </el-radio-group>
@@ -135,7 +129,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh } from '@element-plus/icons-vue'
 import {
@@ -150,6 +144,9 @@ const loading = ref(false)
 const submitting = ref(false)
 const tableData = ref([])
 const allData = ref([])
+const levelOptions = computed(() => [...new Set(
+  allData.value.map(item => item.competitionLevel).filter(Boolean)
+)])
 
 // 搜索表单
 const searchForm = reactive({
@@ -188,17 +185,6 @@ const rules = {
   ],
 }
 
-// 获取级别类型
-const getLevelType = (level) => {
-  const typeMap = {
-    '国家级': 'danger',
-    '省级': 'warning',
-    '市级': 'success',
-    '校级': 'info'
-  }
-  return typeMap[level] || 'info'
-}
-
 // 加载数据
 const loadData = async () => {
   loading.value = true
@@ -227,14 +213,14 @@ const filterAndPaginate = () => {
   // 应用搜索条件
   if (searchForm.name) {
     filtered = filtered.filter(item =>
-      item.competitionName.includes(searchForm.name)
+      (item.competitionName || '').includes(searchForm.name.trim())
     )
   }
   if (searchForm.level) {
-    filtered = filtered.filter(item => item.level === searchForm.level)
+    filtered = filtered.filter(item => item.competitionLevel === searchForm.level)
   }
   if (searchForm.status) {
-    filtered = filtered.filter(item => item.status === searchForm.status)
+    filtered = filtered.filter(item => item.competitionStatus === searchForm.status)
   }
 
   // 更新总数
@@ -382,6 +368,9 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.search-form .el-form-item { display: flex; margin-right: 0; width: 100%; }
+.search-form :deep(.el-form-item__content) { min-width: 0; flex: 1; }
+.search-form .el-col:last-child :deep(.el-form-item__content) { flex-wrap: nowrap; }
 .competition-dict {
   padding: 20px;
 }

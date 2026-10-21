@@ -1,0 +1,15 @@
+const { test } = require('node:test')
+const assert = require('node:assert/strict')
+const { loadBindings } = require('./helpers/sourceHarness')
+const { taskMatchesTab } = loadBindings('utils/taskCategory.js', ['taskMatchesTab'])
+const { formatDateTime } = loadBindings('utils/dateTime.js', ['formatDateTime'])
+test('UTC completion timestamps become Beijing 24-hour times without shifting local deadlines', () => {
+  assert.equal(formatDateTime('2026-10-01T07:36:00Z'), '2026-10-01 15:36')
+  assert.equal(formatDateTime('2026-10-01T16:00:00Z'), '2026-10-02 00:00')
+  assert.equal(formatDateTime('2026-10-01T15:36:00'), '2026-10-01 15:36')
+  assert.equal(formatDateTime(''), '')
+})
+test('routine tasks are included without mixing academic and volunteer records', () => {
+  for (const activityCategory of ['daily', 'routine', undefined]) assert.equal(taskMatchesTab({activityCategory}, 'tasks'), true)
+  for (const activityCategory of ['academic', 'volunteer']) assert.equal(taskMatchesTab({activityCategory}, 'tasks'), false)
+})

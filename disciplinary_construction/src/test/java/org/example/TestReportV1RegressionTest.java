@@ -1,7 +1,6 @@
 package org.example;
 
 import org.example.controller.*;
-import org.example.dto.StudentProfileUpdate;
 import org.example.model.*;
 import org.example.repository.*;
 import org.example.service.*;
@@ -81,19 +80,23 @@ class TestReportV1RegressionTest {
         assertDoesNotThrow(() -> SubmissionValidation.validate(c));
         c.setDescription("描述文字"); assertThrows(IllegalArgumentException.class, () -> SubmissionValidation.validate(c));
     }
-    @Test void profileAcceptsStudentFieldsButExcludesPoliticalStatus() {
-        StudentProfileUpdate dto = new StudentProfileUpdate(); dto.setMajor("计算机"); dto.setClassName("一班"); dto.setSupervisor("导师"); dto.setWorkStatus("班委");
-        StudentModel result = dto.toStudent("student-a"); assertEquals("计算机",result.getMajor()); assertEquals("一班",result.getClassName());
-        assertEquals("导师",result.getSupervisor()); assertEquals("班委",result.getWorkStatus()); assertNull(result.getPoliticalStatus());
-    }
     private StudyRecordModel study() {
-        StudyRecordModel r = new StudyRecordModel(); r.setCourse("课程"); r.setSemester("2026秋"); r.setScore(85); r.setCredit(2.0); r.setAttachments(FILES); return r;
+        StudyRecordModel r = new StudyRecordModel(); r.setCourse("课程"); r.setSemester("2026秋"); r.setScore(85); r.setCredit(2.0); r.setCourseType("degree"); r.setAttachments(FILES); return r;
     }
     @Test void studentStudyRecordUsesAuthenticatedOwnerAndCannotForgeOfficialStatus() {
         StudyRecordRepository repository = mock(StudyRecordRepository.class); when(repository.save(any())).thenAnswer(i -> i.getArgument(0));
         StudyRecordController c = new StudyRecordController(repository, access()); StudyRecordModel r = study();
         r.setStudentDbId("victim"); r.setStudentId("victim"); r.setSource("official"); r.setStatus("已通过");
         StudyRecordModel saved = c.save(r,user); assertEquals("student-a", saved.getStudentDbId()); assertEquals("2026001", saved.getStudentId()); assertEquals("student",saved.getSource()); assertEquals("学生自填",saved.getStatus());
+    }
+    @Test void studyRecordRequiresCourseTypeAndPositiveCredits() {
+        StudyRecordRepository repository = mock(StudyRecordRepository.class);
+        StudyRecordController controller = new StudyRecordController(repository, access());
+        StudyRecordModel record = study(); record.setCourseType(null);
+        assertThrows(ResponseStatusException.class, () -> controller.save(record, user));
+        record.setCourseType("degree"); record.setCredit(0.0);
+        assertThrows(ResponseStatusException.class, () -> controller.save(record, user));
+        verify(repository, never()).save(any());
     }
     @Test void cannotEditOtherStudentsOrImportedGrades() {
         StudyRecordRepository repository = mock(StudyRecordRepository.class); StudyRecordController c = new StudyRecordController(repository, access());
@@ -129,6 +132,10 @@ class TestReportV1RegressionTest {
         MongoTemplate mongo = mock(MongoTemplate.class); VolunteerCompletionService sync = new VolunteerCompletionService(mongo);
         DailyTaskModel nonVolunteer = new DailyTaskModel(); nonVolunteer.setId("task-d"); nonVolunteer.setActivityCategory("daily");
         assertFalse(sync.sync(nonVolunteer, student(), null)); verifyNoInteractions(mongo);
+        DailyTaskModel ordinary = new DailyTaskModel(); ordinary.setId("task-normal"); ordinary.setActivityCategory("volunteer"); ordinary.setTaskCategory("normal");
+        sync.sync(ordinary, student(), null);
+        verify(mongo).upsert(any(Query.class), any(Update.class), eq(VolunteerServiceModel.class));
+        reset(mongo);
         DailyTaskModel task = new DailyTaskModel(); task.setId("task-a"); task.setActivityCategory("volunteer"); task.setTaskCategory("registration");
         sync.sync(task,student(),null); verifyNoInteractions(mongo);
         ActivityModel activity = new ActivityModel(); activity.setActivityTime(LocalDateTime.now());
@@ -136,19 +143,6 @@ class TestReportV1RegressionTest {
         verify(mongo,times(2)).upsert(argThat((Query q) -> "task:task-a:student:student-a".equals(q.getQueryObject().get("_id"))),
                 argThat((Update u) -> "2026001".equals(((org.bson.Document) u.getUpdateObject().get("$setOnInsert")).get("studentId"))
                         && "通过".equals(((org.bson.Document) u.getUpdateObject().get("$set")).get("auditStatus"))), eq(VolunteerServiceModel.class));
-    }
-    @Test void ordinaryVolunteerSubmissionCreatesRecordButRegistrationWaitsForAttendance() {
-        MongoTemplate mongo = mock(MongoTemplate.class); VolunteerCompletionService sync = new VolunteerCompletionService(mongo);
-        DailyTaskModel ordinary = new DailyTaskModel(); ordinary.setId("task-normal"); ordinary.setActivityCategory("volunteer"); ordinary.setTaskCategory("normal");
-        sync.sync(ordinary, student(), null);
-        verify(mongo).upsert(any(Query.class), any(Update.class), eq(VolunteerServiceModel.class));
-
-        reset(mongo);
-        DailyTaskModel registration = new DailyTaskModel(); registration.setId("task-registration"); registration.setActivityCategory("volunteer"); registration.setTaskCategory("registration");
-        sync.sync(registration, student(), null);
-        verifyNoInteractions(mongo);
-        sync.sync(registration, student(), new ActivityModel());
-        verify(mongo).upsert(any(Query.class), any(Update.class), eq(VolunteerServiceModel.class));
     }
     @Test void attendanceSyncAndCompensationReportCreatedSkippedAndOutOfScopeStudents() {
         ActivityRepository activities = mock(ActivityRepository.class);

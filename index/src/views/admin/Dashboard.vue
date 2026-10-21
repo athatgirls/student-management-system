@@ -80,7 +80,7 @@
     </el-card>
 
     <!-- 图表和详细信息 -->
-    <el-row :gutter="20" style="margin-top: 20px;">
+    <el-row :gutter="20" class="overview-row" style="margin-top: 20px;">
       <el-col :xs="24" :sm="24" :md="16" :lg="16">
         <el-card>
           <template #header>
@@ -123,7 +123,7 @@
     </el-row>
 
     <!-- 最新动态和待审批 -->
-    <el-row :gutter="20" style="margin-top: 20px;">
+    <el-row :gutter="20" class="activity-approval-row" style="margin-top: 20px;">
       <el-col :xs="24" :sm="24" :md="12" :lg="12">
         <el-card>
           <template #header>
@@ -131,7 +131,7 @@
               <span>最新动态</span>
             </div>
           </template>
-          <el-timeline v-if="recentActivities.length > 0">
+          <el-timeline v-if="recentActivities.length > 0" class="recent-activities-list">
             <el-timeline-item
               v-for="activity in displayedRecentActivities"
               :key="activity.id"
@@ -172,15 +172,16 @@
               class="approval-item"
             >
               <div class="approval-info">
-                <div class="approval-title">{{ approval.title }}</div>
+                <el-button link type="primary" class="approval-title" @click="openApproval(approval)">{{ approval.title }}</el-button>
                 <div class="approval-desc">{{ approval.description }}</div>
                 <div class="approval-time">{{ approval.time }}</div>
               </div>
               <div class="approval-actions">
-                <el-button size="small" type="success" @click="handleApprove(approval)">
+                <el-button size="small" type="primary" plain @click="openApproval(approval)">查看详情</el-button>
+                <el-button size="small" type="success" :loading="auditingIds.includes(approval.id)" @click="handleApprove(approval)">
                   通过
                 </el-button>
-                <el-button size="small" type="danger" @click="handleReject(approval)">
+                <el-button size="small" type="danger" :loading="auditingIds.includes(approval.id)" @click="handleReject(approval)">
                   拒绝
                 </el-button>
               </div>
@@ -228,7 +229,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, computed } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { 
   User, 
@@ -239,7 +241,9 @@ import {
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import request from '@/api/request'
-import { getTaskCompletionAnalysis } from '@/api/daily'
+import { getTaskCompletionAnalysis, auditItem } from '@/api/daily'
+import { auditLeaveRequest } from '@/api/leave'
+import { thoughtReportApi, partyCourseApi, volunteerServiceApi, partyApplicationApi } from '@/api/party'
 
 const router = useRouter()
 
@@ -275,6 +279,20 @@ const displayedRecentActivities = computed(() => {
 // 待审批事项
 const pendingApprovals = ref([])
 const taskCompletionAnalysis = ref([])
+const approvalRoutes = {
+  academic: '/admin/daily/academic', daily: '/admin/daily/daily', honor: '/admin/daily/honor',
+  leave: '/admin/daily/leave', volunteerService: '/admin/daily/volunteer',
+  thoughtReport: '/admin/party/management', partyCourse: '/admin/party/management',
+  partyApplication: '/admin/party/management',
+  competition: '/admin/innovation/competitions/list', project: '/admin/innovation/projects/list',
+  paper: '/admin/innovation/papers/list', patent: '/admin/innovation/patents/list'
+}
+const approvalTabs = { thoughtReport: 'report', partyCourse: 'course', partyApplication: 'application', volunteerService: 'service' }
+const openApproval = approval => {
+  const path = approvalRoutes[approval.dataType]
+  if (!path || !approval.dataId) return ElMessage.warning('无法定位该审批事项')
+  router.push({ path, query: { approvalId: approval.dataId, ...(approvalTabs[approval.dataType] && { approvalTab: approvalTabs[approval.dataType] }) } })
+}
 
 // 图表引用
 const majorChart = ref(null)
@@ -435,13 +453,53 @@ const initChart = () => {
 }
 
 // 处理审批
-const handleApprove = (_approval) => {
-  // 这里可以调用后端API进行审批
+const auditingIds = ref([])
+const submitApproval = async (approval, approved) => {
+  if (auditingIds.value.includes(approval.id)) return
+  auditingIds.value.push(approval.id)
+  let comment = ''
+  try {
+    if (approved) {
+      await ElMessageBox.confirm(`确定通过“${approval.title}”吗？`, '审批确认', { type: 'warning' })
+    } else {
+      const result = await ElMessageBox.prompt('请输入拒绝原因', '拒绝审批', {
+        inputValidator: value => !!value?.trim() || '请输入拒绝原因'
+      })
+      comment = result.value.trim()
+    }
+    const status = approved ? 'approved' : 'rejected'
+    const partyData = { auditStatus: approved ? '通过' : '拒绝', auditComment: comment }
+    const partyAuditors = {
+      thoughtReport: thoughtReportApi.auditThoughtReport,
+      partyCourse: partyCourseApi.auditPartyCourse,
+      volunteerService: volunteerServiceApi.auditVolunteerService,
+      partyApplication: partyApplicationApi.auditPartyApplication
+    }
+    let res
+    if (approval.dataType === 'leave') {
+      res = await auditLeaveRequest(approval.dataId, status, comment)
+    } else if (partyAuditors[approval.dataType]) {
+      res = await partyAuditors[approval.dataType](approval.dataId, partyData)
+    } else if (['academic', 'daily', 'honor'].includes(approval.dataType)) {
+      res = await auditItem(approval.dataType, { id: approval.dataId, auditStatus: status, auditComment: comment })
+    } else {
+      throw new Error('暂不支持此类审批，请进入对应业务页面处理')
+    }
+    if (res.code !== 200) throw new Error(res.msg || '审批失败')
+    ElMessage.success('审批成功')
+    window.dispatchEvent(new Event('admin-audit-updated'))
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') ElMessage.error(error.message || '审批失败')
+  } finally {
+    auditingIds.value = auditingIds.value.filter(id => id !== approval.id)
+  }
 }
+const handleApprove = approval => submitApproval(approval, true)
+const handleReject = approval => submitApproval(approval, false)
 
-const handleReject = (_approval) => {
-  // 这里可以调用后端API进行审批
-}
+const refreshApprovals = () => loadStatistics()
+const refreshOnFocus = () => loadStatistics()
+let refreshTimer
 
 // 快速操作跳转
 const goToStudents = () => {
@@ -453,7 +511,7 @@ const goToInternships = () => {
 }
 
 const goToCompetitions = () => {
-  router.push('/admin/competition/list')
+  router.push('/admin/innovation/competitions/list')
 }
 
 const goToAlumni = () => {
@@ -461,7 +519,7 @@ const goToAlumni = () => {
 }
 
 const goToSystem = () => {
-  router.push('/admin/system')
+  router.push('/admin/profile')
 }
 
 onMounted(() => {
@@ -472,6 +530,18 @@ onMounted(() => {
     loadStatistics()
     loadTaskCompletionAnalysis()
   })
+  window.addEventListener('admin-audit-updated', refreshApprovals)
+  window.addEventListener('focus', refreshOnFocus)
+  refreshTimer = window.setInterval(refreshApprovals, 30000)
+})
+const resizeChart = () => chartInstance?.resize()
+onMounted(() => window.addEventListener('resize', resizeChart))
+onUnmounted(() => {
+  window.removeEventListener('admin-audit-updated', refreshApprovals)
+  window.removeEventListener('focus', refreshOnFocus)
+  window.clearInterval(refreshTimer)
+  window.removeEventListener('resize', resizeChart)
+  chartInstance?.dispose()
 })
 </script>
 
@@ -549,9 +619,12 @@ onMounted(() => {
 }
 
 .overview-list {
-  max-height: 300px;
+  height: 300px;
   overflow-y: auto;
 }
+
+.overview-row > .el-col { margin-bottom: 20px; }
+.overview-row :deep(.el-card) { height: 100%; }
 
 .overview-item {
   display: flex;
@@ -585,6 +658,38 @@ onMounted(() => {
   overflow-y: auto;
 }
 
+.recent-activities-list {
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+@media (min-width: 992px) {
+  .activity-approval-row > .el-col > .el-card {
+    height: 680px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .activity-approval-row > .el-col > .el-card > :deep(.el-card__body) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .activity-approval-row .recent-activities-list,
+  .activity-approval-row .approval-list {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+  }
+
+  .activity-approval-row .more-actions {
+    flex-shrink: 0;
+  }
+}
+
 .approval-item {
   display: flex;
   justify-content: space-between;
@@ -606,6 +711,10 @@ onMounted(() => {
   font-weight: bold;
   color: #303133;
   margin-bottom: 4px;
+  padding: 0;
+  height: auto;
+  white-space: normal;
+  text-align: left;
 }
 
 .approval-desc {
@@ -622,6 +731,7 @@ onMounted(() => {
 .approval-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .quick-actions {

@@ -9,6 +9,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Data
 @Document(collection = "patent")
@@ -24,6 +26,10 @@ public class PatentModel {
     private String inventorRank;       // 发明人排名（数字）
     private String coInventors;         // 合作发明人
     private String attachments;         // 附件路径
+    private BigDecimal score;
+    private boolean scorePending;
+    @JsonIgnore
+    private BigDecimal previousScore;
 
     // 专利相关时间
     @JsonFormat(pattern = "yyyy-MM-dd")

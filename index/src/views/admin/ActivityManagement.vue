@@ -1,6 +1,5 @@
 <template>
   <div class="page-wrap">
-    <!-- Hero -->
     <section class="hero">
       <div class="hero-inner container">
         <div>
@@ -66,12 +65,12 @@
                 导入学生
               </el-button>
               <el-button
-                v-if="row.activityCategory === 'volunteer'"
+                v-if="scope.row.activityCategory === 'volunteer'"
                 type="success"
                 link
                 size="small"
-                :disabled="!(row.participantStudentIds || []).length"
-                @click="handleSyncVolunteer(row)"
+                :disabled="!(scope.row.participantStudentIds || []).length"
+                @click="handleSyncVolunteer(scope.row)"
               >
                 同步志愿到场
               </el-button>
@@ -543,6 +542,12 @@ const handleCreateActivity = async () => {
   }
 
   if (activityAttachmentUploading.value) return ElMessage.warning('请等待文件上传完成')
+  const deadline = activityForm.taskMode === 'create'
+    ? activityForm.taskDeadline
+    : availableTasks.value.find(task => task.id === activityForm.taskId)?.deadline
+  if (!deadline || new Date(deadline).getTime() <= new Date(activityForm.activityTime).getTime()) {
+    return ElMessage.warning('截止日期必须大于活动开始时间')
+  }
   // 验证任务信息
   let taskId = null
   if (activityForm.taskMode === 'create') {
@@ -811,43 +816,36 @@ onMounted(() => {
 <style scoped>
 .page-wrap {
   min-height: 100vh;
-  background: #f0f2f5;
+  background: linear-gradient(180deg, #f7f9ff, #ffffff 40%);
 }
 
 .hero {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 40px 0;
-  margin-bottom: 20px;
+  padding: 28px 0;
+  background: radial-gradient(1200px 220px at 50% -40px, #e8eeff, transparent);
 }
 
 .hero-inner {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-end;
+  gap: 20px;
 }
 
 .hero-title {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 700;
-  margin-bottom: 8px;
+  color: #1f2d3d;
 }
 
 .hero-sub {
-  font-size: 14px;
-  opacity: 0.9;
+  color: #6b7280;
+  margin-top: 6px;
 }
 
 .container {
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 0 20px;
-}
-
-.glass {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
+  padding: 20px;
 }
 
 .card-header {
@@ -867,5 +865,12 @@ onMounted(() => {
   color: #909399;
   font-size: 12px;
   line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  .hero-inner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 </style>

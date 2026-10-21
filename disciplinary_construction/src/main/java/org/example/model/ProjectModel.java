@@ -9,6 +9,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Data
 @Document(collection = "project")
@@ -24,6 +26,10 @@ public class ProjectModel {
     private String teamMembers;         // 团队成员
     private String instructorName;      // 指导老师
     private String attachments;         // 附件路径
+    private BigDecimal score;
+    private boolean scorePending;
+    @JsonIgnore
+    private BigDecimal previousScore;
 
     // 项目起止时间
     @JsonFormat(pattern = "yyyy-MM-dd")

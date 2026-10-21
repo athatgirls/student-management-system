@@ -967,14 +967,10 @@ onMounted(() => {
 <style scoped>
 .internship-page {
   padding: 20px;
-  background: linear-gradient(180deg, #f6faf8 0%, #f5f7fb 100%);
 }
 
 .module-tabs-card {
   margin-bottom: 20px;
-  border: none;
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(18, 32, 55, 0.06);
 }
 
 .secondary-tabs :deep(.el-tabs__header) {
@@ -990,14 +986,14 @@ onMounted(() => {
   grid-template-columns: minmax(260px, 0.55fr) minmax(0, 1fr);
   gap: 20px;
   margin-bottom: 18px;
-  padding: 24px;
+  padding: 20px;
   border: 1px solid #e4e7ed;
-  border-radius: 8px;
-  background: linear-gradient(90deg, #eefaf5 0%, #ffffff 55%);
+  border-radius: 4px;
+  background: #fff;
 }
 
 .intent-kicker {
-  color: #0f766e;
+  color: #909399;
   font-size: 13px;
   font-weight: 600;
 }
@@ -1017,10 +1013,7 @@ onMounted(() => {
 }
 
 .intent-form {
-  padding: 18px;
-  border: 1px solid rgba(228, 231, 237, 0.9);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.88);
+  min-width: 0;
 }
 
 .intent-actions {
@@ -1037,33 +1030,32 @@ onMounted(() => {
 }
 
 .classification-card {
-  padding: 18px;
-  border: 1px solid rgba(15, 118, 110, 0.12);
-  border-radius: 18px;
-  background: white;
+  padding: 16px;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  background: #fff;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .classification-card.active,
 .classification-card:hover {
-  border-color: #0f766e;
-  background: #f0faf7;
-  box-shadow: 0 12px 28px rgba(15, 118, 110, 0.12);
+  border-color: #409eff;
+  background: #ecf5ff;
 }
 
 .classification-card span,
 .classification-card em {
   display: block;
-  color: #667085;
+  color: #909399;
   font-style: normal;
 }
 
 .classification-card strong {
   display: block;
   margin: 10px 0 6px;
-  color: #17212f;
-  font-size: 32px;
+  color: #303133;
+  font-size: 24px;
 }
 
 .card-header {

@@ -39,6 +39,8 @@
             <el-menu-item index="/admin/students/list">学生列表</el-menu-item>
             <el-menu-item index="/admin/students/add">添加学生</el-menu-item>
             <el-menu-item index="/admin/students/grades/import">成绩导入</el-menu-item>
+            <el-menu-item index="/admin/grades">成绩管理</el-menu-item>
+            <el-menu-item index="/admin/students/overview">学生全量信息</el-menu-item>
           </el-sub-menu>
           
           <el-sub-menu index="/admin/alumni">
@@ -65,8 +67,8 @@
               <el-icon><Trophy /></el-icon>
               <span>科创竞赛</span>
               <el-badge 
-                v-if="totalPendingCount > 0" 
-                :value="totalPendingCount" 
+                v-if="innovationPendingCount > 0"
+                :value="innovationPendingCount"
                 :max="99"
                 class="menu-badge"
               />
@@ -96,7 +98,7 @@
             <el-menu-item index="/admin/innovation/projects/list">
               <el-icon><Operation /></el-icon>
               <span>项目管理</span>
-              <el-badge 
+              <el-badge
                 v-if="pendingCounts.project > 0" 
                 :value="pendingCounts.project" 
                 :max="99"
@@ -139,8 +141,12 @@
             <template #title>
               <el-icon><Flag /></el-icon>
               <span>党员发展与管理</span>
+              <el-badge v-if="pendingCounts.party > 0" :value="pendingCounts.party" :max="99" class="menu-badge" />
             </template>
-            <el-menu-item index="/admin/party/management">综合管理</el-menu-item>
+            <el-menu-item index="/admin/party/management">
+              综合管理
+              <el-badge v-if="pendingCounts.party > 0" :value="pendingCounts.party" :max="99" class="item-badge" />
+            </el-menu-item>
             <el-menu-item index="/admin/party/list">党员列表</el-menu-item>
             <el-menu-item index="/admin/party/add">添加党员</el-menu-item>
           </el-sub-menu>
@@ -156,7 +162,16 @@
                 class="menu-badge"
               />
             </template>
-            <el-menu-item index="/admin/daily/dailycontrol">活动审批列表</el-menu-item>
+            <el-menu-item v-for="item in dailyApprovalMenus" :key="item.path" :index="item.path">
+              <span>{{ item.label }}</span>
+              <el-badge
+                v-if="dailyPendingCounts[item.key] > 0"
+                :value="dailyPendingCounts[item.key]"
+                :max="99"
+                class="item-badge"
+              />
+            </el-menu-item>
+            <el-menu-item index="/admin/daily/tasks">日常任务</el-menu-item>
             <el-menu-item index="/admin/daily/task-completion-analysis">任务完成度分析</el-menu-item>
             <el-menu-item index="/admin/daily/activity-management">活动管理</el-menu-item>
           </el-sub-menu>
@@ -173,6 +188,7 @@
               管理员管理
             </el-menu-item>
             <el-menu-item index="/admin/profile">个人信息</el-menu-item>
+            <el-menu-item index="/admin/templates">模板管理</el-menu-item>
           </el-sub-menu>
         </el-menu>
       </el-aside>
@@ -198,7 +214,9 @@
 
           <div class="header-right">
             <!-- 待审核提醒 -->
-            <el-badge 
+            <el-popover placement="bottom-end" :width="300" trigger="click">
+              <template #reference>
+              <el-badge
               :value="totalPendingCount" 
               :max="99" 
               :hidden="totalPendingCount === 0"
@@ -208,10 +226,18 @@
                 type="primary" 
                 :icon="DocumentChecked" 
                 circle 
-                @click="goToAudit"
                 title="待审核项目"
               />
             </el-badge>
+              </template>
+              <div class="audit-popover">
+                <strong>待审核事项</strong>
+                <el-empty v-if="!totalPendingCount" description="暂无待审核项目" :image-size="50" />
+                <el-button v-for="item in pendingLinks" :key="item.path" text @click="router.push(item.path)">
+                  <span>{{ item.label }}</span><el-tag size="small" type="danger">{{ item.count }}</el-tag>
+                </el-button>
+              </div>
+            </el-popover>
         
             <el-dropdown @command="handleCommand">
               <span class="user-info">
@@ -244,7 +270,7 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
-import { ElMessageBox, ElMessage } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
 import { Menu } from '@element-plus/icons-vue'
 import request from '@/api/request'
 import {
@@ -276,17 +302,20 @@ const pendingCounts = ref({
   project: 0,
   paper: 0,
   patent: 0,
-  daily: 0
+  daily: 0,
+  party: 0
 })
 
 // 总待审核数量
-const totalPendingCount = computed(() => {
+const dailyPendingCounts = ref({})
+const innovationPendingCount = computed(() => {
   return pendingCounts.value.competition + 
          pendingCounts.value.project + 
          pendingCounts.value.paper + 
-         pendingCounts.value.patent +
-         pendingCounts.value.daily
+         pendingCounts.value.patent
 })
+const totalPendingCount = computed(() => innovationPendingCount.value + pendingCounts.value.daily + pendingCounts.value.party)
+const partyPendingCounts = ref({})
 
 const userInfo = computed(() => {
   const user = store.state.user
@@ -355,53 +384,63 @@ const loadPendingStats = async () => {
     }
     
     if (data) {
+      dailyPendingCounts.value = data.daily || {}
+      partyPendingCounts.value = data.party || {}
       pendingCounts.value = {
         competition: data.competition?.pending || 0,
         project: data.project?.pending || 0,
         paper: data.paper?.pending || 0,
         patent: data.patent?.pending || 0,
-        daily: data.daily?.pending || 0
+        daily: data.daily?.pending || 0,
+        party: data.party?.pending || 0
       }
       
     } else {
+      dailyPendingCounts.value = {}
+      partyPendingCounts.value = {}
       // 设置为 0
       pendingCounts.value = {
         competition: 0,
         project: 0,
         paper: 0,
         patent: 0,
-        daily: 0
+        daily: 0,
+        party: 0
       }
     }
   } catch (error) {
     console.error('加载待审核统计失败:', error)
+    dailyPendingCounts.value = {}
+    partyPendingCounts.value = {}
     // 失败时设置为 0
     pendingCounts.value = {
       competition: 0,
       project: 0,
       paper: 0,
       patent: 0,
-      daily: 0
+      daily: 0,
+      party: 0
     }
   }
 }
 
-// 跳转到第一个有待审核的页面
-const goToAudit = () => {
-  if (pendingCounts.value.competition > 0) {
-    router.push('/admin/innovation/competitions/list')
-  } else if (pendingCounts.value.project > 0) {
-    router.push('/admin/innovation/projects/list')
-  } else if (pendingCounts.value.paper > 0) {
-    router.push('/admin/innovation/papers/list')
-  } else if (pendingCounts.value.patent > 0) {
-    router.push('/admin/innovation/patents/list')
-  } else if (pendingCounts.value.daily > 0) {
-    router.push('/admin/daily/dailycontrol')
-  } else {
-    ElMessage.info('暂无待审核项目')
-  }
-}
+const dailyApprovalMenus = [
+  { label: '学术活动', path: '/admin/daily/academic', key: 'academic' },
+  { label: '志愿活动', path: '/admin/daily/volunteer', key: 'volunteer' },
+  { label: '日常活动', path: '/admin/daily/daily', key: 'dailyActivity' },
+  { label: '请假管理', path: '/admin/daily/leave', key: 'leave' },
+  { label: '荣誉', path: '/admin/daily/honor', key: 'honor' }
+]
+const pendingLinks = computed(() => [
+  { label: '竞赛管理', path: '/admin/innovation/competitions/list', count: pendingCounts.value.competition },
+  { label: '项目管理', path: '/admin/innovation/projects/list', count: pendingCounts.value.project },
+  { label: '论文管理', path: '/admin/innovation/papers/list', count: pendingCounts.value.paper },
+  { label: '专利管理', path: '/admin/innovation/patents/list', count: pendingCounts.value.patent },
+  { label: '入党申请', path: '/admin/party/management?approvalTab=application', count: partyPendingCounts.value.application || 0 },
+  { label: '思想汇报', path: '/admin/party/management?approvalTab=report', count: partyPendingCounts.value.report || 0 },
+  { label: '微党课', path: '/admin/party/management?approvalTab=course', count: partyPendingCounts.value.course || 0 },
+  ...dailyApprovalMenus.map(item => ({ ...item, count: dailyPendingCounts.value[item.key] || 0 }))
+].filter(item => item.count > 0))
 
 // 定时器ID
 let refreshTimer = null
@@ -417,6 +456,8 @@ onMounted(() => {
   
   // 监听窗口大小变化
   window.addEventListener('resize', handleResize)
+  window.addEventListener('admin-audit-updated', loadPendingStats)
+  window.addEventListener('focus', loadPendingStats)
 })
 
 onUnmounted(() => {
@@ -425,6 +466,8 @@ onUnmounted(() => {
     clearInterval(refreshTimer)
   }
   window.removeEventListener('resize', handleResize)
+  window.removeEventListener('admin-audit-updated', loadPendingStats)
+  window.removeEventListener('focus', loadPendingStats)
 })
 
 
@@ -493,10 +536,13 @@ const handleCommand = async (command) => {
   margin-left: 8px;
 }
 
-:deep(.el-badge__content) {
-  top: 8px;
-  right: -8px;
+.sidebar-menu :deep(.el-badge__content) {
+  position: static;
+  transform: none;
 }
+.sidebar-menu :deep(.el-badge) { display: inline-flex; align-items: center; }
+.audit-popover .el-button { display: flex; width: 100%; margin: 8px 0 0; }
+.audit-popover .el-button :deep(> span) { width: 100%; display: flex; justify-content: space-between; align-items: center; }
 
 /* 子菜单中的徽章 */
 :deep(.el-sub-menu__title .menu-badge) {

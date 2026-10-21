@@ -7,6 +7,28 @@ import java.util.*;
 
 public final class TaskSubmissionValidation {
     private TaskSubmissionValidation() { }
+    public static void validateDefinition(DailyTaskModel task) {
+        SubmissionValidation.required(task.getTitle(), "任务标题");
+        SubmissionValidation.required(task.getType(), "任务类型");
+        if (task.getDeadline() == null || !task.getDeadline().isAfter(LocalDateTime.now(ZoneId.of("Asia/Shanghai"))))
+            throw new IllegalArgumentException("截止日期必须晚于当前时间");
+        if ("registration".equals(task.getTaskCategory()) && (task.getMaxParticipants() == null || task.getMaxParticipants() < 1))
+            throw new IllegalArgumentException("报名人数限制必须为正整数");
+        Set<String> names = new HashSet<>();
+        if (task.getFields() != null) for (DailyTaskModel.TaskField field : task.getFields()) {
+            if (field == null) throw new IllegalArgumentException("字段定义不能为空");
+            SubmissionValidation.required(field.getFieldName(), "字段名称");
+            field.setFieldName(field.getFieldName().trim());
+            if (!names.add(field.getFieldName())) throw new IllegalArgumentException("字段名称不能重复");
+            if (!Arrays.asList("text", "textarea", "number", "date", "select", "file").contains(field.getFieldType()))
+                throw new IllegalArgumentException("字段类型无效");
+            if ("select".equals(field.getFieldType()) && (field.getOptions() == null || field.getOptions().isEmpty()
+                    || field.getOptions().stream().anyMatch(value -> value == null || value.isBlank())))
+                throw new IllegalArgumentException("请填写下拉字段的选项");
+        }
+        task.setTitle(task.getTitle().trim());
+        task.setType(task.getType().trim());
+    }
     public static String category(String category) {
         if (category == null || category.isBlank()) return "daily";
         if (!Arrays.asList("academic", "daily", "volunteer", "routine").contains(category)) throw new IllegalArgumentException("请选择有效的活动分类");

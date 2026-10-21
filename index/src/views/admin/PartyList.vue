@@ -2,8 +2,34 @@
   <div class="party-member-list">
     <div class="page-header">
       <h2>党员发展与管理</h2>
-      <div>
-        <el-button type="success" @click="showBatchImportDialog = true" style="margin-right: 10px">
+    </div>
+
+    <!-- 搜索和筛选 -->
+    <div class="search-section">
+      <div class="search-filters">
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索姓名或学号"
+          clearable
+          @keyup.enter="handleSearch"
+        />
+        <el-select v-model="filterBranch" placeholder="选择党支部" clearable>
+          <el-option v-for="branch in PARTY_BRANCHES" :key="branch" :label="branch" :value="branch" />
+        </el-select>
+        <el-select v-model="filterStatus" placeholder="选择党员状态" clearable>
+          <el-option label="正式党员" value="是" />
+          <el-option label="预备党员" value="否" />
+        </el-select>
+        <el-select v-model="filterAuditStatus" placeholder="选择审核状态" clearable>
+          <el-option label="待审核" value="待审核" />
+          <el-option label="已通过" value="通过" />
+          <el-option label="已拒绝" value="拒绝" />
+        </el-select>
+      </div>
+      <div class="search-actions">
+        <el-button @click="handleReset">重置</el-button>
+        <el-button type="primary" @click="handleSearch">搜索</el-button>
+        <el-button type="success" @click="showBatchImportDialog = true">
           <el-icon><Upload /></el-icon>
           批量导入党员
         </el-button>
@@ -12,48 +38,6 @@
           添加党员
         </el-button>
       </div>
-    </div>
-
-    <!-- 搜索和筛选 -->
-    <div class="search-section">
-      <el-row :gutter="16">
-        <el-col :xs="24" :sm="12" :md="6" :lg="6">
-          <el-input
-            v-model="searchKeyword"
-            placeholder="搜索姓名或学号"
-            clearable
-            @keyup.enter="handleSearch"
-          >
-            <template #append>
-              <el-button @click="handleSearch">
-                <el-icon><Search /></el-icon>
-              </el-button>
-            </template>
-          </el-input>
-        </el-col>
-        <el-col :xs="12" :sm="8" :md="4" :lg="4">
-          <el-select v-model="filterBranch" placeholder="选择党支部" clearable style="width: 100%">
-            <el-option v-for="branch in PARTY_BRANCHES" :key="branch" :label="branch" :value="branch" />
-          </el-select>
-        </el-col>
-        <el-col :xs="12" :sm="8" :md="4" :lg="4">
-          <el-select v-model="filterStatus" placeholder="选择党员状态" clearable style="width: 100%">
-            <el-option label="正式党员" value="是" />
-            <el-option label="预备党员" value="否" />
-          </el-select>
-        </el-col>
-        <el-col :xs="12" :sm="8" :md="4" :lg="4">
-          <el-select v-model="filterAuditStatus" placeholder="选择审核状态" clearable style="width: 100%">
-            <el-option label="待审核" value="待审核" />
-            <el-option label="已通过" value="通过" />
-            <el-option label="已拒绝" value="拒绝" />
-          </el-select>
-        </el-col>
-        <el-col :xs="24" :sm="24" :md="6" :lg="6">
-          <el-button @click="handleReset" style="width: 100%; margin-bottom: 10px;">重置</el-button>
-          <el-button type="primary" @click="handleSearch" style="width: 100%;">搜索</el-button>
-          </el-col>
-      </el-row>
     </div>
 
     <!-- 党员列表 -->
@@ -91,19 +75,21 @@
           {{ formatDate(row.createTime) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="280" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" @click="handleView(row)">查看</el-button>
-          <el-button size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
-          <el-button 
-            size="small" 
-            type="warning" 
-            @click="handleAudit(row)"
-            v-if="row.auditStatus === '待审核'"
-          >
-            审核
-          </el-button>
-          <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+          <div class="party-row-actions">
+            <el-button size="small" @click="handleView(row)">查看</el-button>
+            <el-button size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
+            <el-button
+              v-if="row.auditStatus === '待审核'"
+              size="small"
+              type="warning"
+              @click="handleAudit(row)"
+            >
+              审核
+            </el-button>
+            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+          </div>
         </template>
       </el-table-column>
     </el-table>
@@ -421,7 +407,7 @@
 import { PARTY_BRANCHES } from '@/constants/partyBranches'
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Upload, UploadFilled } from '@element-plus/icons-vue'
+import { Plus, Upload, UploadFilled } from '@element-plus/icons-vue'
 import { partyMemberApi } from '@/api/party'
 import { readExcelObjects } from '@/utils/excel'
 
@@ -799,10 +785,52 @@ onMounted(() => {
 }
 
 .search-section {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 20px;
   padding: 20px;
   background-color: #f5f7fa;
   border-radius: 4px;
+}
+
+.search-filters {
+  display: flex;
+  flex: 1 1 560px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.search-filters > .el-input {
+  flex: 1.5 1 160px;
+}
+
+.search-filters > .el-select {
+  flex: 1 1 120px;
+  width: auto;
+}
+
+.search-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.search-actions .el-button + .el-button {
+  margin-left: 0;
+}
+
+.party-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.party-row-actions .el-button + .el-button {
+  margin-left: 0;
 }
 
 .pagination-section {
@@ -835,10 +863,6 @@ onMounted(() => {
     margin-bottom: 15px;
   }
 
-  .search-section .el-col {
-    margin-bottom: 10px;
-  }
-
   :deep(.el-table) {
     font-size: 12px;
   }
@@ -853,6 +877,11 @@ onMounted(() => {
 }
 
 @media (max-width: 480px) {
+  .search-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
   .party-member-list {
     padding: 8px;
   }

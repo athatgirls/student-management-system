@@ -49,7 +49,7 @@ export function createAdmin(adminData) {
 export function updateAdmin(adminData) {
   return request({
     url: '/admin/update',
-    method: 'put',
+    method: 'post',
     data: adminData
   })
 }
@@ -58,7 +58,7 @@ export function updateAdmin(adminData) {
 export function deleteAdmin(adminId) {
   return request({
     url: `/admin/delete/${adminId}`,
-    method: 'delete'
+    method: 'post'
   })
 }
 
@@ -82,7 +82,7 @@ export function getAdminsByRole(role) {
 export function updateAdminStatus(adminId, isActive) {
   return request({
     url: `/admin/status/${adminId}`,
-    method: 'put',
+    method: 'post',
     data: { isActive }
   })
 }
@@ -130,8 +130,8 @@ export const getAllProjects = () => {
 // 审核竞赛
 export const auditCompetition = (data) => {
   return request({
-    url: `/admin/competitions/${data.id}/audit`,
-    method: 'put',
+    url: `/competitions/admin/${data.id}/audit`,
+    method: 'post',
     data: {
       auditStatus: data.auditStatus,
       auditComment: data.auditComment
@@ -142,8 +142,8 @@ export const auditCompetition = (data) => {
 // 审核论文
 export const auditPaper = (data) => {
   return request({
-    url: `/admin/papers/${data.id}/audit`,
-    method: 'put',
+    url: `/papers/admin/${data.id}/audit`,
+    method: 'post',
     data: {
       auditStatus: data.auditStatus,
       auditComment: data.auditComment
@@ -154,8 +154,8 @@ export const auditPaper = (data) => {
 // 审核专利
 export const auditPatent = (data) => {
   return request({
-    url: `/admin/patents/${data.id}/audit`,
-    method: 'put',
+    url: `/patents/admin/${data.id}/audit`,
+    method: 'post',
     data: {
       auditStatus: data.auditStatus,
       auditComment: data.auditComment
@@ -166,8 +166,8 @@ export const auditPatent = (data) => {
 // 审核项目
 export const auditProject = (data) => {
   return request({
-    url: `/admin/projects/${data.id}/audit`,
-    method: 'put',
+    url: `/projects/admin/${data.id}/audit`,
+    method: 'post',
     data: {
       auditStatus: data.auditStatus,
       auditComment: data.auditComment

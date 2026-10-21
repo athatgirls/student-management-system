@@ -1,6 +1,7 @@
 package org.example.model;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateDeserializer;
 import lombok.Data;
@@ -9,6 +10,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 @Data
 @Document(collection = "paper")
@@ -23,6 +25,13 @@ public class PaperModel {
     private String journalLevel;        // 期刊级别
     private String authorRank;         // 作者排名（数字）
     private String coAuthors;           // 合作作者
+    private String scoreRatio;          // 管理员维护的署名得分比例原值
+    private BigDecimal paperScore;      // 管理员维护的论文得分
+    private boolean scorePending;       // 学生修改的得分尚待管理员审核
+    @JsonIgnore
+    private String previousScoreRatio;  // 驳回时恢复原得分
+    @JsonIgnore
+    private BigDecimal previousPaperScore;
     private String doi;                 // DOI号
     private String attachments;         // 附件路径
 

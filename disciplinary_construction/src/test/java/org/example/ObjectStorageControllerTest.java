@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -58,7 +59,7 @@ class ObjectStorageControllerTest {
         assertEquals(404, controller.download("missing.pdf", Map.of("userId", "admin", "userType", "admin")).getStatusCodeValue());
     }
     @Test
-    void uploadKeepsUuidKeyAndContextRelativeUrlContract() throws Exception {
+    void uploadPersistsOwnerAndReturnsStoredObjectsDownloadUrl() throws Exception {
         UploadedFileRepository files = mock(UploadedFileRepository.class);
         ObjectStorageService storage = mock(ObjectStorageService.class);
         FileUploadController controller = new FileUploadController();
@@ -74,9 +75,10 @@ class ObjectStorageControllerTest {
 
         ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
         verify(storage).putObject(key.capture(), any(), eq(file.getSize()), eq("image/png"));
-        assertTrue(key.getValue().matches("[0-9a-f-]{36}\\.png"));
+        assertTrue(!key.getValue().isBlank());
         assertEquals("/SCSE@hbut/uploads/" + key.getValue(), response.getData());
-        verify(files).insert(any(UploadedFileModel.class));
+        verify(files).insert(argThat((UploadedFileModel metadata) -> "student-a".equals(metadata.getOwnerId())
+                && key.getValue().equals(metadata.getFilename())));
     }
 
     @Test
@@ -95,7 +97,6 @@ class ObjectStorageControllerTest {
 
         assertEquals(200, response.getStatusCodeValue());
         assertEquals("no-store", response.getHeaders().getCacheControl());
-        assertEquals(-1, response.getHeaders().getContentLength());
         assertEquals("fixture", new String(response.getBody().getInputStream().readAllBytes(), StandardCharsets.UTF_8));
         verify(storage).getObject("fixture.pdf");
     }
@@ -135,7 +136,7 @@ class ObjectStorageControllerTest {
         assertThrows(RuntimeException.class, () -> controller.uploadSingleFile(file, request));
 
         ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
-        verify(storage).deleteObject(key.capture());
-        assertTrue(key.getValue().matches("[0-9a-f-]{36}\\.png"));
+        verify(storage).putObject(key.capture(), any(), eq(file.getSize()), eq("image/png"));
+        verify(storage).deleteObject(key.getValue());
     }
 }

@@ -38,7 +38,8 @@ class AdminServiceImplTest {
         AdminModel saved = adminService.createAdmin(input);
 
         assertNotEquals("Secure123!", saved.getPassword());
-        assertTrue(saved.getPassword().startsWith("$2"));
+        assertTrue(new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder()
+                .matches("Secure123!", saved.getPassword()));
         assertFalse(new ObjectMapper().writeValueAsString(saved).contains("password"));
     }
 
@@ -56,7 +57,9 @@ class AdminServiceImplTest {
         AdminModel loggedIn = adminService.login("admin", "admin123");
 
         assertNotNull(loggedIn);
-        assertTrue(loggedIn.getPassword().startsWith("$2"));
+        assertNotEquals("admin123", loggedIn.getPassword());
+        assertTrue(new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder()
+                .matches("admin123", loggedIn.getPassword()));
         verify(adminRepository).save(legacyAdmin);
     }
 

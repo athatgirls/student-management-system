@@ -9,7 +9,6 @@ import org.example.service.*;
 import org.example.service.Impl.*;
 import org.example.util.*;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.GenericApplicationContext;
@@ -22,14 +21,12 @@ import org.springframework.security.web.FilterChainProxy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.servlet.handler.HandlerMappingIntrospector;
-import java.nio.file.*;
 import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class SecurityRegressionTest {
-    @TempDir Path dir;
     @Test void fileCookieIsReadOnlyAndHttpsCanForceSecureFlag() throws Exception {
         JwtUtil jwt = mock(JwtUtil.class);
         when(jwt.validateToken("fixture-token")).thenReturn(true);
@@ -209,9 +206,7 @@ class SecurityRegressionTest {
         FilterChainProxy security = securityFilterChain();
         List<String[]> adminOnlyEndpoints = List.of(
                 new String[]{"POST", "/msi/major/create"},
-                new String[]{"DELETE", "/msi/major/delete-by-name"},
-                new String[]{"DELETE", "/msi/major/delete/software-engineering"},
-                new String[]{"PUT", "/msi/student/batch-update-major"},
+                new String[]{"POST", "/msi/major/delete-by-name"},
                 new String[]{"POST", "/msi/student/batch-update-major"});
 
         for (String[] endpoint : adminOnlyEndpoints) {
@@ -224,7 +219,7 @@ class SecurityRegressionTest {
         assertEquals(204, status(security, "student-token", "GET", "/msi/major/list"));
     }
 
-    @Test void reportFixesPreserveAdministratorAuthorizationOnPostAliases() throws Exception {
+    @Test void businessMutationsPreserveAdministratorAuthorization() throws Exception {
         FilterChainProxy security = securityFilterChain();
         for (String url : List.of("/msi/activities/delete/fixture", "/msi/daily-tasks/delete/fixture",
                 "/msi/competitions/admin/fixture/audit", "/msi/papers/admin/fixture/audit",

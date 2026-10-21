@@ -200,7 +200,7 @@ public class AdminController {
         return ResponseEntity.ok(result);
     }
 
-    @PutMapping("/update")
+    @PostMapping("/update")
     public ResponseEntity<Map<String, Object>> updateAdmin(
             @RequestBody AdminModel admin,
             @CurrentUser Map<String, Object> currentUser) {
@@ -245,7 +245,7 @@ public class AdminController {
         return ResponseEntity.ok(result);
     }
 
-    @DeleteMapping("/delete/{adminId}")
+    @PostMapping("/delete/{adminId}")
     public ResponseEntity<Map<String, Object>> deleteAdmin(
             @PathVariable String adminId,
             @CurrentUser Map<String, Object> currentUser) {
@@ -347,7 +347,7 @@ public class AdminController {
         return ResponseEntity.ok(result);
     }
 
-    @PutMapping("/status/{adminId}")
+    @PostMapping("/status/{adminId}")
     public ResponseEntity<Map<String, Object>> updateAdminStatus(
             @PathVariable String adminId, 
             @RequestBody Map<String, Boolean> statusMap,

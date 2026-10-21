@@ -6,7 +6,7 @@
           <h2>成绩导入</h2>
           <p>教秘/管理员上传课程成绩表，系统按学号归档到学生个人学习记录。</p>
         </div>
-        <el-button type="primary" plain :icon="Download" @click="downloadTemplate">
+        <el-button type="primary" plain :icon="Download" :loading="templateLoading" @click="downloadTemplate">
           下载导入模板
         </el-button>
       </div>
@@ -48,7 +48,7 @@
       </template>
 
       <el-alert
-        title="表头建议：学号、姓名、学期、课程名称、成绩、学分、状态。姓名可选，系统主要按学号匹配学生。"
+        title="表头建议：学号、姓名、学期、课程名称、成绩、学分、课程类别（学位课/非学位课）、状态。课程类别必填。"
         type="info"
         :closable="false"
         show-icon
@@ -96,6 +96,7 @@
         <el-table-column prop="courseName" label="课程名称" min-width="180" />
         <el-table-column prop="score" label="成绩" width="90" />
         <el-table-column prop="credit" label="学分" width="90" />
+        <el-table-column prop="courseType" label="课程类别" width="110"><template #default="{ row }">{{ courseTypeLabels[row.courseType] || row.courseType || '未分类' }}</template></el-table-column>
         <el-table-column prop="status" label="状态" width="100">
           <template #default="scope">
             <el-tag :type="scope.row.status === '已通过' ? 'success' : 'warning'">
@@ -113,6 +114,24 @@
 
       <el-empty v-if="parsedRows.length === 0" description="请先上传成绩表" />
     </el-card>
+    <el-card class="table-card" shadow="hover">
+      <template #header>历史课程类别维护</template>
+      <div class="action-bar">
+        <el-input v-model="recordStudentId" placeholder="输入学号查询教务课程" style="max-width: 240px" clearable @keyup.enter="loadRecords" />
+        <el-button type="primary" :loading="recordsLoading" @click="loadRecords">查询</el-button>
+      </div>
+      <el-table :data="existingRecords" stripe style="width: 100%" max-height="400">
+        <el-table-column prop="semester" label="学期" width="150" />
+        <el-table-column prop="course" label="课程名称" min-width="180" />
+        <el-table-column prop="score" label="成绩" width="85" />
+        <el-table-column prop="credit" label="学分" width="85" />
+        <el-table-column label="课程类别" width="190"><template #default="{ row }">
+          <el-select :model-value="row.courseType || ''" placeholder="未分类" @change="value => assignCourseType(row, value)">
+            <el-option label="学位课" value="degree" /><el-option label="非学位课" value="non_degree" />
+          </el-select>
+        </template></el-table-column>
+      </el-table>
+    </el-card>
   </div>
 </template>
 
@@ -120,15 +139,21 @@
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Download, UploadFilled } from '@element-plus/icons-vue'
-import { importGrades } from '@/api/grade'
-import { downloadExcel, readExcelObjects } from '@/utils/excel'
+import { importGrades, getGradeTemplate, getGradeRecords, setGradeCourseType } from '@/api/grade'
+import { readExcelObjects } from '@/utils/excel'
 
 const uploadRef = ref()
 const selectedFile = ref(null)
 const parsedRows = ref([])
 const submitLoading = ref(false)
+const templateLoading = ref(false)
+const recordStudentId = ref('')
+const existingRecords = ref([])
+const recordsLoading = ref(false)
+const courseTypeLabels = { degree: '学位课', non_degree: '非学位课' }
+const parseCourseType = value => ({ 学位课: 'degree', 非学位课: 'non_degree', degree: 'degree', non_degree: 'non_degree' })[String(value || '').trim()] || ''
 
-const requiredFields = ['studentId', 'semester', 'courseName', 'score']
+const requiredFields = ['studentId', 'semester', 'courseName', 'score', 'courseType']
 const validCount = computed(() => parsedRows.value.filter(row => row.valid).length)
 const invalidCount = computed(() => parsedRows.value.filter(row => !row.valid).length)
 const canSubmit = computed(() => selectedFile.value && parsedRows.value.length > 0 && invalidCount.value === 0)
@@ -140,6 +165,7 @@ const headerMap = {
   courseName: ['课程名称', '课程', 'courseName', 'course'],
   score: ['成绩', '分数', 'score'],
   credit: ['学分', 'credit'],
+  courseType: ['课程类别', '课程类型', 'courseType'],
   status: ['状态', 'status']
 }
 
@@ -164,13 +190,16 @@ const normalizeRow = (row, index) => {
     courseName: String(pickValue(row, headerMap.courseName)).trim(),
     score: pickValue(row, headerMap.score),
     credit: pickValue(row, headerMap.credit),
+    courseType: parseCourseType(pickValue(row, headerMap.courseType)),
     status: ''
   }
 
   normalized.status = inferStatus(normalized.score, pickValue(row, headerMap.status))
   const missing = requiredFields.filter(field => normalized[field] === '' || normalized[field] === undefined)
-  normalized.valid = missing.length === 0
-  normalized.error = missing.length ? `缺少：${missing.map(fieldNameMap).join('、')}` : ''
+  const credit = Number(normalized.credit)
+  const invalidCredit = normalized.credit === '' || !Number.isFinite(credit) || credit <= 0
+  normalized.valid = missing.length === 0 && !invalidCredit
+  normalized.error = missing.length ? `缺少：${missing.map(fieldNameMap).join('、')}` : invalidCredit ? '学分必须是大于 0 的有效数字' : ''
   return normalized
 }
 
@@ -178,7 +207,8 @@ const fieldNameMap = (field) => ({
   studentId: '学号',
   semester: '学期',
   courseName: '课程名称',
-  score: '成绩'
+  score: '成绩',
+  courseType: '课程类别'
 }[field] || field)
 
 const handleFileChange = (file) => {
@@ -223,6 +253,7 @@ const submitImport = async () => {
     courseName: row.courseName,
     score: row.score,
     credit: row.credit,
+    courseType: row.courseType,
     status: row.status
   }))
   const formData = new FormData()
@@ -247,11 +278,41 @@ const submitImport = async () => {
 }
 
 const downloadTemplate = async () => {
-  const rows = [
-    ['学号', '姓名', '学期', '课程名称', '成绩', '学分', '状态'],
-    ['10240001', '张同学', '2025-2026-1', 'Web 前端开发', 92, 3, '已通过']
-  ]
-  await downloadExcel(rows, '成绩导入模板', '成绩导入模板.xlsx')
+  templateLoading.value = true
+  try {
+    const blob = await getGradeTemplate()
+    if (!(blob instanceof Blob) || blob.type.includes('json')) throw new Error('模板下载失败')
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = '成绩导入模板.xlsx'
+    link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  } catch (error) {
+    ElMessage.error(error.message || '模板下载失败，请重试')
+  } finally {
+    templateLoading.value = false
+  }
+}
+
+const loadRecords = async () => {
+  const studentId = recordStudentId.value.trim()
+  if (!studentId) { ElMessage.warning('请先输入学号'); return }
+  recordsLoading.value = true
+  try {
+    const res = await getGradeRecords({ studentId })
+    if (res.code !== 200) throw new Error(res.msg)
+    existingRecords.value = res.data || []
+  } catch (e) { ElMessage.error(e.message || '查询课程失败') }
+  finally { recordsLoading.value = false }
+}
+const assignCourseType = async (row, value) => {
+  try {
+    const res = await setGradeCourseType(row.id, value)
+    if (res.code !== 200) throw new Error(res.msg)
+    row.courseType = value
+    ElMessage.success('课程类别已更新')
+  } catch (e) { ElMessage.error(e.message || '更新失败') }
 }
 </script>
 
