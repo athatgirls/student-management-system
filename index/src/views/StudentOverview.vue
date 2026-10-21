@@ -62,7 +62,7 @@
                 <td class="bonus-cell">
                   <div v-for="(item, itemIndex) in getBonusDetails(student)" :key="item.record.id || itemIndex" class="bonus-entry">
                     <span>{{ item.category }}：</span><el-button link type="primary" class="record-link" @click="showDetail({ label: item.category }, item.record)">{{ item.text }}</el-button>
-                    <template v-if="item.category === '任职' && !isAdmin">
+                    <template v-if="item.category === '任职' && item.record.source !== 'profile' && !isAdmin">
                       <el-button link type="primary" @click="editAppointment(item.record)">编辑</el-button>
                       <el-button link type="danger" @click="removeAppointment(item.record)">删除</el-button>
                     </template>
@@ -80,6 +80,7 @@
                       <div class="grade-explanation">X {{ calculateStudyGrade(student.grades).x.toFixed(2) }} × 70% + Y {{ calculateStudyGrade(student.grades).y.toFixed(2) }} × 30%</div>
                     </template>
                     <span v-else class="empty-value">待完善</span>
+                    <div><el-button link type="primary" @click="showGrades(student)">查看全部课程（{{ (student.grades || []).length }}）</el-button></div>
                   </td>
                   <template v-for="slot in section.slots" v-else :key="slot">
                     <td v-for="field in section.columns" :key="field.key">
@@ -101,6 +102,7 @@
       </table>
     </div>
     <el-pagination v-if="isAdmin" v-model:current-page="page" v-model:page-size="pageSize" :page-sizes="[10, 20, 50, 100]" :total="total" layout="total, sizes, prev, pager, next" @current-change="load" @size-change="changePageSize" />
+    <StudentGradeDetails :student="gradeStudent" @close="gradeStudent = null" />
     <el-dialog :model-value="!!detail" :title="detailTitle" width="min(900px, 95vw)" @close="detail = null">
       <el-descriptions v-if="detail" :column="1" border>
         <el-descriptions-item v-for="[key, value] in detailEntries" :key="key" :label="fieldLabels[key] || key">{{ displayValue(key, value) }}</el-descriptions-item>
@@ -134,6 +136,7 @@ import request from '@/api/request'
 import { getAllGrades } from '@/api/student'
 import RecordAttachments from '@/components/RecordAttachments.vue'
 import PrivateAttachments from '@/components/PrivateAttachments.vue'
+import StudentGradeDetails from '@/components/StudentGradeDetails.vue'
 import { fieldLabels, displayValue } from '@/utils/overviewFields'
 import { buildOverviewGroups, getOverviewRecords, getBonusDetails, overviewValue } from '@/utils/overviewLayout'
 import { calculateStudyGrade } from '@/utils/studyGradeScore'
@@ -163,6 +166,8 @@ const pageSize = ref(10)
 const total = ref(0)
 const detail = ref(null)
 const detailTitle = ref('详情')
+const gradeStudent = ref(null)
+const showGrades = student => { gradeStudent.value = student }
 const detailEntries = computed(() => Object.entries(detail.value || {}).filter(([key]) => !['id', 'studentDbId', 'userId', 'auditorId', 'attachments', 'evidenceUrl', 'attachmentUrl', 'submissionFields', 'overviewType'].includes(key) && !(key === 'content' && detail.value?.submissionFields)))
 const attachmentValue = value => {
   try {

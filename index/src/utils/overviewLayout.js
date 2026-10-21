@@ -41,6 +41,11 @@ export const getOverviewRecords = (student, sectionKey) => {
 export const getBonusDetails = student => [
   ...getOverviewRecords(student, 'activities').map(record => ({ category: '活动', record, text: `${record.overviewType}：${record.title || record.serviceName || '未命名'}` })),
   ...getOverviewRecords(student, 'honors').map(record => ({ category: '荣誉', record, text: record.title || '未命名' })),
+  ...(typeof student.workStatus === 'string' && student.workStatus.trim() ? [{
+    category: '任职',
+    record: { id: `profile-work-status:${student.id || student.studentId}`, position: student.workStatus.trim(), source: 'profile' },
+    text: `${student.workStatus.trim()}（个人资料）`
+  }] : []),
   ...getOverviewRecords(student, 'appointments').map(record => ({ category: '任职', record, text: `${record.position || '未命名'}${record.organization ? `（${record.organization}）` : ''}` }))
 ]
 

@@ -28,5 +28,5 @@ export const displayValue = (key, value) => {
   if (['createTime', 'updateTime', 'auditTime', 'submissionTime', 'deadline'].includes(key)) return new Date(value).toLocaleString('zh-CN')
   if (Array.isArray(value)) return value.join('、')
   if (typeof value === 'object') return JSON.stringify(value)
-  return ({ degree: '学位课', non_degree: '非学位课', pending: '待审核', approved: '已通过', rejected: '已驳回', passed: '已通过', failed: '未通过', student: '学生填写', official: '教务导入', completed: '已完成', submitted: '已提交', task: '日常任务', normal: '普通任务', registration: '报名活动' })[value] || value
+  return ({ degree: '学位课', non_degree: '非学位课', pending: '待审核', approved: '已通过', rejected: '已驳回', passed: '已通过', failed: '未通过', not_entered: '未录入', student: '学生填写', official: '教务导入', profile: '个人资料', completed: '已完成', submitted: '已提交', task: '日常任务', normal: '普通任务', registration: '报名活动' })[value] || value
 }

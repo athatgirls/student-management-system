@@ -60,6 +60,8 @@ public class StudentOverviewService {
         result.put("id", student.getId()); result.put("studentId", student.getStudentId()); result.put("name", student.getName());
         result.put("grade", student.getGrade()); result.put("major", student.getMajor()); result.put("className", student.getClassName());
         result.put("supervisor", student.getSupervisor());
+        // Keep the existing profile summary alongside independently maintained appointments.
+        result.put("workStatus", student.getWorkStatus());
         result.put("grades", records(StudyRecordModel.class, student, "studentDbId", "studentId"));
         result.put("papers", records(PaperModel.class, student, "studentId"));
         result.put("competitions", records(CompetitionModel.class, student, "studentId"));
@@ -125,6 +127,7 @@ public class StudentOverviewService {
             entry.put("submissionTime", org.example.util.UtcTimestamps.toWire(submission.getSubmissionTime()));
             entry.put("deadline", task.getDeadline() == null ? null : task.getDeadline().toString());
             entry.put("content", submission.getContent());
+            entry.put("attachments", submission.getAttachments());
             // Form content includes user-defined fields; preserve labels and make uploaded proofs downloadable.
             try {
                 com.fasterxml.jackson.databind.JsonNode content = mapper.readTree(submission.getContent());
