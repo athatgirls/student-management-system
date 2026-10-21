@@ -353,8 +353,7 @@ const exportGradeAnalysis = async (grade) => {
 // 查看未完成任务
 const viewIncompleteTasks = async (student) => {
   try {
-    // 需要根据studentId获取学生ID（MongoDB的_id）
-    // 这里需要先通过studentId查找学生的完整信息
+    // 管理端按学号指定目标学生（studentId=学号），后端内部解析为账号主键
     const res = await getStudentIncompleteTasks(student.studentId)
     if (res.code === 200) {
       incompleteTasks.value = res.data || []

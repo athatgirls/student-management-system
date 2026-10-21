@@ -15,11 +15,11 @@ public interface InternshipEmploymentService {
     InternshipEmploymentModel update(InternshipEmploymentModel model);
     void delete(String id);
     InternshipEmploymentModel getById(String id);
-    List<InternshipEmploymentModel> getByUserId(String userId);
+    /** 按学生账号主键（studentAccountId）查询记录，标识约定见 {@link org.example.dto.StudentRef}。 */
+    List<InternshipEmploymentModel> getByStudentAccountId(String studentAccountId);
     List<InternshipEmploymentModel> getAll();
     
     // 查询方法
-    List<InternshipEmploymentModel> getByStudentId(String studentId);
     List<InternshipEmploymentModel> getByStatus(String status);
     List<InternshipEmploymentModel> getByApprovalStatus(String approvalStatus);
     List<InternshipEmploymentModel> getByType(String type);
@@ -27,8 +27,8 @@ public interface InternshipEmploymentService {
     List<InternshipEmploymentModel> getByIndustry(String industry);
     List<InternshipEmploymentModel> getByWorkType(String workType);
     List<InternshipEmploymentModel> getByDateRange(Date startDate, Date endDate);
-    List<InternshipEmploymentModel> getByStudentIdAndStatus(String studentId, String status);
-    List<InternshipEmploymentModel> getByStudentIdAndApprovalStatus(String studentId, String approvalStatus);
+    List<InternshipEmploymentModel> getByStudentAccountIdAndStatus(String studentAccountId, String status);
+    List<InternshipEmploymentModel> getByStudentAccountIdAndApprovalStatus(String studentAccountId, String approvalStatus);
     List<InternshipEmploymentModel> getByApprovalStatusAndType(String approvalStatus, String type);
     
     // 审批相关

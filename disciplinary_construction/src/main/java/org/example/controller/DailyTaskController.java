@@ -1,12 +1,15 @@
 package org.example.controller;
 
 import org.example.annotation.CurrentUser;
+import org.example.dto.StudentRef;
 import org.example.model.DailyTaskModel;
 import org.example.model.DailyTaskSubmissionModel;
 import org.example.model.StudentModel;
 import org.example.repository.StudentRepository;
+import org.example.service.CurrentUserAccessService;
 import org.example.service.DailyTaskAudienceService;
 import org.example.service.DailyTaskService;
+import org.example.service.StudentRefService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -32,13 +35,18 @@ public class DailyTaskController {
     @Autowired
     private DailyTaskAudienceService dailyTaskAudienceService;
 
+    @Autowired
+    private CurrentUserAccessService currentUserAccessService;
+
+    @Autowired
+    private StudentRefService studentRefService;
+
     // 管理员：发布任务
     @PostMapping("/create")
     public ResponseEntity<Map<String, Object>> createTask(@RequestBody DailyTaskModel task, @CurrentUser Map<String, Object> currentUser) {
         Map<String, Object> result = new HashMap<>();
         try {
-            String userId = (String) currentUser.get("userId");
-            task.setCreatorId(userId);
+            task.setCreatorId(currentUserAccessService.requireUserId(currentUser));
             DailyTaskModel createdTask = dailyTaskService.createTask(task);
             result.put("code", 200);
             result.put("data", createdTask);
@@ -67,10 +75,11 @@ public class DailyTaskController {
     public ResponseEntity<Map<String, Object>> getActiveTasks(@CurrentUser Map<String, Object> currentUser) {
         Map<String, Object> result = new HashMap<>();
         try {
-            String userId = (String) currentUser.get("userId");
+            // JWT userId 即学生账号主键（studentAccountId），见 org.example.dto.StudentRef
+            String studentAccountId = currentUserAccessService.requireUserId(currentUser);
             
             // 获取当前学生信息
-            StudentModel student = studentRepository.findById(userId).orElse(null);
+            StudentModel student = studentRepository.findById(studentAccountId).orElse(null);
             final String studentPartyStage = dailyTaskAudienceService.resolvePartyStage(student);
             
             List<DailyTaskModel> tasks = dailyTaskService.getActiveTasks();
@@ -105,7 +114,7 @@ public class DailyTaskController {
                     taskMap.put("currentParticipants", null);
                 }
                 
-                DailyTaskSubmissionModel submission = dailyTaskService.getSubmissionByTaskAndStudent(task.getId(), userId);
+                DailyTaskSubmissionModel submission = dailyTaskService.getSubmissionByTaskAndStudent(task.getId(), studentAccountId);
                 taskMap.put("completed", submission != null);
                 if (submission != null) {
                     taskMap.put("submissionTime", org.example.util.UtcTimestamps.toWire(submission.getSubmissionTime()));
@@ -129,10 +138,10 @@ public class DailyTaskController {
     public ResponseEntity<Map<String, Object>> submitTask(@RequestBody DailyTaskSubmissionModel submission, @CurrentUser Map<String, Object> currentUser) {
         Map<String, Object> result = new HashMap<>();
         try {
-            String userId = (String) currentUser.get("userId");
-            String username = (String) currentUser.get("username");
-            submission.setStudentId(userId);
-            submission.setStudentName(username);
+            StudentRef ref = studentRefService.current(currentUser);
+            submission.setStudentAccountId(ref.getAccountId());
+            submission.setStudentId(ref.getStudentId());
+            submission.setStudentName(ref.getName());
             DailyTaskSubmissionModel savedSubmission = dailyTaskService.submitTask(submission);
             result.put("code", 200);
             result.put("data", savedSubmission);
@@ -184,8 +193,8 @@ public class DailyTaskController {
     @GetMapping("/my-submission/{taskId}")
     public ResponseEntity<Map<String, Object>> getMySubmission(@PathVariable String taskId, @CurrentUser Map<String, Object> currentUser) {
         Map<String, Object> result = new HashMap<>();
-        String userId = (String) currentUser.get("userId");
-        DailyTaskSubmissionModel submission = dailyTaskService.getSubmissionByTaskAndStudent(taskId, userId);
+        String studentAccountId = currentUserAccessService.requireUserId(currentUser);
+        DailyTaskSubmissionModel submission = dailyTaskService.getSubmissionByTaskAndStudent(taskId, studentAccountId);
         result.put("code", 200);
         result.put("data", submission);
         return ResponseEntity.ok(result);
@@ -212,7 +221,7 @@ public class DailyTaskController {
         Map<String, Object> result = new HashMap<>();
         try {
             result.put("code", 200);
-            result.put("data", dailyTaskService.getStudentTaskCompletionAnalysis((String) currentUser.get("userId")));
+            result.put("data", dailyTaskService.getStudentTaskCompletionAnalysis(currentUserAccessService.requireUserId(currentUser)));
         } catch (IllegalArgumentException e) {
             result.put("code", 400);
             result.put("msg", e.getMessage());
@@ -235,7 +244,7 @@ public class DailyTaskController {
         return new ResponseEntity<>(excelContent, headers, HttpStatus.OK);
     }
     
-    // 获取学生未完成的任务列表（管理员）
+    // 获取学生未完成的任务列表（管理员）：studentId 为学号，服务内部解析为账号主键，见 org.example.dto.StudentRef
     @GetMapping("/student-incomplete-tasks/{studentId}")
     public ResponseEntity<Map<String, Object>> getStudentIncompleteTasks(@PathVariable String studentId) {
         Map<String, Object> result = new HashMap<>();

@@ -46,6 +46,9 @@ class GradeControllerTest {
     @Mock
     private StudentRepository studentRepository;
 
+    @Mock
+    private org.example.service.StudentRefService studentRefService;
+
     @InjectMocks
     private GradeController gradeController;
 
@@ -112,10 +115,11 @@ class GradeControllerTest {
 
     @Test
     void reimportWithoutCourseTypeKeepsExistingClassification() {
-        StudentModel student = new StudentModel(); student.setId("student-db-id");
         StudyRecordModel old = new StudyRecordModel(); old.setCourseType("degree");
-        when(studentRepository.findByStudentId("2026001")).thenReturn(student);
-        when(studyRecordRepository.findByStudentIdAndSemesterAndCourse("2026001", "2026秋", "数学"))
+        // 导入行学号仅作匹配，经 resolveByStudentId 解析出关联键后查重（见 org.example.dto.StudentRef）
+        when(studentRefService.resolveByStudentId("2026001"))
+                .thenReturn(new org.example.dto.StudentRef("student-db-id", "2026001", "学生甲"));
+        when(studyRecordRepository.findByStudentAccountIdAndSemesterAndCourse("student-db-id", "2026秋", "数学"))
                 .thenReturn(Optional.of(old));
         ReflectionTestUtils.setField(gradeController, "objectMapper", new ObjectMapper());
 

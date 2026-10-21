@@ -676,10 +676,10 @@ const loadMemberInfo = async () => {
       return
     }
 
-    // 优先使用studentId（学号），如果没有则使用id（数据库ID）
-    const studentId = currentUser.studentId || currentUser.id
-    if (!studentId) {
-      ElMessage.warning('无法获取学号信息')
+    // 学生关联键统一取账号主键（students._id）
+    const studentAccountId = currentUser.id
+    if (!studentAccountId) {
+      ElMessage.warning('无法获取用户信息，请重新登录')
       return
     }
 
@@ -688,7 +688,7 @@ const loadMemberInfo = async () => {
     
     // 如果是党员，获取党员信息
     if (isPartyMember.value) {
-      const response = await partyMemberApi.getStudentPartyMembers(studentId)
+      const response = await partyMemberApi.getStudentPartyMembers(studentAccountId)
       // request拦截器返回response.data，即ResponseResult对象
       if (response && response.code === 200 && response.data) {
         if (Array.isArray(response.data) && response.data.length > 0) {
@@ -702,7 +702,7 @@ const loadMemberInfo = async () => {
       }
     } else {
       // 如果不是党员，获取申请入党信息
-      const response = await partyApplicationApi.getByStudentId(studentId)
+      const response = await partyApplicationApi.getByStudentId(studentAccountId)
       if (response && response.code === 200 && response.data) {
         Object.assign(applicationInfo, response.data)
       } else if (response && response.id) {
@@ -758,10 +758,10 @@ const submitApplication = async () => {
   applicationLoading.value = true
   try {
     const currentUser = store.state.user
-    const studentId = currentUser.studentId || currentUser.id
     
     const data = {
-      studentId: studentId,
+      studentAccountId: currentUser.id,
+      studentId: currentUser.studentId, // 学号，仅用于展示
       name: currentUser.name || studentProfile.value?.name || '',
       applicationDate: applicationForm.applicationDate,
       branch: applicationForm.branch,
@@ -879,11 +879,11 @@ const loadReports = async () => {
     if (!currentUser) {
       return
     }
-    const studentId = currentUser.studentId || currentUser.id
-    if (!studentId) {
+    const studentAccountId = currentUser.id
+    if (!studentAccountId) {
       return
     }
-    const response = await thoughtReportApi.getStudentThoughtReports(studentId)
+    const response = await thoughtReportApi.getStudentThoughtReports(studentAccountId)
     // 处理响应格式
     if (Array.isArray(response)) {
       reportList.value = response
@@ -951,11 +951,11 @@ const loadCourses = async () => {
     if (!currentUser) {
       return
     }
-    const studentId = currentUser.studentId || currentUser.id
-    if (!studentId) {
+    const studentAccountId = currentUser.id
+    if (!studentAccountId) {
       return
     }
-    const response = await partyCourseApi.getStudentPartyCourses(studentId)
+    const response = await partyCourseApi.getStudentPartyCourses(studentAccountId)
     // 处理响应格式（ResponseResult格式）
     if (response && response.code === 200 && response.data) {
       courseList.value = Array.isArray(response.data) ? response.data : []
@@ -1019,11 +1019,11 @@ const loadServices = async () => {
     if (!currentUser) {
       return
     }
-    const studentId = currentUser.studentId || currentUser.id
-    if (!studentId) {
+    const studentAccountId = currentUser.id
+    if (!studentAccountId) {
       return
     }
-    const response = await volunteerServiceApi.getStudentVolunteerServices(studentId)
+    const response = await volunteerServiceApi.getStudentVolunteerServices(studentAccountId)
     // 处理响应格式（ResponseResult格式）
     if (response && response.code === 200 && response.data) {
       serviceList.value = Array.isArray(response.data) ? response.data : []

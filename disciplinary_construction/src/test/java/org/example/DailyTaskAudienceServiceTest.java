@@ -4,7 +4,8 @@ import org.example.model.DailyTaskModel;
 import org.example.model.PartyApplicationModel;
 import org.example.model.StudentModel;
 import org.example.service.DailyTaskAudienceService;
-import org.example.service.PartyApplicationService;
+import org.example.repository.PartyApplicationRepository;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -26,16 +27,18 @@ class DailyTaskAudienceServiceTest {
 
     @BeforeEach
     void setUp() {
-        PartyApplicationService partyApplicationService = mock(PartyApplicationService.class);
+        PartyApplicationRepository partyApplicationRepository = mock(PartyApplicationRepository.class);
         PartyApplicationModel application = new PartyApplicationModel();
         application.setCurrentStage("入党积极分子");
         application.setAuditStatus("通过");
-        when(partyApplicationService.getByStudentId("10240001")).thenReturn(application);
+        // 入党申请按学生关联键（账号主键）查询，见 org.example.dto.StudentRef
+        when(partyApplicationRepository.findByStudentAccountId("account-10240001")).thenReturn(Optional.of(application));
 
         audienceService = new DailyTaskAudienceService();
-        ReflectionTestUtils.setField(audienceService, "partyApplicationService", partyApplicationService);
+        ReflectionTestUtils.setField(audienceService, "partyApplicationRepository", partyApplicationRepository);
 
         student = new StudentModel();
+        student.setId("account-10240001");
         student.setStudentId("10240001");
         student.setGrade("2024级");
         student.setPoliticalStatus("共青团员");

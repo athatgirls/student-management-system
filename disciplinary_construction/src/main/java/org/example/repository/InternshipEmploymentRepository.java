@@ -13,8 +13,8 @@ import java.util.Date;
 public interface InternshipEmploymentRepository extends MongoRepository<InternshipEmploymentModel, String> {
     
     // 基础查询方法
-    List<InternshipEmploymentModel> findByUserId(String userId);
-    List<InternshipEmploymentModel> findByStudentId(String studentId);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。本接口不提供 findByStudentId 这类歧义命名。 */
+    List<InternshipEmploymentModel> findByStudentAccountId(String studentAccountId);
     List<InternshipEmploymentModel> findByStudentNameContaining(String studentName);
     List<InternshipEmploymentModel> findByStudentClass(String studentClass);
     List<InternshipEmploymentModel> findByMajor(String major);
@@ -53,8 +53,10 @@ public interface InternshipEmploymentRepository extends MongoRepository<Internsh
     List<InternshipEmploymentModel> findByCompanyTypeAndIsDeletedFalse(String companyType);
     List<InternshipEmploymentModel> findByIndustryAndIsDeletedFalse(String industry);
     List<InternshipEmploymentModel> findByWorkTypeAndIsDeletedFalse(String workType);
-    List<InternshipEmploymentModel> findByStudentIdAndStatusAndIsDeletedFalse(String studentId, String status);
-    List<InternshipEmploymentModel> findByStudentIdAndApprovalStatusAndIsDeletedFalse(String studentId, String approvalStatus);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。本接口不提供 findByStudentId 这类歧义命名。 */
+    List<InternshipEmploymentModel> findByStudentAccountIdAndStatusAndIsDeletedFalse(String studentAccountId, String status);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。本接口不提供 findByStudentId 这类歧义命名。 */
+    List<InternshipEmploymentModel> findByStudentAccountIdAndApprovalStatusAndIsDeletedFalse(String studentAccountId, String approvalStatus);
     List<InternshipEmploymentModel> findByApprovalStatusAndTypeAndIsDeletedFalse(String approvalStatus, String type);
     @Query("{'startDate': {$gte: ?0, $lte: ?1}, 'isDeleted': false}")
     List<InternshipEmploymentModel> findByStartDateBetweenAndIsDeletedFalse(Date startDate, Date endDate);
@@ -79,8 +81,10 @@ public interface InternshipEmploymentRepository extends MongoRepository<Internsh
     List<InternshipEmploymentModel> findByCreateTimeBetween(Date startDate, Date endDate);
     
     // 复合查询
-    List<InternshipEmploymentModel> findByStudentIdAndStatus(String studentId, String status);
-    List<InternshipEmploymentModel> findByStudentIdAndApprovalStatus(String studentId, String approvalStatus);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。本接口不提供 findByStudentId 这类歧义命名。 */
+    List<InternshipEmploymentModel> findByStudentAccountIdAndStatus(String studentAccountId, String status);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。本接口不提供 findByStudentId 这类歧义命名。 */
+    List<InternshipEmploymentModel> findByStudentAccountIdAndApprovalStatus(String studentAccountId, String approvalStatus);
     List<InternshipEmploymentModel> findByApprovalStatusAndType(String approvalStatus, String type);
     List<InternshipEmploymentModel> findByIndustryAndCompanyType(String industry, String companyType);
     List<InternshipEmploymentModel> findByTechnologyStackAndProjectType(String technologyStack, String projectType);
@@ -142,8 +146,6 @@ public interface InternshipEmploymentRepository extends MongoRepository<Internsh
     List<InternshipEmploymentModel> findByApprovalStatusAndIsDeletedFalse(String approvalStatus);
     
     // 查找特定学生的所有记录
-    List<InternshipEmploymentModel> findByStudentIdAndIsDeletedFalse(String studentId);
-    
-    // 查找特定用户的所有记录
-    List<InternshipEmploymentModel> findByUserIdAndIsDeletedFalse(String userId);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。本接口不提供 findByStudentId 这类歧义命名。 */
+    List<InternshipEmploymentModel> findByStudentAccountIdAndIsDeletedFalse(String studentAccountId);
 } 

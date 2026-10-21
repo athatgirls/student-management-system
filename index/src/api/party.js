@@ -18,8 +18,8 @@ export const partyMemberApi = {
   // 删除党员信息
   deletePartyMember: (id) => request.post(`/party-member/delete/${id}`),
   
-  // 获取学生党员信息
-  getStudentPartyMembers: (studentId) => request.get(`/party-member/student/${studentId}`),
+  // 获取学生党员信息（studentAccountId=学生账号主键）
+  getStudentPartyMembers: (studentAccountId) => request.get(`/party-member/student/${studentAccountId}`),
   
   // 根据ID获取党员信息
   getPartyMemberById: (id) => request.get(`/party-member/${id}`),
@@ -58,8 +58,8 @@ export const thoughtReportApi = {
   // 删除思想汇报
   deleteThoughtReport: (id) => request.post(`/thought-report/delete/${id}`),
   
-  // 获取学生思想汇报
-  getStudentThoughtReports: (studentId) => request.get(`/thought-report/student/${studentId}`),
+  // 获取学生思想汇报（studentAccountId=学生账号主键）
+  getStudentThoughtReports: (studentAccountId) => request.get(`/thought-report/student/${studentAccountId}`),
   
   // 根据ID获取思想汇报
   getThoughtReportById: (id) => request.get(`/thought-report/${id}`),
@@ -98,8 +98,8 @@ export const partyCourseApi = {
   // 删除党课记录
   deletePartyCourse: (id) => request.post(`/party-course/delete/${id}`),
   
-  // 获取学生党课记录
-  getStudentPartyCourses: (studentId) => request.get(`/party-course/student/${studentId}`),
+  // 获取学生党课记录（studentAccountId=学生账号主键）
+  getStudentPartyCourses: (studentAccountId) => request.get(`/party-course/student/${studentAccountId}`),
   
   // 根据ID获取党课记录
   getPartyCourseById: (id) => request.get(`/party-course/${id}`),
@@ -138,8 +138,8 @@ export const volunteerServiceApi = {
   // 删除志愿活动记录
   deleteVolunteerService: (id) => request.post(`/volunteer-service/delete/${id}`),
   
-  // 获取学生志愿活动记录
-  getStudentVolunteerServices: (studentId) => request.get(`/volunteer-service/student/${studentId}`),
+  // 获取学生志愿活动记录（studentAccountId=学生账号主键）
+  getStudentVolunteerServices: (studentAccountId) => request.get(`/volunteer-service/student/${studentAccountId}`),
   
   // 根据ID获取志愿活动记录
   getVolunteerServiceById: (id) => request.get(`/volunteer-service/${id}`),
@@ -178,8 +178,8 @@ export const partyApplicationApi = {
   // 删除申请入党信息
   deletePartyApplication: (id) => request.post(`/party-application/delete/${id}`),
   
-  // 根据学号获取申请入党信息
-  getByStudentId: (studentId) => request.get(`/party-application/student/${studentId}`),
+  // 根据学生账号主键获取申请入党信息
+  getByStudentId: (studentAccountId) => request.get(`/party-application/student/${studentAccountId}`),
   
   // 根据ID获取申请入党信息
   getById: (id) => request.get(`/party-application/${id}`),

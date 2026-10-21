@@ -5,9 +5,11 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.example.annotation.CurrentUser;
+import org.example.dto.StudentRef;
 import org.example.model.InternshipEmploymentModel;
 import org.example.service.CurrentUserAccessService;
 import org.example.service.InternshipEmploymentService;
+import org.example.service.StudentRefService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
@@ -35,6 +37,9 @@ public class InternshipEmploymentController {
     @Autowired
     private CurrentUserAccessService currentUserAccessService;
 
+    @Autowired
+    private StudentRefService studentRefService;
+
     /**
      * 添加实习就业记录
      */
@@ -42,10 +47,16 @@ public class InternshipEmploymentController {
     public ResponseEntity<Map<String, Object>> add(@RequestBody InternshipEmploymentModel model, @CurrentUser Map<String, Object> currentUser) {
         Map<String, Object> result = new HashMap<>();
         try {
-            if (!currentUserAccessService.isAdmin(currentUser)) {
-                model.setUserId(currentUserAccessService.requireUserId(currentUser));
-                model.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
-                model.setStudentName((String) currentUser.get("username"));
+            if (currentUserAccessService.isAdmin(currentUser)) {
+                // 管理端按学号指定目标学生，解析出账号主键写入关联键
+                StudentRef ref = currentUserAccessService.requireAdminTarget(currentUser, model.getStudentId());
+                model.setStudentAccountId(ref.getAccountId());
+                model.setStudentId(ref.getStudentId());
+            } else {
+                StudentRef ref = studentRefService.current(currentUser);
+                model.setStudentAccountId(ref.getAccountId());
+                model.setStudentId(ref.getStudentId());
+                model.setStudentName(ref.getName());
             }
             
             InternshipEmploymentModel savedModel = service.add(model);
@@ -77,9 +88,8 @@ public class InternshipEmploymentController {
                 result.put("msg", "记录不存在");
                 return ResponseEntity.ok(result);
             }
-            currentUserAccessService.requireStudentAccess(currentUser,
-                    existing.getUserId() != null ? existing.getUserId() : existing.getStudentId());
-            model.setUserId(existing.getUserId());
+            currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
+            model.setStudentAccountId(existing.getStudentAccountId());
             model.setStudentId(existing.getStudentId());
             model.setStudentName(existing.getStudentName());
             if (!currentUserAccessService.isAdmin(currentUser)) {
@@ -113,8 +123,7 @@ public class InternshipEmploymentController {
         try {
             InternshipEmploymentModel existing = service.getById(id);
             if (existing != null) {
-                currentUserAccessService.requireStudentAccess(currentUser,
-                        existing.getUserId() != null ? existing.getUserId() : existing.getStudentId());
+                currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
             }
             service.delete(id);
             result.put("code", 200);
@@ -140,8 +149,7 @@ public class InternshipEmploymentController {
         try {
             InternshipEmploymentModel model = service.getById(id);
             if (model != null) {
-                currentUserAccessService.requireStudentAccess(currentUser,
-                        model.getUserId() != null ? model.getUserId() : model.getStudentId());
+                currentUserAccessService.requireStudentRecord(currentUser, model.getStudentAccountId());
                 result.put("code", 200);
                 result.put("data", model);
                 result.put("msg", "获取成功");
@@ -167,8 +175,8 @@ public class InternshipEmploymentController {
     public ResponseEntity<Map<String, Object>> getMyRecords(@CurrentUser Map<String, Object> currentUser) {
         Map<String, Object> result = new HashMap<>();
         try {
-            String userId = (String) currentUser.get("userId");
-            List<InternshipEmploymentModel> models = service.getByUserId(userId);
+            StudentRef ref = studentRefService.current(currentUser);
+            List<InternshipEmploymentModel> models = service.getByStudentAccountId(ref.getAccountId());
             result.put("code", 200);
             result.put("data", models);
             result.put("msg", "获取成功");
@@ -200,13 +208,13 @@ public class InternshipEmploymentController {
     }
 
     // 基础查询API
-    @GetMapping("/student/{studentId}")
-    public ResponseEntity<Map<String, Object>> getByStudentId(@PathVariable String studentId,
-                                                              @CurrentUser Map<String, Object> currentUser) {
-        currentUserAccessService.requireStudentAccess(currentUser, studentId);
+    @GetMapping("/student/{studentAccountId}")
+    public ResponseEntity<Map<String, Object>> getByStudentAccountId(@PathVariable String studentAccountId,
+                                                                     @CurrentUser Map<String, Object> currentUser) {
+        currentUserAccessService.requireStudentRecord(currentUser, studentAccountId);
         Map<String, Object> result = new HashMap<>();
         result.put("code", 200);
-        result.put("data", service.getByStudentId(studentId));
+        result.put("data", service.getByStudentAccountId(studentAccountId));
         result.put("msg", "success");
         return ResponseEntity.ok(result);
     }
@@ -277,23 +285,23 @@ public class InternshipEmploymentController {
     }
 
     @GetMapping("/student-status")
-    public ResponseEntity<Map<String, Object>> getByStudentIdAndStatus(
-            @RequestParam String studentId, 
+    public ResponseEntity<Map<String, Object>> getByStudentAccountIdAndStatus(
+            @RequestParam String studentAccountId, 
             @RequestParam String status) {
         Map<String, Object> result = new HashMap<>();
         result.put("code", 200);
-        result.put("data", service.getByStudentIdAndStatus(studentId, status));
+        result.put("data", service.getByStudentAccountIdAndStatus(studentAccountId, status));
         result.put("msg", "success");
         return ResponseEntity.ok(result);
     }
 
     @GetMapping("/student-approval")
-    public ResponseEntity<Map<String, Object>> getByStudentIdAndApprovalStatus(
-            @RequestParam String studentId, 
+    public ResponseEntity<Map<String, Object>> getByStudentAccountIdAndApprovalStatus(
+            @RequestParam String studentAccountId, 
             @RequestParam String approvalStatus) {
         Map<String, Object> result = new HashMap<>();
         result.put("code", 200);
-        result.put("data", service.getByStudentIdAndApprovalStatus(studentId, approvalStatus));
+        result.put("data", service.getByStudentAccountIdAndApprovalStatus(studentAccountId, approvalStatus));
         result.put("msg", "success");
         return ResponseEntity.ok(result);
     }

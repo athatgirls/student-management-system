@@ -3,13 +3,17 @@ package org.example.controller;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.annotation.CurrentUser;
+import org.example.dto.StudentRef;
 import org.example.dto.StudyRecordImportItem;
+import org.example.exception.BusinessException;
 import org.example.model.GradeModel;
 import org.example.model.StudentModel;
 import org.example.model.StudyRecordModel;
 import org.example.repository.StudentRepository;
 import org.example.repository.StudyRecordRepository;
+import org.example.service.CurrentUserAccessService;
 import org.example.service.GradeService;
+import org.example.service.StudentRefService;
 import org.example.service.StudentService;
 import org.example.util.StudentGradePolicy;
 import org.example.util.StudyCourseType;
@@ -59,6 +63,12 @@ public class GradeController {
 
     @Autowired
     private StudentRepository studentRepository;
+
+    @Autowired
+    private StudentRefService studentRefService;
+
+    @Autowired
+    private CurrentUserAccessService currentUserAccessService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -248,15 +258,18 @@ public class GradeController {
                     continue;
                 }
 
-                StudentModel student = studentRepository.findByStudentId(studentId);
-                if (student == null) {
+                // 导入行里的学号仅作匹配用，解析为学生身份后再按关联键写入/查重，查无此学号不新建学生
+                StudentRef ref;
+                try {
+                    ref = studentRefService.resolveByStudentId(studentId);
+                } catch (BusinessException e) {
                     skippedCount++;
                     missingStudents.add(studentId);
                     continue;
                 }
 
                 Optional<StudyRecordModel> existing = studyRecordRepository
-                        .findByStudentIdAndSemesterAndCourse(studentId, semester, courseName);
+                        .findByStudentAccountIdAndSemesterAndCourse(ref.getAccountId(), semester, courseName);
 
                 StudyRecordModel studyRecord = existing.orElseGet(StudyRecordModel::new);
                 String type = trim(item.getCourseType());
@@ -275,8 +288,8 @@ public class GradeController {
                         continue;
                     }
                 }
-                studyRecord.setStudentId(studentId);
-                studyRecord.setStudentDbId(student.getId());
+                studyRecord.setStudentAccountId(ref.getAccountId());
+                studyRecord.setStudentId(ref.getStudentId());
                 studyRecord.setSemester(semester);
                 studyRecord.setCourse(courseName);
                 studyRecord.setScore(score);
@@ -320,26 +333,33 @@ public class GradeController {
         Map<String, Object> result = new HashMap<>();
         try {
             String userType = (String) currentUser.get("userType");
-            String effectiveStudentId = trim(studentId);
+            String effectiveStudentAccountId = "";
 
             if ("student".equals(userType)) {
-                String studentDbId = (String) currentUser.get("userId");
-                StudentModel currentStudent = studentRepository.findById(studentDbId).orElse(null);
-                if (currentStudent == null) {
-                    result.put("code", 404);
-                    result.put("data", null);
-                    result.put("msg", "Current student not found");
-                    return ResponseEntity.ok(result);
+                // 学生自查：JWT userId 即账号主键，直接按关联键查询
+                effectiveStudentAccountId = currentUserAccessService.requireUserId(currentUser);
+            } else {
+                // 管理端按学号定位学生（学号仅作匹配用），解析为账号主键后按关联键查询
+                String cleanStudentId = trim(studentId);
+                if (!cleanStudentId.isEmpty()) {
+                    try {
+                        effectiveStudentAccountId = studentRefService.resolveByStudentId(cleanStudentId).getAccountId();
+                    } catch (BusinessException e) {
+                        // 无匹配学号：保持历史行为，返回空列表
+                        result.put("code", 200);
+                        result.put("data", new ArrayList<>());
+                        result.put("msg", "Grade records loaded");
+                        return ResponseEntity.ok(result);
+                    }
                 }
-                effectiveStudentId = currentStudent.getStudentId();
             }
 
             List<StudyRecordModel> records;
             String cleanSemester = trim(semester);
-            if (!effectiveStudentId.isEmpty() && !cleanSemester.isEmpty()) {
-                records = studyRecordRepository.findByStudentIdAndSemester(effectiveStudentId, cleanSemester);
-            } else if (!effectiveStudentId.isEmpty()) {
-                records = studyRecordRepository.findByStudentId(effectiveStudentId);
+            if (!effectiveStudentAccountId.isEmpty() && !cleanSemester.isEmpty()) {
+                records = studyRecordRepository.findByStudentAccountIdAndSemester(effectiveStudentAccountId, cleanSemester);
+            } else if (!effectiveStudentAccountId.isEmpty()) {
+                records = studyRecordRepository.findByStudentAccountId(effectiveStudentAccountId);
             } else if (!cleanSemester.isEmpty()) {
                 records = studyRecordRepository.findBySemester(cleanSemester);
             } else {
@@ -378,7 +398,18 @@ public class GradeController {
         String cleanSemester = trim(semester);
         String cleanCourse = trim(course);
         String cleanGrade = StudentGradePolicy.normalize(grade);
-        if (!cleanStudentId.isEmpty()) query.addCriteria(Criteria.where("studentId").is(cleanStudentId));
+        // 学生过滤统一收拢为 studentAccountId 集合（同一字段只加一条 Criteria），学号仅作匹配用
+        Set<String> studentAccountFilter = null;
+        if (!cleanStudentId.isEmpty()) {
+            // 管理端按学号定位学生（学号仅作匹配用），解析为账号主键后按关联键过滤
+            try {
+                studentAccountFilter = Set.of(studentRefService.resolveByStudentId(cleanStudentId).getAccountId());
+            } catch (BusinessException e) {
+                // 无匹配学号：保持历史行为，返回空列表
+                return ResponseEntity.ok(Map.of("code", 200,
+                        "data", Map.of("records", List.of(), "total", 0L), "msg", "Grade records loaded"));
+            }
+        }
         if (!cleanSemester.isEmpty()) query.addCriteria(Criteria.where("semester").is(cleanSemester));
         if (!cleanCourse.isEmpty()) query.addCriteria(Criteria.where("course").regex(Pattern.quote(cleanCourse), "i"));
         if (cleanGrade != null && !cleanGrade.isEmpty()) {
@@ -386,12 +417,13 @@ public class GradeController {
             grades.add(cleanGrade);
             if (cleanGrade.endsWith("级")) grades.add(cleanGrade.substring(0, cleanGrade.length() - 1));
             List<StudentModel> students = studentRepository.findByGradeIn(grades);
-            Set<String> studentIds = students.stream().map(StudentModel::getStudentId)
+            Set<String> gradeStudentAccountIds = students.stream().map(StudentModel::getId)
                     .filter(id -> id != null && !id.isEmpty()).collect(Collectors.toSet());
-            Set<String> dbIds = students.stream().map(StudentModel::getId)
-                    .filter(id -> id != null && !id.isEmpty()).collect(Collectors.toSet());
-            query.addCriteria(new Criteria().orOperator(
-                    Criteria.where("studentId").in(studentIds), Criteria.where("studentDbId").in(dbIds)));
+            studentAccountFilter = studentAccountFilter == null ? gradeStudentAccountIds
+                    : studentAccountFilter.stream().filter(gradeStudentAccountIds::contains).collect(Collectors.toSet());
+        }
+        if (studentAccountFilter != null) {
+            query.addCriteria(Criteria.where("studentAccountId").in(studentAccountFilter));
         }
         PageRequest pageable = PageRequest.of(page - 1, size,
                 Sort.by(Sort.Direction.DESC, "semester").and(Sort.by("studentId", "id")));
@@ -439,7 +471,8 @@ public class GradeController {
         catch (IllegalArgumentException | ClassCastException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "课程类别无效");
         }
-        studyRecordRepository.findByStudentIdAndSemesterAndCourse(record.getStudentId(), semester, course)
+        // 同一学生的重复判定按 studentAccountId + 学期 + 课程
+        studyRecordRepository.findByStudentAccountIdAndSemesterAndCourse(record.getStudentAccountId(), semester, course)
                 .filter(other -> !other.getId().equals(id))
                 .ifPresent(other -> { throw new ResponseStatusException(HttpStatus.CONFLICT, "该学生在此学期已有同名课程"); });
 

@@ -60,7 +60,8 @@ public class TaskAttachmentAccessService {
                 if (!url.startsWith(prefix) || !url.substring(prefix.length()).matches("[a-zA-Z0-9_-]+\\.(jpg|jpeg|png|pdf|doc|docx)") || !seen.add(url))
                     throw new IllegalArgumentException("请上传有效的任务材料");
                 UploadedFileModel file = files.findById(url.substring(prefix.length())).orElse(null);
-                if (file == null || submission.getStudentId() == null || !submission.getStudentId().equals(file.getOwnerId()))
+                // ownerId 即学生账号主键（studentAccountId），可与业务记录直接比较；禁止用学号比较（见 StudentRef 约定）
+                if (file == null || submission.getStudentAccountId() == null || !submission.getStudentAccountId().equals(file.getOwnerId()))
                     throw new IllegalArgumentException("只能提交本人上传的材料");
             }
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {

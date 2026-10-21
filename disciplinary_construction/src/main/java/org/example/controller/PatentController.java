@@ -1,9 +1,11 @@
 package org.example.controller;
 
 import org.example.annotation.CurrentUser;
+import org.example.dto.StudentRef;
 import org.example.model.PatentModel;
 import org.example.service.CurrentUserAccessService;
 import org.example.service.PatentService;
+import org.example.service.StudentRefService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,14 +25,17 @@ public class PatentController {
     @Autowired
     private CurrentUserAccessService currentUserAccessService;
 
+    @Autowired
+    private StudentRefService studentRefService;
+
     // ==================== 学生端接口 ====================
 
-    @GetMapping("/student/{studentId}")
-    public ResponseEntity<?> getStudentPatents(@PathVariable String studentId,
+    @GetMapping("/student/{studentAccountId}")
+    public ResponseEntity<?> getStudentPatents(@PathVariable String studentAccountId,
                                                @CurrentUser Map<String, Object> currentUser) {
-        currentUserAccessService.requireStudentAccess(currentUser, studentId);
+        currentUserAccessService.requireStudentRecord(currentUser, studentAccountId);
         try {
-            List<PatentModel> patents = patentService.getPatentsByStudentId(studentId);
+            List<PatentModel> patents = patentService.getPatentsByStudentAccountId(studentAccountId);
             return ResponseEntity.ok(patents);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("获取专利数据失败: " + e.getMessage());
@@ -40,8 +45,12 @@ public class PatentController {
     @PostMapping
     public ResponseEntity<?> addPatent(@RequestBody PatentModel patent,
                                        @CurrentUser Map<String, Object> currentUser) {
-        patent.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
-        patent.setStudentName((String) currentUser.get("username"));
+        StudentRef ref = studentRefService.current(currentUser);
+        if (ref.getStudentId() == null || ref.getStudentId().isBlank())
+            throw new AccessDeniedException("当前学生账号缺少学号");
+        patent.setStudentAccountId(ref.getAccountId());
+        patent.setStudentId(ref.getStudentId());
+        patent.setStudentName(ref.getName());
         patent.setScore(null);
         patent.setScorePending(false);
         patent.setPreviousScore(null);
@@ -63,9 +72,10 @@ public class PatentController {
         if (existing == null) {
             return ResponseEntity.notFound().build();
         }
-        currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+        currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
         try {
             patent.setId(id);
+            patent.setStudentAccountId(existing.getStudentAccountId());
             patent.setStudentId(existing.getStudentId());
             patent.setStudentName(existing.getStudentName());
             org.example.util.SubmissionValidation.validate(patent);
@@ -95,7 +105,7 @@ public class PatentController {
         if (existing == null) {
             return ResponseEntity.notFound().build();
         }
-        currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+        currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
         try {
             patentService.deletePatent(id);
             return ResponseEntity.ok("删除成功");
@@ -112,7 +122,7 @@ public class PatentController {
             if (patent == null) {
                 return ResponseEntity.badRequest().body("专利不存在");
             }
-            currentUserAccessService.requireStudentAccess(currentUser, patent.getStudentId());
+            currentUserAccessService.requireStudentRecord(currentUser, patent.getStudentAccountId());
             return ResponseEntity.ok(patent);
         } catch (org.springframework.security.access.AccessDeniedException e) {
             throw e;

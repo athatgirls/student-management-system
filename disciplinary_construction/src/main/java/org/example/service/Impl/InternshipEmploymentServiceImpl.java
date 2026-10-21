@@ -75,18 +75,13 @@ public class InternshipEmploymentServiceImpl implements InternshipEmploymentServ
     }
 
     @Override
-    public List<InternshipEmploymentModel> getByUserId(String userId) {
-        return repository.findByUserIdAndIsDeletedFalse(userId);
+    public List<InternshipEmploymentModel> getByStudentAccountId(String studentAccountId) {
+        return repository.findByStudentAccountIdAndIsDeletedFalse(studentAccountId);
     }
 
     @Override
     public List<InternshipEmploymentModel> getAll() {
         return repository.findByIsDeletedFalse();
-    }
-
-    @Override
-    public List<InternshipEmploymentModel> getByStudentId(String studentId) {
-        return repository.findByStudentIdAndIsDeletedFalse(studentId);
     }
 
     @Override
@@ -125,13 +120,13 @@ public class InternshipEmploymentServiceImpl implements InternshipEmploymentServ
     }
 
     @Override
-    public List<InternshipEmploymentModel> getByStudentIdAndStatus(String studentId, String status) {
-        return repository.findByStudentIdAndStatusAndIsDeletedFalse(studentId, status);
+    public List<InternshipEmploymentModel> getByStudentAccountIdAndStatus(String studentAccountId, String status) {
+        return repository.findByStudentAccountIdAndStatusAndIsDeletedFalse(studentAccountId, status);
     }
 
     @Override
-    public List<InternshipEmploymentModel> getByStudentIdAndApprovalStatus(String studentId, String approvalStatus) {
-        return repository.findByStudentIdAndApprovalStatusAndIsDeletedFalse(studentId, approvalStatus);
+    public List<InternshipEmploymentModel> getByStudentAccountIdAndApprovalStatus(String studentAccountId, String approvalStatus) {
+        return repository.findByStudentAccountIdAndApprovalStatusAndIsDeletedFalse(studentAccountId, approvalStatus);
     }
 
     @Override

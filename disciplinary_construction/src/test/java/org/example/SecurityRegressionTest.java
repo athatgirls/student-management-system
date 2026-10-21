@@ -67,14 +67,18 @@ class SecurityRegressionTest {
         ReflectionTestUtils.setField(service, "projectRepository", repository);
         CurrentUserAccessService access = mock(CurrentUserAccessService.class);
         Map<String,Object> user = Map.of("userId", "a", "userType", "student");
-        when(access.requireStudentNumber(user)).thenReturn("student-a");
+        org.example.service.StudentRefService refs = mock(org.example.service.StudentRefService.class);
+        when(refs.current(user)).thenReturn(new org.example.dto.StudentRef("student-a", "2026001", "本人"));
         ProjectController controller = new ProjectController();
         ReflectionTestUtils.setField(controller, "projectService", service);
         ReflectionTestUtils.setField(controller, "currentUserAccessService", access);
+        ReflectionTestUtils.setField(controller, "studentRefService", refs);
         ProjectModel input = new ProjectModel(); input.setId("victim-id"); input.setStudentId("victim");
         input.setAttachments("[{\"url\":\"/uploads/fixture.pdf\"}]"); input.setTeamMembers("本人"); input.setInstructorName("导师");
         assertEquals(200, controller.addProject(input, user).getStatusCodeValue());
-        verify(repository).save(argThat(p -> p.getId() == null && "student-a".equals(p.getStudentId())));
+        verify(repository).save(argThat(p -> p.getId() == null
+                && "student-a".equals(p.getStudentAccountId()) && "2026001".equals(p.getStudentId())
+                && "本人".equals(p.getStudentName())));
     }
     @Test void profileDtoCannotCarryCredentialOrInstitutionControlledFields() throws Exception {
         StudentProfileUpdate profile = new ObjectMapper().readValue("{\"id\":\"victim\",\"password\":\"x\",\"status\":\"在读\",\"politicalStatus\":\"中共党员\",\"grade\":\"2026\",\"name\":\"spoof\",\"phone\":\"fixture\",\"workStatus\":\"班委\"}", StudentProfileUpdate.class);
@@ -194,11 +198,12 @@ class SecurityRegressionTest {
         assertDoesNotThrow(() -> limiter.check("student", "other"));
     }
     @Test void unauditedPartyStageCannotGrantTaskEligibility() {
-        PartyApplicationService applications = mock(PartyApplicationService.class);
+        org.example.repository.PartyApplicationRepository applications = mock(org.example.repository.PartyApplicationRepository.class);
         PartyApplicationModel application = new PartyApplicationModel(); application.setCurrentStage("中共党员"); application.setAuditStatus("待审核");
-        when(applications.getByStudentId("fixture")).thenReturn(application);
-        DailyTaskAudienceService audience = new DailyTaskAudienceService(); ReflectionTestUtils.setField(audience, "partyApplicationService", applications);
-        StudentModel student = new StudentModel(); student.setStudentId("fixture");
+        // 入党申请按学生关联键（账号主键）查询，见 org.example.dto.StudentRef
+        when(applications.findByStudentAccountId("fixture")).thenReturn(java.util.Optional.of(application));
+        DailyTaskAudienceService audience = new DailyTaskAudienceService(); ReflectionTestUtils.setField(audience, "partyApplicationRepository", applications);
+        StudentModel student = new StudentModel(); student.setId("fixture"); student.setStudentId("1001");
         assertNull(audience.resolvePartyStage(student));
         application.setAuditStatus("通过"); assertEquals("中共党员", audience.resolvePartyStage(student));
     }

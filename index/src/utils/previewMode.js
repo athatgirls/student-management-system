@@ -40,7 +40,7 @@ export function enablePreviewMode(userType = 'student') {
   localStorage.setItem(PREVIEW_USER_TYPE, user.userType)
   localStorage.setItem('token', `preview-token-${user.userType}`)
   localStorage.setItem('token_expire', String(Date.now() + 24 * 60 * 60 * 1000))
-  localStorage.setItem('userId', user.studentId || user.adminId || user.id)
+  localStorage.setItem('userId', user.id)
   localStorage.setItem('userInfo', JSON.stringify(user))
 
   return user

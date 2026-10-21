@@ -371,7 +371,7 @@ const loadUserInfo = async () => {
     if (res.code === 200 && res.data) {
       userInfo.value = {
         name: res.data.name || storeUser.name || '',
-        studentId: res.data.studentId || storeUser.studentId || '',
+        studentId: res.data.studentId || '',
         major: res.data.major || '',
         grade: res.data.grade || ''
       }
@@ -590,7 +590,8 @@ const loadTodoList = async () => {
     
     // 1. 加载已审核通过的请假记录（未销假）
     try {
-      const studentId = userInfo.value.studentId || store.state.user?.studentId
+      // 查询参数走学号语义（管理端按学号指定目标学生），学生端由登录态解析身份
+      const studentId = store.state.user && store.state.user.studentId
       if (studentId) {
         const leaveRes = await getMyLeaveRequests(studentId)
         if (leaveRes.code === 200 && leaveRes.data) {
@@ -724,11 +725,11 @@ const updateTime = () => {
 // 加载个人数据
 const loadPersonalData = async () => {
   try {
-    // 获取当前登录学生的ID（从 store 或 userInfo）
-    const studentId = userInfo.value.studentId || (store.state.user && store.state.user.studentId)
-    if (!studentId) {
-      console.error('无法获取当前用户学号')
-      // 如果无法获取学号，保持默认值0
+    // 获取当前登录学生的账号主键（学生关联键）
+    const studentAccountId = store.state.user && store.state.user.id
+    if (!studentAccountId) {
+      console.error('无法获取当前用户账号信息')
+      // 如果无法获取账号信息，保持默认值0
       personalStats.value = {
         internships: 0,
         competitions: 0,
@@ -738,7 +739,7 @@ const loadPersonalData = async () => {
       return
     }
     
-    const response = await getPersonalStats(studentId)
+    const response = await getPersonalStats(studentAccountId)
     if (response.code === 200 && response.data) {
       const data = response.data
       personalStats.value = {
@@ -854,7 +855,7 @@ const goToProfile = () => {
 onMounted(async () => {
   updateTime()
   await loadUserInfo() // 先加载用户完整信息（包含专业和年级）
-  // 确保用户信息加载完成后再加载个人统计数据（需要studentId）
+  // 确保用户信息加载完成后再加载个人统计数据（需要账号主键）
   await loadPersonalData()
   loadTodoList()
   loadTaskCompletion()

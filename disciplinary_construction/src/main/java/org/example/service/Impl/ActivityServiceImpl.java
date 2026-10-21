@@ -1,5 +1,6 @@
 package org.example.service.Impl;
 
+import org.example.dto.StudentRef;
 import org.example.model.ActivityModel;
 import org.example.model.DailyTaskModel;
 import org.example.model.DailyTaskSubmissionModel;
@@ -56,8 +57,8 @@ public class ActivityServiceImpl implements ActivityService {
         activity.setCreateTime(LocalDateTime.now());
         activity.setUpdateTime(LocalDateTime.now());
         activity.setMatched(false);
-        if (activity.getParticipantStudentIds() == null) {
-            activity.setParticipantStudentIds(new ArrayList<>());
+        if (activity.getParticipantStudentAccountIds() == null) {
+            activity.setParticipantStudentAccountIds(new ArrayList<>());
         }
         return activityRepository.save(activity);
     }
@@ -112,7 +113,7 @@ public class ActivityServiceImpl implements ActivityService {
         }
 
         // 已报名者即使满员也必须允许导入到场名单；只为新增报名占用名额。
-        Set<String> participantIds = new LinkedHashSet<>(activity.getParticipantStudentIds() == null ? Collections.emptyList() : activity.getParticipantStudentIds());
+        Set<String> participantAccountIds = new LinkedHashSet<>(activity.getParticipantStudentAccountIds() == null ? Collections.emptyList() : activity.getParticipantStudentAccountIds());
 
         for (Map<String, String> studentInfo : students) {
             String name = studentInfo.get("name");
@@ -142,6 +143,7 @@ public class ActivityServiceImpl implements ActivityService {
             }
 
             final StudentModel student = foundStudent;
+            final StudentRef ref = new StudentRef(student.getId(), student.getStudentId(), student.getName());
 
             // 活动导入与学生任务列表、任务提交使用同一套接收范围判断。
             boolean canCompleteTask = dailyTaskAudienceService.matches(associatedTask, student);
@@ -150,8 +152,8 @@ public class ActivityServiceImpl implements ActivityService {
             int matchedCount = 0;
             if (canCompleteTask) {
                 // 检查是否已经提交过
-                Optional<DailyTaskSubmissionModel> existing = submissionRepository.findByTaskIdAndStudentId(
-                        associatedTask.getId(), student.getId());
+                Optional<DailyTaskSubmissionModel> existing = submissionRepository.findByTaskIdAndStudentAccountId(
+                        associatedTask.getId(), ref.getAccountId());
 
                 if (!existing.isPresent()) {
                     // 如果是报名型任务，需要检查报名人数限制
@@ -192,8 +194,9 @@ public class ActivityServiceImpl implements ActivityService {
                     // 创建新的提交记录
                     DailyTaskSubmissionModel submission = new DailyTaskSubmissionModel();
                     submission.setTaskId(associatedTask.getId());
-                    submission.setStudentId(student.getId());
-                    submission.setStudentName(student.getName());
+                    submission.setStudentAccountId(ref.getAccountId());
+                    submission.setStudentId(ref.getStudentId());
+                    submission.setStudentName(ref.getName());
                     submission.setSubmissionTime(LocalDateTime.now());
                     submission.setUpdateTime(LocalDateTime.now());
                     submission.setStatus("completed");
@@ -208,7 +211,7 @@ public class ActivityServiceImpl implements ActivityService {
                     matchedCount = 1;
                 }
                 volunteerCompletionService.sync(associatedTask, student, activity);
-                participantIds.add(student.getId());
+                participantAccountIds.add(ref.getAccountId());
             } else {
                 // 不符合任务限制条件
                 Map<String, Object> unmatched = new HashMap<>();
@@ -226,8 +229,8 @@ public class ActivityServiceImpl implements ActivityService {
             matchedResults.add(matched);
         }
 
-        // 更新活动的参与学生列表
-        activity.setParticipantStudentIds(new ArrayList<>(participantIds));
+        // 更新活动的参与学生列表（账号主键）
+        activity.setParticipantStudentAccountIds(new ArrayList<>(participantAccountIds));
         activity.setMatched(true);
         activity.setUpdateTime(LocalDateTime.now());
         activityRepository.save(activity);
@@ -261,7 +264,7 @@ public class ActivityServiceImpl implements ActivityService {
         int activityCount = 0;
 
         for (ActivityModel activity : activityRepository.findAll()) {
-            if (activity.getTaskId() == null || activity.getParticipantStudentIds() == null || activity.getParticipantStudentIds().isEmpty()) continue;
+            if (activity.getTaskId() == null || activity.getParticipantStudentAccountIds() == null || activity.getParticipantStudentAccountIds().isEmpty()) continue;
             DailyTaskModel task = taskRepository.findById(activity.getTaskId()).orElse(null);
             if (task == null || !"volunteer".equals(org.example.util.TaskSubmissionValidation.category(task.getActivityCategory()))) continue;
             activityCount++;
@@ -278,13 +281,13 @@ public class ActivityServiceImpl implements ActivityService {
         List<Map<String, Object>> syncedResults = new ArrayList<>();
         List<Map<String, Object>> skippedResults = new ArrayList<>();
         List<Map<String, Object>> outOfScopeResults = new ArrayList<>();
-        Set<String> participantIds = new LinkedHashSet<>(activity.getParticipantStudentIds() == null
-                ? Collections.emptyList() : activity.getParticipantStudentIds());
+        Set<String> participantAccountIds = new LinkedHashSet<>(activity.getParticipantStudentAccountIds() == null
+                ? Collections.emptyList() : activity.getParticipantStudentAccountIds());
 
-        for (String participantId : participantIds) {
-            StudentModel student = studentRepository.findById(participantId).orElse(null);
+        for (String participantAccountId : participantAccountIds) {
+            StudentModel student = studentRepository.findById(participantAccountId).orElse(null);
             if (student == null) {
-                skippedResults.add(syncStudentResult(null, participantId, "学生不存在"));
+                skippedResults.add(syncStudentResult(null, participantAccountId, "学生不存在"));
             } else if (!dailyTaskAudienceService.matches(task, student)) {
                 outOfScopeResults.add(syncStudentResult(student, null, "不符合任务接收范围"));
             } else if (volunteerCompletionService.sync(task, student, activity)) {
@@ -310,10 +313,12 @@ public class ActivityServiceImpl implements ActivityService {
         return result;
     }
 
-    private Map<String, Object> syncStudentResult(StudentModel student, String participantId, String reason) {
+    private Map<String, Object> syncStudentResult(StudentModel student, String studentAccountId, String reason) {
         Map<String, Object> item = new HashMap<>();
         item.put("name", student == null ? "-" : student.getName());
-        item.put("studentId", student == null ? participantId : student.getStudentId());
+        // studentId 只展示学号，账号主键单独放 studentAccountId，禁止拿主键当学号展示（见 org.example.dto.StudentRef）
+        item.put("studentId", student == null ? "-" : student.getStudentId());
+        item.put("studentAccountId", student == null ? studentAccountId : student.getId());
         item.put("reason", reason);
         return item;
     }

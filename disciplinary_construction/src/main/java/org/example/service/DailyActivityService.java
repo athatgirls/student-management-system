@@ -6,7 +6,7 @@ import java.util.List;
 public interface DailyActivityService {
     DailyActivityModel create(DailyActivityModel model);
     List<DailyActivityModel> findAll();
-    List<DailyActivityModel> findByStudentId(String studentId);
+    List<DailyActivityModel> findByStudentAccountId(String studentAccountId);
     DailyActivityModel findById(String id);
     DailyActivityModel audit(String id, String status, String comment, String auditorId);
     void delete(String id);

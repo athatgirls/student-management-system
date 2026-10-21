@@ -1,5 +1,6 @@
 package org.example.service.Impl;
 
+import org.example.dto.StudentRef;
 import org.example.model.PartyMemberModel;
 import org.example.model.StudentModel;
 import org.example.repository.PartyMemberRepository;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class PartyMemberServiceImpl implements PartyMemberService {
@@ -41,8 +43,8 @@ public class PartyMemberServiceImpl implements PartyMemberService {
     }
 
     @Override
-    public List<PartyMemberModel> getStudentPartyMembers(String studentId) {
-        return partyMemberRepository.findByStudentId(studentId);
+    public List<PartyMemberModel> getStudentPartyMembers(String studentAccountId) {
+        return partyMemberRepository.findByStudentAccountId(studentAccountId);
     }
 
     @Override
@@ -75,8 +77,11 @@ public class PartyMemberServiceImpl implements PartyMemberService {
 
     @Override
     public List<PartyMemberModel> searchPartyMembers(String keyword) {
+        // 学号只是展示字段，按学号检索属于展示匹配，不走关联键
         List<PartyMemberModel> byName = partyMemberRepository.findByNameContaining(keyword);
-        List<PartyMemberModel> byStudentId = partyMemberRepository.findByStudentIdContaining(keyword);
+        List<PartyMemberModel> byStudentId = partyMemberRepository.findAll().stream()
+                .filter(member -> member.getStudentId() != null && member.getStudentId().contains(keyword))
+                .collect(Collectors.toList());
         byName.addAll(byStudentId);
         return byName;
     }
@@ -101,25 +106,10 @@ public class PartyMemberServiceImpl implements PartyMemberService {
             String studentId = studentData.get("studentId");
             String name = studentData.get("name");
             
-            // 查找学生
+            // 按学号匹配学生（导入匹配），姓名不参与匹配
             StudentModel foundStudent = null;
             if (studentId != null && !studentId.trim().isEmpty()) {
                 foundStudent = studentRepository.findByStudentId(studentId.trim());
-            }
-            
-            // 如果通过学号找不到，尝试通过姓名查找
-            if (foundStudent == null && name != null && !name.trim().isEmpty()) {
-                List<StudentModel> studentsByName = studentRepository.findByName(name.trim());
-                if (studentsByName != null && !studentsByName.isEmpty()) {
-                    if (studentId != null && !studentId.trim().isEmpty()) {
-                        foundStudent = studentsByName.stream()
-                                .filter(s -> studentId.trim().equals(s.getStudentId()))
-                                .findFirst()
-                                .orElse(studentsByName.get(0));
-                    } else {
-                        foundStudent = studentsByName.get(0);
-                    }
-                }
             }
             
             if (foundStudent == null) {
@@ -131,12 +121,15 @@ public class PartyMemberServiceImpl implements PartyMemberService {
                 continue;
             }
             
-            // 检查是否已经存在党员记录
-            List<PartyMemberModel> existingMembers = partyMemberRepository.findByStudentId(foundStudent.getStudentId());
+            // 学生身份：账号主键是关联键，学号仅展示
+            StudentRef ref = new StudentRef(foundStudent.getId(), foundStudent.getStudentId(), foundStudent.getName());
+            
+            // 检查是否已经存在党员记录（按学生关联键查询）
+            List<PartyMemberModel> existingMembers = partyMemberRepository.findByStudentAccountId(ref.getAccountId());
             if (!existingMembers.isEmpty()) {
                 Map<String, Object> unmatched = new HashMap<>();
-                unmatched.put("name", foundStudent.getName());
-                unmatched.put("studentId", foundStudent.getStudentId());
+                unmatched.put("name", ref.getName());
+                unmatched.put("studentId", ref.getStudentId());
                 unmatched.put("reason", "该学生已有党员记录");
                 unmatchedResults.add(unmatched);
                 continue;
@@ -144,8 +137,9 @@ public class PartyMemberServiceImpl implements PartyMemberService {
             
             // 创建党员记录
             PartyMemberModel partyMember = new PartyMemberModel();
-            partyMember.setStudentId(foundStudent.getStudentId());
-            partyMember.setName(foundStudent.getName());
+            partyMember.setStudentAccountId(ref.getAccountId());
+            partyMember.setStudentId(ref.getStudentId());
+            partyMember.setName(ref.getName());
             partyMember.setGender(foundStudent.getGender());
             partyMember.setClassName(foundStudent.getClassName());
             partyMember.setCreateTime(LocalDateTime.now());
@@ -169,8 +163,8 @@ public class PartyMemberServiceImpl implements PartyMemberService {
             partyMemberRepository.save(partyMember);
             
             Map<String, Object> matched = new HashMap<>();
-            matched.put("name", foundStudent.getName());
-            matched.put("studentId", foundStudent.getStudentId());
+            matched.put("name", ref.getName());
+            matched.put("studentId", ref.getStudentId());
             matchedResults.add(matched);
         }
         
@@ -184,10 +178,12 @@ public class PartyMemberServiceImpl implements PartyMemberService {
 
     // 创建默认党员数据
     public void createDefaultPartyMember() {
-        // 为默认学生创建党员信息
-        if (partyMemberRepository.findByStudentId("10240001").isEmpty()) {
+        // 为默认学生创建党员信息（先按学号找到学生账号，记录挂到账号主键）
+        StudentModel student1 = studentRepository.findByStudentId("10240001");
+        if (student1 != null && partyMemberRepository.findByStudentAccountId(student1.getId()).isEmpty()) {
             PartyMemberModel partyMember1 = new PartyMemberModel();
-            partyMember1.setStudentId("10240001");
+            partyMember1.setStudentAccountId(student1.getId());
+            partyMember1.setStudentId(student1.getStudentId());
             partyMember1.setName("默认学生");
             partyMember1.setGender("男");
             partyMember1.setNation("汉族");
@@ -207,10 +203,12 @@ public class PartyMemberServiceImpl implements PartyMemberService {
             partyMemberRepository.save(partyMember1);
         }
 
-        // 为测试学生创建党员信息
-        if (partyMemberRepository.findByStudentId("20240001").isEmpty()) {
+        // 为测试学生创建党员信息（先按学号找到学生账号，记录挂到账号主键）
+        StudentModel student2 = studentRepository.findByStudentId("20240001");
+        if (student2 != null && partyMemberRepository.findByStudentAccountId(student2.getId()).isEmpty()) {
             PartyMemberModel partyMember2 = new PartyMemberModel();
-            partyMember2.setStudentId("20240001");
+            partyMember2.setStudentAccountId(student2.getId());
+            partyMember2.setStudentId(student2.getStudentId());
             partyMember2.setName("学生111");
             partyMember2.setGender("女");
             partyMember2.setNation("汉族");
@@ -230,10 +228,12 @@ public class PartyMemberServiceImpl implements PartyMemberService {
             partyMemberRepository.save(partyMember2);
         }
 
-        // 为20230001学生创建党员信息（用于测试）
-        if (partyMemberRepository.findByStudentId("20230001").isEmpty()) {
+        // 为20230001学生创建党员信息（用于测试，先按学号找到学生账号，记录挂到账号主键）
+        StudentModel student3 = studentRepository.findByStudentId("20230001");
+        if (student3 != null && partyMemberRepository.findByStudentAccountId(student3.getId()).isEmpty()) {
             PartyMemberModel partyMember3 = new PartyMemberModel();
-            partyMember3.setStudentId("20230001");
+            partyMember3.setStudentAccountId(student3.getId());
+            partyMember3.setStudentId(student3.getStudentId());
             partyMember3.setName("张三");
             partyMember3.setGender("男");
             partyMember3.setNation("汉族");

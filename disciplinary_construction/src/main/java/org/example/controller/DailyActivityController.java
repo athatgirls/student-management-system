@@ -1,11 +1,11 @@
 package org.example.controller;
 
 import org.example.annotation.CurrentUser;
+import org.example.dto.StudentRef;
 import org.example.model.DailyActivityModel;
-import org.example.model.StudentModel;
 import org.example.service.DailyActivityService;
 import org.example.service.CurrentUserAccessService;
-import org.example.service.StudentService;
+import org.example.service.StudentRefService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,17 +23,20 @@ public class DailyActivityController {
     private DailyActivityService service;
     
     @Autowired
-    private StudentService studentService;
+    private StudentRefService studentRefService;
 
     @Autowired
     private CurrentUserAccessService currentUserAccessService;
 
     @PostMapping("/create")
     public ResponseEntity<Map<String, Object>> create(@RequestBody DailyActivityModel model, @CurrentUser Map<String, Object> currentUser) {
-        String userId = (String) currentUser.get("userId");
-        String username = (String) currentUser.get("username");
-        model.setStudentId(userId);
-        model.setStudentName(username);
+        // 学生本人提交填本人身份；管理员代填按学号指定目标学生，姓名不信任请求体
+        StudentRef ref = currentUserAccessService.isAdmin(currentUser)
+                ? currentUserAccessService.requireAdminTarget(currentUser, model.getStudentId())
+                : studentRefService.current(currentUser);
+        model.setStudentAccountId(ref.getAccountId());
+        model.setStudentId(ref.getStudentId());
+        model.setStudentName(ref.getName());
         Map<String, Object> result = new HashMap<>();
         result.put("code", 200);
         result.put("data", service.create(model));
@@ -41,27 +44,27 @@ public class DailyActivityController {
     }
 
     @GetMapping("/list")
-    public ResponseEntity<Map<String, Object>> list(@RequestParam(required = false) String studentId,
+    public ResponseEntity<Map<String, Object>> list(@RequestParam(required = false) String studentAccountId,
                                                      @CurrentUser Map<String, Object> currentUser) {
         if (!currentUserAccessService.isAdmin(currentUser)) {
-            studentId = currentUserAccessService.requireUserId(currentUser);
+            studentAccountId = currentUserAccessService.requireUserId(currentUser);
         }
         Map<String, Object> result = new HashMap<>();
         result.put("code", 200);
         List<DailyActivityModel> activities;
-        if (studentId != null && !studentId.isEmpty()) {
-            activities = service.findByStudentId(studentId);
+        if (studentAccountId != null && !studentAccountId.isEmpty()) {
+            activities = service.findByStudentAccountId(studentAccountId);
         } else {
             activities = service.findAll();
         }
         
-        // 填充学号（通过studentId查询学生信息）
+        // 填充学号（通过账号主键解析学生信息）
         List<DailyActivityModel> activitiesWithStudentInfo = activities.stream().map(activity -> {
-            if (activity.getStudentId() != null && !activity.getStudentId().isEmpty()) {
+            if (activity.getStudentAccountId() != null && !activity.getStudentAccountId().isEmpty()) {
                 try {
-                    StudentModel student = studentService.findById(activity.getStudentId());
+                    StudentRef student = studentRefService.resolveByAccountId(activity.getStudentAccountId());
                     if (student != null) {
-                        activity.setStudentNumber(student.getStudentId()); // 学号
+                        activity.setStudentId(student.getStudentId()); // 学号
                         // studentName 已经在创建时设置了，这里确保正确
                         if (activity.getStudentName() == null || activity.getStudentName().isEmpty()) {
                             activity.setStudentName(student.getName());
@@ -83,7 +86,7 @@ public class DailyActivityController {
         String id = (String) params.get("id");
         String status = (String) params.get("auditStatus");
         String comment = (String) params.get("auditComment");
-        String auditorId = (String) currentUser.get("userId");
+        String auditorId = currentUserAccessService.requireUserId(currentUser);
         Map<String, Object> result = new HashMap<>();
         result.put("code", 200);
         result.put("data", service.audit(id, status, comment, auditorId));

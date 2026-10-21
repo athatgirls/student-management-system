@@ -150,7 +150,7 @@ export function getRecentActivities() {
   })
 }
 
-// 管理员重置学生密码（Hbut_加学号后六位，首次登录必须修改）
+// 管理员重置学生密码（Hbut_加学号后六位，首次登录必须修改；studentId=学号，管理端按学号指定学生）
 export function resetStudentPassword(studentId, newPassword = null) {
   return request({
     url: '/student/reset-password',
@@ -168,7 +168,7 @@ export function changePassword(oldPassword, newPassword) {
   })
 }
 
-// 修改初始密码（不需要登录）
+// 修改初始密码（不需要登录；studentId=学号，与登录使用的学号一致）
 export function changeInitialPassword(studentId, initialPassword, newPassword) {
   return request({
     url: '/student/change-initial-password',

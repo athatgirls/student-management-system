@@ -7,13 +7,18 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.util.Date;
 
+/**
+ * 学生账号与档案。注意双标识：id（_id）= 账号主键（业务关联键 studentAccountId，JWT userId）；studentId = 学号（登录账号/展示）。
+ */
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Document(collection = "students")
 public class StudentModel {
+    /** 账号主键（_id）：业务关联键 studentAccountId，JWT userId，业务关联字段只存它。 */
     @Id
     private String id;
-    private String studentId; // 学号
+    /** 学号（登录账号/展示），禁止作为关联键。 */
+    private String studentId;
     private String name; // 姓名
     private String gender; // 性别
     private Integer age; // 年龄

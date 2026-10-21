@@ -704,6 +704,7 @@ const route = useRoute()
 const router = useRouter()
 const currentUser = computed(() => store.state.user || {})
 const currentStudentId = computed(() => currentUser.value.studentId || '')
+const currentStudentAccountId = computed(() => currentUser.value.id || '')
 const currentStudentName = computed(() => currentUser.value.name || currentUser.value.realName || '')
 
 // 响应式数据
@@ -790,6 +791,7 @@ const dialogTitle = computed(() => {
 
 // 表单数据
 const competitionForm = reactive({
+  studentAccountId: '',
   studentId: '',
   studentName: '',
   competitionName: '',
@@ -804,6 +806,7 @@ const competitionForm = reactive({
 })
 
 const paperForm = reactive({
+  studentAccountId: '',
   studentId: '',
   studentName: '',
   paperTitle: '',
@@ -821,6 +824,7 @@ const paperForm = reactive({
 })
 
 const patentForm = reactive({
+  studentAccountId: '',
   studentId: '',
   studentName: '',
   patentTitle: '',
@@ -836,6 +840,7 @@ const patentForm = reactive({
 })
 
 const projectForm = reactive({
+  studentAccountId: '',
   studentId: '',
   studentName: '',
   projectName: '',
@@ -994,19 +999,19 @@ const handleUploadError = (error, file) => {
 const loadData = async () => {
   loading.value = true
   try {
-    const studentId = currentStudentId.value
+    const studentAccountId = currentStudentAccountId.value
 
-    if (!studentId) {
+    if (!studentAccountId) {
       ElMessage.error('无法获取学生信息，请重新登录')
       loading.value = false
       return
     }
 
     const [competitions, papers, patents, projects] = await Promise.all([
-      getStudentCompetitions(studentId),
-      getStudentPapers(studentId),
-      getStudentPatents(studentId),
-      getStudentProjects(studentId)
+      getStudentCompetitions(studentAccountId),
+      getStudentPapers(studentAccountId),
+      getStudentPatents(studentAccountId),
+      getStudentProjects(studentAccountId)
     ])
 
     competitionList.value = Array.isArray(competitions) ? competitions : (competitions?.data || [])
@@ -1336,6 +1341,7 @@ const submitProject = async () => {
 // 重置表单方法
 const resetCompetitionForm = () => {
   Object.assign(competitionForm, {
+    studentAccountId: currentStudentAccountId.value,
     studentId: currentStudentId.value, 
     studentName: currentStudentName.value, 
     competitionName: '',
@@ -1353,6 +1359,7 @@ const resetCompetitionForm = () => {
 
 const resetPaperForm = () => {
   Object.assign(paperForm, {
+    studentAccountId: currentStudentAccountId.value,
     studentId: currentStudentId.value, 
     studentName: currentStudentName.value, 
     paperTitle: '',
@@ -1373,6 +1380,7 @@ const resetPaperForm = () => {
 
 const resetPatentForm = () => {
   Object.assign(patentForm, {
+    studentAccountId: currentStudentAccountId.value,
     studentId: currentStudentId.value, 
     studentName: currentStudentName.value,
     patentTitle: '',
@@ -1391,6 +1399,7 @@ const resetPatentForm = () => {
 
 const resetProjectForm = () => {
   Object.assign(projectForm, {
+    studentAccountId: currentStudentAccountId.value,
     studentId: currentStudentId.value, 
     studentName: currentStudentName.value, 
     projectName: '',
@@ -1419,12 +1428,16 @@ const handleTabChange = (tabName) => {
 
 // 初始化
 onMounted(async () => {
+  competitionForm.studentAccountId = currentStudentAccountId.value
   competitionForm.studentId = currentStudentId.value
   competitionForm.studentName = currentStudentName.value
+  paperForm.studentAccountId = currentStudentAccountId.value
   paperForm.studentId = currentStudentId.value
   paperForm.studentName = currentStudentName.value
+  patentForm.studentAccountId = currentStudentAccountId.value
   patentForm.studentId = currentStudentId.value
   patentForm.studentName = currentStudentName.value
+  projectForm.studentAccountId = currentStudentAccountId.value
   projectForm.studentId = currentStudentId.value
   projectForm.studentName = currentStudentName.value
 

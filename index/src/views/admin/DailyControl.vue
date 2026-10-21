@@ -98,7 +98,7 @@
               </template>
             </el-table-column>
             <el-table-column prop="studentName" label="学生姓名" min-width="120" />
-            <el-table-column :prop="(moduleKey === 'academic' || moduleKey === 'daily') ? 'studentNumber' : 'studentId'" label="学号" min-width="120" />
+            <el-table-column prop="studentId" label="学号" min-width="120" />
             <el-table-column prop="auditStatus" label="状态" width="160">
               <template #default="scope">
                 <el-tag :type="statusMeta(scope.row.auditStatus).type" effect="light" class="status-tag">
@@ -560,10 +560,10 @@
             <span class="dot">·</span>
             <span class="muted">发起人：</span>
             <span>{{ reviewEntity.studentName || '-' }}</span>
-            <span v-if="((moduleKey === 'academic' || moduleKey === 'daily') ? reviewEntity.studentNumber : reviewEntity.studentId)" class="dot">·</span>
-            <span v-if="((moduleKey === 'academic' || moduleKey === 'daily') ? reviewEntity.studentNumber : reviewEntity.studentId)" class="muted">学号：</span>
-            <span v-if="((moduleKey === 'academic' || moduleKey === 'daily') ? reviewEntity.studentNumber : reviewEntity.studentId)">
-              {{ (moduleKey === 'academic' || moduleKey === 'daily') ? (reviewEntity.studentNumber || '-') : (reviewEntity.studentId || '-') }}
+            <span v-if="reviewEntity.studentId" class="dot">·</span>
+            <span v-if="reviewEntity.studentId" class="muted">学号：</span>
+            <span v-if="reviewEntity.studentId">
+              {{ reviewEntity.studentId || '-' }}
             </span>
             <span class="dot">·</span>
             <span class="muted">时间：</span>
@@ -1123,9 +1123,7 @@ const rows = computed(() => {
     return list.filter(r =>
       (r.title && r.title.toLowerCase().includes(key)) ||
       (r.studentName && r.studentName.toLowerCase().includes(key)) ||
-      (r.studentId && r.studentId.toLowerCase().includes(key)) ||
-      (r.studentNumber && r.studentNumber.toLowerCase().includes(key)) ||
-      (r.userId && r.userId.toLowerCase().includes(key))
+      (r.studentId && r.studentId.toLowerCase().includes(key))
     )
   }
 })
@@ -1189,7 +1187,7 @@ const reviewForm = reactive({
   id: '',
   title: '',
   studentName: '',
-  userId: '',
+  studentAccountId: '',
   status: '', // 请假状态（仅用于请假）
   auditStatus: 'pending',
   auditComment: '',
@@ -1213,7 +1211,7 @@ const openReview = async (row) => {
     id: entity.id || '',
     title: entity.title || '',
     studentName: entity.studentName || '',
-    userId: entity.userId || '',
+    studentAccountId: entity.studentAccountId || '',
     status: entity.status || '', // 请假状态
     auditStatus: entity.auditStatus || 'pending',
     auditComment: entity.auditComment || '',
@@ -1330,7 +1328,7 @@ const detailPairs = computed(() => {
   const e = reviewEntity
   if (moduleKey.value === 'academic') {
     return [
-      { label: '学号', value: e.studentNumber || '-' },
+      { label: '学号', value: e.studentId || '-' },
       { label: '学生姓名', value: e.studentName },
       { label: '活动类型', value: e.type },
       { label: '主办方', value: e.organizer },
@@ -1362,7 +1360,7 @@ const detailPairs = computed(() => {
     ]
   } else if (moduleKey.value === 'daily') {
     return [
-      { label: '学号', value: e.studentNumber || '-' },
+      { label: '学号', value: e.studentId || '-' },
       { label: '学生姓名', value: e.studentName },
       { label: '活动类型', value: dict.activityTypeLabel[e.activityType] || e.activityType },
       { label: '主办/授予', value: e.organizer },

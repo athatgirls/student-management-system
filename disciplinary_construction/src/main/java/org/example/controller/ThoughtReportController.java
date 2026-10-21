@@ -3,9 +3,11 @@ package org.example.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.annotation.CurrentUser;
+import org.example.dto.StudentRef;
 import org.example.model.ThoughtReportModel;
 import org.example.response.ResponseResult;
 import org.example.service.CurrentUserAccessService;
+import org.example.service.StudentRefService;
 import org.example.service.ThoughtReportService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -22,13 +24,16 @@ public class ThoughtReportController {
     private ThoughtReportService thoughtReportService;
 
     @Autowired
+    private StudentRefService studentRefService;
+
+    @Autowired
     private CurrentUserAccessService currentUserAccessService;
 
     @Operation(summary = "添加思想汇报")
     @PostMapping("/add")
     public ResponseResult<ThoughtReportModel> addThoughtReport(@RequestBody ThoughtReportModel thoughtReport, @CurrentUser Map<String, Object> currentUser) {
-        thoughtReport.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
-        thoughtReport.setStudentName((String) currentUser.get("username"));
+        // 学生本人提交：身份一律取本人档案，不信任请求体
+        fillStudentInfo(thoughtReport, studentRefService.current(currentUser));
         resetAudit(thoughtReport);
         ThoughtReportModel result = thoughtReportService.addThoughtReport(thoughtReport);
         return ResponseResult.success(result);
@@ -39,10 +44,10 @@ public class ThoughtReportController {
     public ResponseResult<ThoughtReportModel> updateThoughtReport(@RequestBody ThoughtReportModel thoughtReport, @CurrentUser Map<String, Object> currentUser) {
         ThoughtReportModel existing = thoughtReportService.getThoughtReportById(thoughtReport.getId());
         if (existing != null) {
-            currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+            currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
         }
-        thoughtReport.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
-        thoughtReport.setStudentName((String) currentUser.get("username"));
+        // 学生本人维护：身份一律取本人档案，不信任请求体
+        fillStudentInfo(thoughtReport, studentRefService.current(currentUser));
         resetAudit(thoughtReport);
         ThoughtReportModel result = thoughtReportService.updateThoughtReport(thoughtReport);
         return ResponseResult.success(result);
@@ -54,18 +59,18 @@ public class ThoughtReportController {
                                                       @CurrentUser Map<String, Object> currentUser) {
         ThoughtReportModel existing = thoughtReportService.getThoughtReportById(id);
         if (existing != null) {
-            currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+            currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
         }
         thoughtReportService.deleteThoughtReport(id);
         return ResponseResult.success("删除成功");
     }
 
     @Operation(summary = "获取学生思想汇报")
-    @GetMapping("/student/{studentId}")
-    public ResponseResult<List<ThoughtReportModel>> getStudentThoughtReports(@PathVariable String studentId,
+    @GetMapping("/student/{studentAccountId}")
+    public ResponseResult<List<ThoughtReportModel>> getStudentThoughtReports(@PathVariable String studentAccountId,
                                                                              @CurrentUser Map<String, Object> currentUser) {
-        currentUserAccessService.requireStudentAccess(currentUser, studentId);
-        List<ThoughtReportModel> result = thoughtReportService.getStudentThoughtReports(studentId);
+        currentUserAccessService.requireStudentRecord(currentUser, studentAccountId);
+        List<ThoughtReportModel> result = thoughtReportService.getStudentThoughtReports(studentAccountId);
         return ResponseResult.success(result);
     }
 
@@ -75,7 +80,7 @@ public class ThoughtReportController {
                                                                    @CurrentUser Map<String, Object> currentUser) {
         ThoughtReportModel result = thoughtReportService.getThoughtReportById(id);
         if (result != null) {
-            currentUserAccessService.requireStudentAccess(currentUser, result.getStudentId());
+            currentUserAccessService.requireStudentRecord(currentUser, result.getStudentAccountId());
         }
         return ResponseResult.success(result);
     }
@@ -93,7 +98,7 @@ public class ThoughtReportController {
             @PathVariable String id,
             @RequestBody Map<String, String> auditData,
             @CurrentUser Map<String, Object> currentUser) {
-        String auditorId = (String) currentUser.get("userId");
+        String auditorId = currentUserAccessService.requireUserId(currentUser);
         String auditStatus = auditData.get("auditStatus");
         String auditComment = auditData.get("auditComment");
         
@@ -141,5 +146,12 @@ public class ThoughtReportController {
         report.setAuditComment(null);
         report.setAuditorId(null);
         report.setAuditTime(null);
+    }
+
+    /** 写入学生标识：studentAccountId 是关联键，studentId（学号）与姓名仅展示。 */
+    private void fillStudentInfo(ThoughtReportModel report, StudentRef ref) {
+        report.setStudentAccountId(ref.getAccountId());
+        report.setStudentId(ref.getStudentId());
+        report.setStudentName(ref.getName());
     }
 } 

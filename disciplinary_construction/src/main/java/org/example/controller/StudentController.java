@@ -112,11 +112,11 @@ public class StudentController {
         return ResponseEntity.ok(result);
     }
 
-    // 根据ID获取学生信息
+    // 根据ID获取学生信息（账号资源：id 为账号主键，用 requireSelf 校验本人）
     @GetMapping("/{id}")
     public ResponseEntity<Map<String, Object>> getStudentById(@PathVariable String id,
                                                               @CurrentUser Map<String, Object> currentUser) {
-        currentUserAccessService.requireStudentAccess(currentUser, id);
+        currentUserAccessService.requireSelf(currentUser, id);
         Map<String, Object> result = new HashMap<>();
         try {
             StudentModel student = studentService.findById(id);
@@ -295,21 +295,20 @@ public class StudentController {
     private org.example.repository.DailyTaskSubmissionRepository dailyTaskSubmissionRepository;
 
     // 获取学生个人统计数据
-    @GetMapping("/personal-stats/{studentId}")
-    public ResponseEntity<Map<String, Object>> getPersonalStats(@PathVariable String studentId,
+    @GetMapping("/personal-stats/{studentAccountId}")
+    public ResponseEntity<Map<String, Object>> getPersonalStats(@PathVariable String studentAccountId,
                                                                 @CurrentUser Map<String, Object> currentUser) {
-        currentUserAccessService.requireStudentAccess(currentUser, studentId);
+        currentUserAccessService.requireSelf(currentUser, studentAccountId);
         Map<String, Object> result = new HashMap<>();
         try {
             // 从数据库获取真实的个人统计数据
             Map<String, Object> personalStats = new HashMap<>();
-            
-            // 注意：数据库中存储的studentId字段是学号，不是数据库ID
-            // 所以直接使用学号查询即可
-            personalStats.put("internshipCount", internshipEmploymentService.getByStudentId(studentId).size());
-            personalStats.put("competitionCount", competitionService.getStudentCompetitions(studentId).size());
-            personalStats.put("paperCount", paperService.getStudentPapers(studentId).size());
-            personalStats.put("projectCount", projectService.getStudentProjects(studentId).size());
+
+            // 业务记录的学生关联统一为账号主键（见 org.example.dto.StudentRef）
+            personalStats.put("internshipCount", internshipEmploymentService.getByStudentAccountId(studentAccountId).size());
+            personalStats.put("competitionCount", competitionService.getStudentCompetitions(studentAccountId).size());
+            personalStats.put("paperCount", paperService.getStudentPapers(studentAccountId).size());
+            personalStats.put("projectCount", projectService.getStudentProjects(studentAccountId).size());
             
             result.put("code", 200);
             result.put("data", personalStats);
@@ -636,11 +635,11 @@ public class StudentController {
     public ResponseEntity<Map<String, Object>> getStudyRecords(@CurrentUser Map<String, Object> currentUser) {
         Map<String, Object> result = new HashMap<>();
         try {
-            // 从JWT Token中获取当前用户ID
+            // 从JWT Token中获取当前用户ID（账号主键，即业务关联键 studentAccountId，见 StudentRef 约定）
             String userId = (String) currentUser.get("userId");
-            
+
             // 从数据库获取真实的学习记录
-            List<org.example.model.StudyRecordModel> studyRecords = studyRecordRepository.findByStudentDbId(userId);
+            List<org.example.model.StudyRecordModel> studyRecords = studyRecordRepository.findByStudentAccountId(userId);
             
             result.put("code", 200);
             result.put("data", studyRecords);
@@ -819,11 +818,12 @@ public class StudentController {
     public ResponseEntity<Map<String, Object>> getRecentActivities(@CurrentUser Map<String, Object> currentUser) {
         Map<String, Object> result = new HashMap<>();
         try {
+            // JWT userId 即账号主键，业务记录统一按 studentAccountId 关联（见 org.example.dto.StudentRef）
             String userId = (String) currentUser.get("userId");
             List<Map<String, Object>> activities = new java.util.ArrayList<>();
             
             // 1. 获取学术活动
-            List<org.example.model.AcademicEventModel> academicEvents = academicEventService.findByStudentId(userId);
+            List<org.example.model.AcademicEventModel> academicEvents = academicEventService.findByStudentAccountId(userId);
             for (org.example.model.AcademicEventModel event : academicEvents) {
                 Map<String, Object> activity = new HashMap<>();
                 activity.put("id", "academic_" + event.getId());
@@ -836,7 +836,7 @@ public class StudentController {
             }
             
             // 2. 获取日常活动
-            List<org.example.model.DailyActivityModel> dailyActivities = dailyActivityService.findByStudentId(userId);
+            List<org.example.model.DailyActivityModel> dailyActivities = dailyActivityService.findByStudentAccountId(userId);
             for (org.example.model.DailyActivityModel activity : dailyActivities) {
                 Map<String, Object> act = new HashMap<>();
                 act.put("id", "daily_" + activity.getId());
@@ -849,7 +849,7 @@ public class StudentController {
             }
             
             // 3. 获取荣誉
-            List<org.example.model.HonorModel> honors = honorService.findByUserId(userId);
+            List<org.example.model.HonorModel> honors = honorService.findByStudentAccountId(userId);
             for (org.example.model.HonorModel honor : honors) {
                 Map<String, Object> act = new HashMap<>();
                 act.put("id", "honor_" + honor.getId());
@@ -862,7 +862,7 @@ public class StudentController {
             }
             
             // 4. 获取任务提交
-            List<org.example.model.DailyTaskSubmissionModel> taskSubmissions = dailyTaskSubmissionRepository.findByStudentId(userId);
+            List<org.example.model.DailyTaskSubmissionModel> taskSubmissions = dailyTaskSubmissionRepository.findByStudentAccountId(userId);
             for (org.example.model.DailyTaskSubmissionModel submission : taskSubmissions) {
                 org.example.model.DailyTaskModel task = dailyTaskService.getTaskById(submission.getTaskId());
                 if (task != null) {
@@ -878,7 +878,7 @@ public class StudentController {
             }
             
             // 5. 获取实习就业
-            List<org.example.model.InternshipEmploymentModel> internships = internshipEmploymentService.getByUserId(userId);
+            List<org.example.model.InternshipEmploymentModel> internships = internshipEmploymentService.getByStudentAccountId(userId);
             for (org.example.model.InternshipEmploymentModel internship : internships) {
                 Map<String, Object> act = new HashMap<>();
                 act.put("id", "internship_" + internship.getId());

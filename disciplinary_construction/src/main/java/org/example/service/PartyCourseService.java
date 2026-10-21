@@ -8,7 +8,8 @@ public interface PartyCourseService {
     PartyCourseModel addPartyCourse(PartyCourseModel partyCourse);
     PartyCourseModel updatePartyCourse(PartyCourseModel partyCourse);
     void deletePartyCourse(String id);
-    List<PartyCourseModel> getStudentPartyCourses(String studentId);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。 */
+    List<PartyCourseModel> getStudentPartyCourses(String studentAccountId);
     PartyCourseModel getPartyCourseById(String id);
 
     // 管理员操作

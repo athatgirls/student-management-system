@@ -2,8 +2,10 @@ package org.example.controller;
 
 import org.example.model.LeaveRequestModel;
 import org.example.annotation.CurrentUser;
+import org.example.dto.StudentRef;
 import org.example.service.CurrentUserAccessService;
 import org.example.service.LeaveRequestService;
+import org.example.service.StudentRefService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,12 +23,18 @@ public class LeaveRequestController {
 
     @Autowired
     private CurrentUserAccessService currentUserAccessService;
+
+    @Autowired
+    private StudentRefService studentRefService;
     
     // 学生提交请假申请
     @PostMapping("/create")
     public ResponseEntity<Map<String, Object>> createLeaveRequest(@RequestBody LeaveRequestModel leaveRequest,
                                                                    @CurrentUser Map<String, Object> currentUser) {
-        leaveRequest.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
+        StudentRef ref = studentRefService.current(currentUser);
+        leaveRequest.setStudentAccountId(ref.getAccountId());
+        leaveRequest.setStudentId(ref.getStudentId());
+        leaveRequest.setStudentName(ref.getName());
         Map<String, Object> result = new HashMap<>();
         try {
             LeaveRequestModel created = leaveRequestService.createLeaveRequest(leaveRequest);
@@ -45,21 +53,25 @@ public class LeaveRequestController {
         return ResponseEntity.ok(result);
     }
     
-    // 学生获取自己的请假记录
+    // 学生获取自己的请假记录（管理端可按学号指定目标学生）
     @GetMapping("/my-leaves")
     public ResponseEntity<Map<String, Object>> getMyLeaveRequests(@RequestParam(required = false) String studentId,
                                                                   @CurrentUser Map<String, Object> currentUser) {
         Map<String, Object> result = new HashMap<>();
         try {
+            String studentAccountId;
             if (!currentUserAccessService.isAdmin(currentUser)) {
-                studentId = currentUserAccessService.requireStudentNumber(currentUser);
+                studentAccountId = studentRefService.current(currentUser).getAccountId();
             } else if (studentId == null || studentId.isEmpty()) {
                 result.put("code", 400);
                 result.put("data", null);
                 result.put("msg", "学号不能为空");
                 return ResponseEntity.badRequest().body(result);
+            } else {
+                // 管理端按学号定位目标学生，解析为账号主键后查询
+                studentAccountId = currentUserAccessService.requireAdminTarget(currentUser, studentId).getAccountId();
             }
-            List<LeaveRequestModel> leaves = leaveRequestService.findByStudentId(studentId);
+            List<LeaveRequestModel> leaves = leaveRequestService.findByStudentAccountId(studentAccountId);
             result.put("code", 200);
             result.put("data", leaves);
             result.put("msg", "获取成功");
@@ -146,7 +158,7 @@ public class LeaveRequestController {
             @CurrentUser Map<String, Object> currentUser) {
         LeaveRequestModel existing = leaveRequestService.findById(id);
         if (existing != null) {
-            currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+            currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
         }
         Map<String, Object> result = new HashMap<>();
         try {

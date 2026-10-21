@@ -31,8 +31,8 @@ public class DailyActivityServiceImpl implements DailyActivityService {
     }
 
     @Override
-    public List<DailyActivityModel> findByStudentId(String studentId) {
-        return repository.findByStudentId(studentId);
+    public List<DailyActivityModel> findByStudentAccountId(String studentAccountId) {
+        return repository.findByStudentAccountId(studentAccountId);
     }
 
     @Override

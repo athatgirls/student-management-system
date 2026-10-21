@@ -3,10 +3,12 @@ package org.example.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.annotation.CurrentUser;
+import org.example.dto.StudentRef;
 import org.example.model.PartyApplicationModel;
 import org.example.response.ResponseResult;
 import org.example.service.CurrentUserAccessService;
 import org.example.service.PartyApplicationService;
+import org.example.service.StudentRefService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,6 +25,9 @@ public class PartyApplicationController {
     private PartyApplicationService partyApplicationService;
 
     @Autowired
+    private StudentRefService studentRefService;
+
+    @Autowired
     private CurrentUserAccessService currentUserAccessService;
 
     @Operation(summary = "添加申请入党信息")
@@ -30,9 +35,12 @@ public class PartyApplicationController {
     public ResponseResult<PartyApplicationModel> addPartyApplication(
             @RequestBody PartyApplicationModel application,
             @CurrentUser Map<String, Object> currentUser) {
-        if (!currentUserAccessService.isAdmin(currentUser)) {
-            application.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
-            application.setName((String) currentUser.get("username"));
+        if (currentUserAccessService.isAdmin(currentUser)) {
+            // 管理端录入：按学号指定目标学生，姓名以学生档案为准，不信任请求体
+            fillStudentInfo(application, currentUserAccessService.requireAdminTarget(currentUser, application.getStudentId()));
+        } else {
+            // 学生本人提交：身份一律取本人档案
+            fillStudentInfo(application, studentRefService.current(currentUser));
             resetAudit(application);
         }
         PartyApplicationModel result = partyApplicationService.addPartyApplication(application);
@@ -45,11 +53,14 @@ public class PartyApplicationController {
                                                                         @CurrentUser Map<String, Object> currentUser) {
         PartyApplicationModel existing = partyApplicationService.getById(application.getId());
         if (existing != null) {
-            currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+            currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
         }
-        if (!currentUserAccessService.isAdmin(currentUser)) {
-            application.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
-            application.setName((String) currentUser.get("username"));
+        if (currentUserAccessService.isAdmin(currentUser)) {
+            // 管理端维护：按学号指定目标学生，姓名以学生档案为准，不信任请求体
+            fillStudentInfo(application, currentUserAccessService.requireAdminTarget(currentUser, application.getStudentId()));
+        } else {
+            // 学生本人维护：身份一律取本人档案
+            fillStudentInfo(application, studentRefService.current(currentUser));
             resetAudit(application);
         }
         PartyApplicationModel result = partyApplicationService.updatePartyApplication(application);
@@ -62,18 +73,18 @@ public class PartyApplicationController {
                                                          @CurrentUser Map<String, Object> currentUser) {
         PartyApplicationModel existing = partyApplicationService.getById(id);
         if (existing != null) {
-            currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+            currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
         }
         partyApplicationService.deletePartyApplication(id);
         return ResponseResult.success("删除成功");
     }
 
-    @Operation(summary = "根据学号获取申请入党信息")
-    @GetMapping("/student/{studentId}")
-    public ResponseResult<PartyApplicationModel> getByStudentId(@PathVariable String studentId,
-                                                                @CurrentUser Map<String, Object> currentUser) {
-        currentUserAccessService.requireStudentAccess(currentUser, studentId);
-        PartyApplicationModel result = partyApplicationService.getByStudentId(studentId);
+    @Operation(summary = "根据学生账号获取申请入党信息")
+    @GetMapping("/student/{studentAccountId}")
+    public ResponseResult<PartyApplicationModel> getByStudentAccountId(@PathVariable String studentAccountId,
+                                                                       @CurrentUser Map<String, Object> currentUser) {
+        currentUserAccessService.requireStudentRecord(currentUser, studentAccountId);
+        PartyApplicationModel result = partyApplicationService.getByStudentAccountId(studentAccountId);
         return ResponseResult.success(result);
     }
 
@@ -83,7 +94,7 @@ public class PartyApplicationController {
                                                          @CurrentUser Map<String, Object> currentUser) {
         PartyApplicationModel result = partyApplicationService.getById(id);
         if (result != null) {
-            currentUserAccessService.requireStudentAccess(currentUser, result.getStudentId());
+            currentUserAccessService.requireStudentRecord(currentUser, result.getStudentAccountId());
         }
         return ResponseResult.success(result);
     }
@@ -108,7 +119,7 @@ public class PartyApplicationController {
             @PathVariable String id,
             @RequestBody Map<String, String> auditData,
             @CurrentUser Map<String, Object> currentUser) {
-        String auditorId = (String) currentUser.get("userId");
+        String auditorId = currentUserAccessService.requireUserId(currentUser);
         String auditStatus = auditData.get("auditStatus");
         String auditComment = auditData.get("auditComment");
         
@@ -141,5 +152,12 @@ public class PartyApplicationController {
         application.setAuditComment(null);
         application.setAuditorId(null);
         application.setAuditTime(null);
+    }
+
+    /** 写入学生标识：studentAccountId 是关联键，studentId（学号）与姓名仅展示。 */
+    private void fillStudentInfo(PartyApplicationModel application, StudentRef ref) {
+        application.setStudentAccountId(ref.getAccountId());
+        application.setStudentId(ref.getStudentId());
+        application.setName(ref.getName());
     }
 }

@@ -8,9 +8,11 @@ import java.util.List;
 
 @Repository
 public interface ProjectRepository extends MongoRepository<ProjectModel, String> {
-    List<ProjectModel> findByStudentId(String studentId);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。本接口不提供 findByStudentId 这类歧义命名。 */
+    List<ProjectModel> findByStudentAccountId(String studentAccountId);
     List<ProjectModel> findByAuditStatus(String auditStatus);
-    List<ProjectModel> findByStudentIdAndAuditStatus(String studentId, String auditStatus);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。本接口不提供 findByStudentId 这类歧义命名。 */
+    List<ProjectModel> findByStudentAccountIdAndAuditStatus(String studentAccountId, String auditStatus);
 
     long countByAuditStatus(String auditStatus);
 }

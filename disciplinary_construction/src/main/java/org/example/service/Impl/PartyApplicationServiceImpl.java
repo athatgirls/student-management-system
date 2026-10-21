@@ -1,5 +1,6 @@
 package org.example.service.Impl;
 
+import org.example.dto.StudentRef;
 import org.example.model.PartyApplicationModel;
 import org.example.model.StudentModel;
 import org.example.repository.PartyApplicationRepository;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class PartyApplicationServiceImpl implements PartyApplicationService {
@@ -44,8 +46,8 @@ public class PartyApplicationServiceImpl implements PartyApplicationService {
     }
 
     @Override
-    public PartyApplicationModel getByStudentId(String studentId) {
-        return repository.findByStudentId(studentId).orElse(null);
+    public PartyApplicationModel getByStudentAccountId(String studentAccountId) {
+        return repository.findByStudentAccountId(studentAccountId).orElse(null);
     }
 
     @Override
@@ -79,7 +81,10 @@ public class PartyApplicationServiceImpl implements PartyApplicationService {
 
     @Override
     public List<PartyApplicationModel> searchPartyApplications(String keyword) {
-        List<PartyApplicationModel> byStudentId = repository.findByStudentIdContaining(keyword);
+        // 学号只是展示字段，按学号检索属于展示匹配，不走关联键
+        List<PartyApplicationModel> byStudentId = repository.findAll().stream()
+                .filter(application -> application.getStudentId() != null && application.getStudentId().contains(keyword))
+                .collect(Collectors.toList());
         List<PartyApplicationModel> byName = repository.findByNameContaining(keyword);
         byStudentId.addAll(byName);
         return byStudentId;
@@ -95,25 +100,10 @@ public class PartyApplicationServiceImpl implements PartyApplicationService {
             String studentId = studentData.get("studentId");
             String name = studentData.get("name");
             
-            // 查找学生
+            // 按学号匹配学生（导入匹配），姓名不参与匹配
             StudentModel foundStudent = null;
             if (studentId != null && !studentId.trim().isEmpty()) {
                 foundStudent = studentRepository.findByStudentId(studentId.trim());
-            }
-            
-            // 如果通过学号找不到，尝试通过姓名查找
-            if (foundStudent == null && name != null && !name.trim().isEmpty()) {
-                List<StudentModel> studentsByName = studentRepository.findByName(name.trim());
-                if (studentsByName != null && !studentsByName.isEmpty()) {
-                    if (studentId != null && !studentId.trim().isEmpty()) {
-                        foundStudent = studentsByName.stream()
-                                .filter(s -> studentId.trim().equals(s.getStudentId()))
-                                .findFirst()
-                                .orElse(studentsByName.get(0));
-                    } else {
-                        foundStudent = studentsByName.get(0);
-                    }
-                }
             }
             
             if (foundStudent == null) {
@@ -125,8 +115,11 @@ public class PartyApplicationServiceImpl implements PartyApplicationService {
                 continue;
             }
             
-            // 检查是否已经存在入党申请记录
-            Optional<PartyApplicationModel> existingApplication = repository.findByStudentId(foundStudent.getStudentId());
+            // 学生身份：账号主键是关联键，学号仅展示
+            StudentRef ref = new StudentRef(foundStudent.getId(), foundStudent.getStudentId(), foundStudent.getName());
+            
+            // 检查是否已经存在入党申请记录（按学生关联键查询）
+            Optional<PartyApplicationModel> existingApplication = repository.findByStudentAccountId(ref.getAccountId());
             if (existingApplication.isPresent()) {
                 // 如果已存在，更新阶段
                 PartyApplicationModel application = existingApplication.get();
@@ -137,8 +130,8 @@ public class PartyApplicationServiceImpl implements PartyApplicationService {
                 }
                 
                 Map<String, Object> matched = new HashMap<>();
-                matched.put("name", foundStudent.getName());
-                matched.put("studentId", foundStudent.getStudentId());
+                matched.put("name", ref.getName());
+                matched.put("studentId", ref.getStudentId());
                 matched.put("action", "已更新");
                 matchedResults.add(matched);
                 continue;
@@ -146,8 +139,9 @@ public class PartyApplicationServiceImpl implements PartyApplicationService {
             
             // 创建新的入党申请记录
             PartyApplicationModel application = new PartyApplicationModel();
-            application.setStudentId(foundStudent.getStudentId());
-            application.setName(foundStudent.getName());
+            application.setStudentAccountId(ref.getAccountId());
+            application.setStudentId(ref.getStudentId());
+            application.setName(ref.getName());
             application.setCurrentStage(currentStage != null && !currentStage.isEmpty() ? currentStage : "提交申请书");
             application.setCreateTime(LocalDateTime.now());
             application.setUpdateTime(LocalDateTime.now());
@@ -164,8 +158,8 @@ public class PartyApplicationServiceImpl implements PartyApplicationService {
             repository.save(application);
             
             Map<String, Object> matched = new HashMap<>();
-            matched.put("name", foundStudent.getName());
-            matched.put("studentId", foundStudent.getStudentId());
+            matched.put("name", ref.getName());
+            matched.put("studentId", ref.getStudentId());
             matched.put("action", "已创建");
             matchedResults.add(matched);
         }

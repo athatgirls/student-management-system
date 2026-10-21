@@ -36,8 +36,8 @@ public class ThoughtReportServiceImpl implements ThoughtReportService {
     }
 
     @Override
-    public List<ThoughtReportModel> getStudentThoughtReports(String studentId) {
-        return thoughtReportRepository.findByStudentId(studentId);
+    public List<ThoughtReportModel> getStudentThoughtReports(String studentAccountId) {
+        return thoughtReportRepository.findByStudentAccountId(studentAccountId);
     }
 
     @Override

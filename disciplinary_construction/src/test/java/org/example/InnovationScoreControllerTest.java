@@ -42,7 +42,7 @@ class InnovationScoreControllerTest {
         ReflectionTestUtils.setField(controller, "competitionService", service);
         ReflectionTestUtils.setField(controller, "currentUserAccessService", access());
         CompetitionModel stored = new CompetitionModel();
-        stored.setId("1"); stored.setStudentId("1001"); stored.setScore(new BigDecimal("8"));
+        stored.setId("1"); stored.setStudentAccountId("db-1"); stored.setStudentId("1001"); stored.setScore(new BigDecimal("8"));
         when(service.getCompetitionById("1")).thenReturn(stored);
         when(service.saveCompetition(any())).thenAnswer(call -> call.getArgument(0));
         when(service.updateCompetition(any())).thenAnswer(call -> call.getArgument(0));
@@ -72,7 +72,7 @@ class InnovationScoreControllerTest {
         ReflectionTestUtils.setField(controller, "patentService", service);
         ReflectionTestUtils.setField(controller, "currentUserAccessService", access());
         PatentModel stored = new PatentModel();
-        stored.setId("1"); stored.setStudentId("1001"); stored.setScore(new BigDecimal("8"));
+        stored.setId("1"); stored.setStudentAccountId("db-1"); stored.setStudentId("1001"); stored.setScore(new BigDecimal("8"));
         when(service.getPatentById("1")).thenReturn(stored);
         when(service.savePatent(any())).thenAnswer(call -> call.getArgument(0));
         PatentController.ScoreUpdate score = new PatentController.ScoreUpdate();
@@ -95,7 +95,7 @@ class InnovationScoreControllerTest {
         ReflectionTestUtils.setField(controller, "projectService", service);
         ReflectionTestUtils.setField(controller, "currentUserAccessService", access());
         ProjectModel stored = new ProjectModel();
-        stored.setId("1"); stored.setStudentId("1001"); stored.setScore(new BigDecimal("8"));
+        stored.setId("1"); stored.setStudentAccountId("db-1"); stored.setStudentId("1001"); stored.setScore(new BigDecimal("8"));
         when(service.getProjectById("1")).thenReturn(stored);
         when(service.saveProject(any())).thenAnswer(call -> call.getArgument(0));
         ProjectModel edit = new ProjectModel();

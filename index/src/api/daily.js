@@ -31,11 +31,11 @@ function normalize(moduleKey, form) {
 }
 
 // 列表（支持搜索/状态/分页）
-export function listItems(moduleKey, { studentId, keyword, status, page = 1, size = 10 } = {}) {
+export function listItems(moduleKey, { studentAccountId, keyword, status, page = 1, size = 10 } = {}) {
     const url = `/${URL[moduleKey]}/list`
     const params = {
-        // honor 用 userId，另外两个用 studentId
-        ...(moduleKey === 'honor' ? { userId: studentId } : { studentId }),
+        // 学生关联键：账号主键（三个模块统一用 studentAccountId）
+        studentAccountId,
         keyword,
         status,
         page,
@@ -75,8 +75,8 @@ export function auditItem(moduleKey, data) {
 }
 
 // 统计卡片
-export function getStudentStats(studentId) {
-    return request.get('/api/student-stats', { params: { studentId } }) // -> {data:{...}}
+export function getStudentStats(studentAccountId) {
+    return request.get('/api/student-stats', { params: { studentAccountId } }) // -> {data:{...}}
 }
 
 /** ========= 日常任务相关 (Admin/Student) ========= */
@@ -148,6 +148,7 @@ export function exportTaskCompletionAnalysis(grade) {
 }
 
 // 获取学生未完成的任务列表 (Admin)
+// 管理端按学号指定目标学生（studentId=学号，后端内部解析为账号）
 export function getStudentIncompleteTasks(studentId) {
     return request.get(`/daily-tasks/student-incomplete-tasks/${studentId}`)
 }

@@ -9,15 +9,16 @@ public interface ProjectService {
     ProjectModel addProject(ProjectModel project);
     ProjectModel updateProject(ProjectModel project);
     void deleteProject(String id);
-    List<ProjectModel> getStudentProjects(String studentId);
+    /** 参数是学生关联键（账号主键），约定见 {@link org.example.dto.StudentRef}。 */
+    List<ProjectModel> getStudentProjects(String studentAccountId);
 
     // 管理员操作
     List<ProjectModel> getPendingProjects();
     ProjectModel auditProject(String id, String auditStatus, String auditComment, String auditorId);
     List<ProjectModel> getAllProjects();
 
-    // 兼容方法
-    List<ProjectModel> getProjectsByStudentId(String studentId);
+    // 兼容方法（参数是学生关联键：账号主键）
+    List<ProjectModel> getProjectsByStudentAccountId(String studentAccountId);
     ProjectModel saveProject(ProjectModel project);
     void deleteProject(Long id);
     ProjectModel getProjectById(Long id);

@@ -9,7 +9,8 @@ public interface PaperService {
     PaperModel addPaper(PaperModel paper);
     PaperModel updatePaper(PaperModel paper);
     void deletePaper(String id);
-    List<PaperModel> getStudentPapers(String studentId);
+    /** 参数是学生关联键（账号主键），约定见 {@link org.example.dto.StudentRef}。 */
+    List<PaperModel> getStudentPapers(String studentAccountId);
 
     // 管理员操作
     List<PaperModel> getPendingPapers();
@@ -19,8 +20,8 @@ public interface PaperService {
     // 基础查询方法
     PaperModel getPaperById(String id);
 
-     // 兼容方法
-    List<PaperModel> getPapersByStudentId(String studentId);
+     // 兼容方法（参数是学生关联键：账号主键）
+    List<PaperModel> getPapersByStudentAccountId(String studentAccountId);
     PaperModel savePaper(PaperModel paper);
     void deletePaper(Long id);
     PaperModel getPaperById(Long id);
