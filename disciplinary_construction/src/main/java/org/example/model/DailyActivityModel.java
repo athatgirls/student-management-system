@@ -17,9 +17,12 @@ public class DailyActivityModel {
     private String id;
 
     // 学生基本信息
-    private String studentId;       // 学生ID（MongoDB的_id）
-    private String studentNumber;   // 学号（用于显示，不存储到数据库）
-    private String studentName;     // 学生姓名
+    /** 学生关联键：账号 Mongo 主键（见 {@link org.example.dto.StudentRef}）。禁止存学号。 */
+    private String studentAccountId;
+    /** 学号，仅用于展示和导入匹配，禁止用于关联查询。 */
+    private String studentId;
+    /** 学生姓名，仅用于展示。 */
+    private String studentName;
 
     // 活动基础信息
     private String activityType;    // 活动类型（lecture=讲座，conference=会议，competition=竞赛，honor=荣誉）

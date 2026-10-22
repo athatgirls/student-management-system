@@ -38,8 +38,8 @@ public class PaperServiceImpl implements PaperService {
     }
 
     @Override
-    public List<PaperModel> getStudentPapers(String studentId) {
-        return paperRepository.findByStudentId(studentId);
+    public List<PaperModel> getStudentPapers(String studentAccountId) {
+        return paperRepository.findByStudentAccountId(studentAccountId);
     }
 
     @Override
@@ -71,8 +71,8 @@ public class PaperServiceImpl implements PaperService {
     }
 
     @Override
-    public List<PaperModel> getPapersByStudentId(String studentId) {
-        return getStudentPapers(studentId); 
+    public List<PaperModel> getPapersByStudentAccountId(String studentAccountId) {
+        return getStudentPapers(studentAccountId); 
     }
     
     @Override

@@ -2,9 +2,11 @@ package org.example.controller;
 
 
 import org.example.annotation.CurrentUser;
+import org.example.dto.StudentRef;
 import org.example.model.CompetitionModel;
 import org.example.service.CompetitionService;
 import org.example.service.CurrentUserAccessService;
+import org.example.service.StudentRefService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,18 +26,21 @@ public class CompetitionController {
     @Autowired
     private CurrentUserAccessService currentUserAccessService;
 
+    @Autowired
+    private StudentRefService studentRefService;
+
 
     // ==================== 学生端接口 ====================
 
     /**
      * 获取学生的竞赛数据
      */
-    @GetMapping("/student/{studentId}")
-    public ResponseEntity<?> getStudentCompetitions(@PathVariable String studentId,
+    @GetMapping("/student/{studentAccountId}")
+    public ResponseEntity<?> getStudentCompetitions(@PathVariable String studentAccountId,
                                                      @CurrentUser Map<String, Object> currentUser) {
-        currentUserAccessService.requireStudentAccess(currentUser, studentId);
+        currentUserAccessService.requireStudentRecord(currentUser, studentAccountId);
         try {
-            List<CompetitionModel> competitions = competitionService.getStudentCompetitions(studentId);
+            List<CompetitionModel> competitions = competitionService.getStudentCompetitions(studentAccountId);
             return ResponseEntity.ok(competitions);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("获取竞赛数据失败: " + e.getMessage());
@@ -48,8 +53,12 @@ public class CompetitionController {
     @PostMapping
     public ResponseEntity<?> addCompetition(@RequestBody CompetitionModel competition,
                                             @CurrentUser Map<String, Object> currentUser) {
-        competition.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
-        competition.setStudentName((String) currentUser.get("username"));
+        StudentRef ref = studentRefService.current(currentUser);
+        if (ref.getStudentId() == null || ref.getStudentId().isBlank())
+            throw new AccessDeniedException("当前学生账号缺少学号");
+        competition.setStudentAccountId(ref.getAccountId());
+        competition.setStudentId(ref.getStudentId());
+        competition.setStudentName(ref.getName());
         competition.setScore(null);
         competition.setScorePending(false);
         competition.setPreviousScore(null);
@@ -74,9 +83,10 @@ public class CompetitionController {
         if (existing == null) {
             return ResponseEntity.notFound().build();
         }
-        currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+        currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
         try {
             competition.setId(id);
+            competition.setStudentAccountId(existing.getStudentAccountId());
             competition.setStudentId(existing.getStudentId());
             competition.setStudentName(existing.getStudentName());
             org.example.util.SubmissionValidation.validate(competition);
@@ -109,7 +119,7 @@ public class CompetitionController {
         if (existing == null) {
             return ResponseEntity.notFound().build();
         }
-        currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+        currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
         try {
             competitionService.deleteCompetition(id);
             return ResponseEntity.ok("删除成功");
@@ -128,7 +138,7 @@ public class CompetitionController {
             if (competition == null) {
                 return ResponseEntity.badRequest().body("竞赛不存在");
             }
-            currentUserAccessService.requireStudentAccess(currentUser, competition.getStudentId());
+            currentUserAccessService.requireStudentRecord(currentUser, competition.getStudentAccountId());
             return ResponseEntity.ok(competition);
         } catch (org.springframework.security.access.AccessDeniedException e) {
             throw e;

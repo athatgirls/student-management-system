@@ -72,7 +72,7 @@ class StudentOverviewServiceTest {
         when(students.findById("db-a")).thenReturn(Optional.of(own));
         MongoTemplate mongo = mock(MongoTemplate.class);
         DailyTaskSubmissionModel submission = new DailyTaskSubmissionModel();
-        submission.setId("submission-a"); submission.setTaskId("task-a"); submission.setStudentId("db-a");
+        submission.setId("submission-a"); submission.setTaskId("task-a"); submission.setStudentAccountId("db-a"); submission.setStudentId("1001");
         submission.setAttachments("[{\"url\":\"/SCSE@hbut/uploads/task-proof.pdf\",\"name\":\"任务证明.pdf\"}]");
         DailyTaskModel task = new DailyTaskModel(); task.setId("task-a"); task.setTitle("活动任务");
         when(mongo.find(any(Query.class), any(Class.class))).thenAnswer(invocation -> {
@@ -133,13 +133,9 @@ class StudentOverviewServiceTest {
         MongoTemplate mongo = mock(MongoTemplate.class);
         when(mongo.find(any(Query.class), any(Class.class))).thenAnswer(invocation -> {
             String query = ((Query) invocation.getArgument(0)).getQueryObject().toJson();
+            // 统一后所有业务记录只按 studentAccountId（账号主键）查询，不混入学号（见 StudentRef 约定）
             assertTrue(query.contains("db-a")); assertFalse(query.contains("db-b"));
-            Class<?> type = invocation.getArgument(1);
-            if (type == org.example.model.AppointmentModel.class || type == org.example.model.DailyTaskSubmissionModel.class) assertFalse(query.contains("1001"));
-            else assertTrue(query.contains("1001"));
-            if (type == org.example.model.StudyRecordModel.class) {
-                assertTrue(query.contains("$and")); assertTrue(query.contains("\"studentDbId\": null"));
-            }
+            assertFalse(query.contains("1001"));
             return Collections.emptyList();
         });
         Map<String, Object> result = new StudentOverviewService(mongo, students, new CurrentUserAccessService(students), new ObjectMapper())
@@ -155,7 +151,7 @@ class StudentOverviewServiceTest {
         when(students.findById("db-a")).thenReturn(Optional.of(own));
         MongoTemplate mongo = mock(MongoTemplate.class);
         org.example.model.DailyTaskSubmissionModel submission = new org.example.model.DailyTaskSubmissionModel();
-        submission.setId("submission-a"); submission.setTaskId("task-a"); submission.setStudentId("db-a"); submission.setStatus("completed");
+        submission.setId("submission-a"); submission.setTaskId("task-a"); submission.setStudentAccountId("db-a"); submission.setStudentId("1001"); submission.setStatus("completed");
         submission.setContent("{\"学习心得\":\"讲座内容\",\"证明\":\"[{\\\"url\\\":\\\"/SCSE@hbut/uploads/proof.pdf\\\"}]\"}");
         org.example.model.DailyTaskModel task = new org.example.model.DailyTaskModel(); task.setId("task-a"); task.setTitle("学术讲座"); task.setActivityCategory("academic");
         when(mongo.find(any(Query.class), any(Class.class))).thenAnswer(invocation -> {
@@ -179,22 +175,22 @@ class StudentOverviewServiceTest {
         when(students.findById("db-a")).thenReturn(Optional.of(own));
         MongoTemplate mongo = mock(MongoTemplate.class);
         org.example.model.DailyTaskSubmissionModel submission = new org.example.model.DailyTaskSubmissionModel();
-        submission.setId("submission-a"); submission.setTaskId("task-a"); submission.setStudentId("db-a");
+        submission.setId("submission-a"); submission.setTaskId("task-a"); submission.setStudentAccountId("db-a"); submission.setStudentId("1001");
         submission.setStatus("completed"); // Registration alone already uses this status.
         submission.setContent("{\"报名理由\":\"参加讲座\"}");
         org.example.model.DailyTaskModel task = new org.example.model.DailyTaskModel();
         task.setId("task-a"); task.setTitle("讲座"); task.setTaskCategory("registration"); task.setActivityCategory("academic");
         org.example.model.ActivityModel activity = new org.example.model.ActivityModel();
-        activity.setId("activity-a"); activity.setTaskId("task-a"); activity.setParticipantStudentIds(List.of("db-a"));
+        activity.setId("activity-a"); activity.setTaskId("task-a"); activity.setParticipantStudentAccountIds(List.of("db-a"));
         when(mongo.find(any(Query.class), any(Class.class))).thenAnswer(invocation -> {
             Class<?> type = invocation.getArgument(1);
             if (type == org.example.model.DailyTaskSubmissionModel.class) return List.of(submission);
             if (type == org.example.model.DailyTaskModel.class) return List.of(task);
             if (type == org.example.model.ActivityModel.class) {
                 String query = ((Query) invocation.getArgument(0)).getQueryObject().toJson();
-                assertTrue(query.contains("participantStudentIds"));
+                assertTrue(query.contains("participantStudentAccountIds"));
                 assertTrue(query.contains("db-a"));
-                return activity.getParticipantStudentIds().contains("db-a") ? List.of(activity) : Collections.emptyList();
+                return activity.getParticipantStudentAccountIds().contains("db-a") ? List.of(activity) : Collections.emptyList();
             }
             return Collections.emptyList();
         });
@@ -204,7 +200,7 @@ class StudentOverviewServiceTest {
         Map<?, ?> attended = (Map<?, ?>) ((List<?>) service.overview(null, null, null, null, null, 1, 10, user).get("students")).get(0);
         assertEquals("已完成", ((Map<?, ?>) ((List<?>) attended.get("academic")).get(0)).get("status"));
 
-        activity.setParticipantStudentIds(Collections.emptyList());
+        activity.setParticipantStudentAccountIds(Collections.emptyList());
         Map<?, ?> registered = (Map<?, ?>) ((List<?>) service.overview(null, null, null, null, null, 1, 10, user).get("students")).get(0);
         assertEquals("已报名", ((Map<?, ?>) ((List<?>) registered.get("academic")).get(0)).get("status"));
     }

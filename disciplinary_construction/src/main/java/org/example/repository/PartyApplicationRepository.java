@@ -9,11 +9,13 @@ import java.util.Optional;
 
 @Repository
 public interface PartyApplicationRepository extends MongoRepository<PartyApplicationModel, String> {
-    Optional<PartyApplicationModel> findByStudentId(String studentId);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。本接口不提供 findByStudentId 这类歧义命名。 */
+    Optional<PartyApplicationModel> findByStudentAccountId(String studentAccountId);
     List<PartyApplicationModel> findByCurrentStage(String currentStage);
     List<PartyApplicationModel> findByAuditStatus(String auditStatus);
     List<PartyApplicationModel> findByBranch(String branch);
-    List<PartyApplicationModel> findByStudentIdContaining(String studentId);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。本接口不提供 findByStudentId 这类歧义命名。 */
+    List<PartyApplicationModel> findByStudentAccountIdContaining(String studentAccountId);
     List<PartyApplicationModel> findByNameContaining(String name);
 }
 

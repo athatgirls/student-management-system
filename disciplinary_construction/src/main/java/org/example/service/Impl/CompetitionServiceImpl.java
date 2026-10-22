@@ -38,8 +38,8 @@ public class CompetitionServiceImpl implements CompetitionService {
     }
 
     @Override
-    public List<CompetitionModel> getStudentCompetitions(String studentId) {
-        return competitionRepository.findByStudentId(studentId);
+    public List<CompetitionModel> getStudentCompetitions(String studentAccountId) {
+        return competitionRepository.findByStudentAccountId(studentAccountId);
     }
 
     @Override
@@ -73,8 +73,8 @@ public class CompetitionServiceImpl implements CompetitionService {
 
 
     @Override
-    public List<CompetitionModel> getCompetitionsByStudentId(String studentId) {
-        return getStudentCompetitions(studentId); // 直接调用已有方法
+    public List<CompetitionModel> getCompetitionsByStudentAccountId(String studentAccountId) {
+        return getStudentCompetitions(studentAccountId); // 直接调用已有方法
     }
 
     @Override

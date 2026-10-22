@@ -114,7 +114,7 @@ public class StudentServiceImpl implements StudentService {
             
             // 如果信息不完整，则删除之前的自动完成记录（撤销完成状态）
             dailyTaskRepository.findByTitle(taskTitle).ifPresent(t -> {
-                dailyTaskSubmissionRepository.findByTaskIdAndStudentId(t.getId(), student.getId()).ifPresent(submission -> {
+                dailyTaskSubmissionRepository.findByTaskIdAndStudentAccountId(t.getId(), student.getId()).ifPresent(submission -> {
                     // 只删除系统自动确认的记录，防止误删学生自己填写的
                     if ("系统自动确认：个人信息已在个人中心完善。".equals(submission.getContent())) {
                         dailyTaskSubmissionRepository.delete(submission);
@@ -133,10 +133,11 @@ public class StudentServiceImpl implements StudentService {
         if (taskOpt.isPresent()) {
             String taskId = taskOpt.get().getId();
             // 如果还没提交过该任务的完成记录，则自动创建一个
-            if (!dailyTaskSubmissionRepository.findByTaskIdAndStudentId(taskId, student.getId()).isPresent()) {
+            if (!dailyTaskSubmissionRepository.findByTaskIdAndStudentAccountId(taskId, student.getId()).isPresent()) {
                 DailyTaskSubmissionModel submission = new DailyTaskSubmissionModel();
                 submission.setTaskId(taskId);
-                submission.setStudentId(student.getId());
+                submission.setStudentAccountId(student.getId());
+                submission.setStudentId(student.getStudentId());
                 submission.setStudentName(student.getName());
                 submission.setContent("系统自动确认：个人信息已在个人中心完善。");
                 submission.setSubmissionTime(java.time.LocalDateTime.now());

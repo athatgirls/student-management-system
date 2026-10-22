@@ -33,12 +33,12 @@ public class PaperController {
 
     // ==================== 学生端接口 ====================
 
-    @GetMapping("/student/{studentId}")
-    public ResponseEntity<?> getStudentPapers(@PathVariable String studentId,
+    @GetMapping("/student/{studentAccountId}")
+    public ResponseEntity<?> getStudentPapers(@PathVariable String studentAccountId,
                                               @CurrentUser Map<String, Object> currentUser) {
-        currentUserAccessService.requireStudentAccess(currentUser, studentId);
+        currentUserAccessService.requireStudentRecord(currentUser, studentAccountId);
         try {
-            List<PaperModel> papers = paperService.getPapersByStudentId(studentId);
+            List<PaperModel> papers = paperService.getPapersByStudentAccountId(studentAccountId);
             return ResponseEntity.ok(papers);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("获取论文数据失败: " + e.getMessage());
@@ -51,6 +51,7 @@ public class PaperController {
         StudentModel student = currentUserAccessService.requireCurrentStudent(currentUser);
         if (student.getStudentId() == null || student.getStudentId().isBlank())
             throw new AccessDeniedException("当前学生账号缺少学号");
+        paper.setStudentAccountId(student.getId());
         paper.setStudentId(student.getStudentId());
         paper.setStudentName(student.getName());
         paper.setScoreRatio(null);
@@ -78,9 +79,10 @@ public class PaperController {
         if (existing == null) {
             return ResponseEntity.notFound().build();
         }
-        currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+        currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
         try {
             paper.setId(id);
+            paper.setStudentAccountId(existing.getStudentAccountId());
             paper.setStudentId(existing.getStudentId());
             paper.setStudentName(existing.getStudentName() == null || existing.getStudentName().isBlank()
                     ? currentUserAccessService.requireCurrentStudent(currentUser).getName() : existing.getStudentName());
@@ -123,7 +125,7 @@ public class PaperController {
         if (existing == null) {
             return ResponseEntity.notFound().build();
         }
-        currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+        currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
         try {
             paperService.deletePaper(id);
             return ResponseEntity.ok("删除成功");
@@ -141,7 +143,7 @@ public class PaperController {
             if (paper == null) {
                 return ResponseEntity.badRequest().body("论文不存在");
             }
-            currentUserAccessService.requireStudentAccess(currentUser, paper.getStudentId());
+            currentUserAccessService.requireStudentRecord(currentUser, paper.getStudentAccountId());
             return ResponseEntity.ok(paper);
         } catch (org.springframework.security.access.AccessDeniedException e) {
             throw e;

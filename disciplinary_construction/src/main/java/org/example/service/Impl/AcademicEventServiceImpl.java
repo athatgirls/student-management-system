@@ -31,8 +31,8 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     }
 
     @Override
-    public List<AcademicEventModel> findByStudentId(String studentId) {
-        return repository.findByStudentId(studentId);
+    public List<AcademicEventModel> findByStudentAccountId(String studentAccountId) {
+        return repository.findByStudentAccountId(studentAccountId);
     }
 
     @Override

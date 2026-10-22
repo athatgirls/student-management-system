@@ -31,15 +31,15 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
             throw new IllegalArgumentException("请假开始日期不能早于今天");
         org.example.util.SubmissionValidation.dates(leaveRequest.getStartDate(), leaveRequest.getEndDate());
         leaveRequest.setId(null);
-        // 必须提供studentId（学号），自动从学生表获取所有信息
-        if (leaveRequest.getStudentId() == null || leaveRequest.getStudentId().isEmpty()) {
-            throw new RuntimeException("学号不能为空");
+        // 必须提供studentAccountId（账号主键关联键），其余学生信息自动从学生表获取
+        if (leaveRequest.getStudentAccountId() == null || leaveRequest.getStudentAccountId().isEmpty()) {
+            throw new RuntimeException("学生身份信息缺失");
         }
         
-        // 根据学号查找学生（注意：这里studentId是学号，不是MongoDB的_id）
-        StudentModel student = studentService.findByStudentId(leaveRequest.getStudentId());
+        // 按账号主键查找学生（studentAccountId=账号主键，学号仅用于展示）
+        StudentModel student = studentService.findById(leaveRequest.getStudentAccountId());
         if (student == null) {
-            throw new RuntimeException("未找到该学号对应的学生信息");
+            throw new RuntimeException("未找到该学生信息");
         }
         
         // 检查必需信息是否完整
@@ -66,6 +66,7 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
         }
         
         // 自动填充所有学生信息
+        leaveRequest.setStudentId(student.getStudentId());
         leaveRequest.setStudentName(student.getName());
         leaveRequest.setGrade(student.getGrade());
         leaveRequest.setMajor(student.getMajor());
@@ -92,8 +93,8 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
     }
     
     @Override
-    public List<LeaveRequestModel> findByStudentId(String studentId) {
-        return leaveRequestRepository.findByStudentId(studentId);
+    public List<LeaveRequestModel> findByStudentAccountId(String studentAccountId) {
+        return leaveRequestRepository.findByStudentAccountId(studentAccountId);
     }
     
     @Override

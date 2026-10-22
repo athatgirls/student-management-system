@@ -17,9 +17,11 @@ public class VolunteerCompletionService {
         if (!"volunteer".equals(task.getActivityCategory())) return false;
         // Signing up alone is not completion: registration activities require attendance import.
         if (activity == null && "registration".equals(task.getTaskCategory())) return false;
+        // 稳定键中的学生标识是账号主键（studentAccountId），保证同一学生幂等，见 org.example.dto.StudentRef
         String id = "task:" + task.getId() + ":student:" + student.getId();
         LocalDateTime now = LocalDateTime.now();
-        Update update = new Update().setOnInsert("studentId", student.getStudentId())
+        Update update = new Update().setOnInsert("studentAccountId", student.getId())
+                .setOnInsert("studentId", student.getStudentId())
                 .setOnInsert("studentName", student.getName()).setOnInsert("serviceName", task.getTitle())
                 .setOnInsert("serviceDescription", task.getDescription()).setOnInsert("sourceTaskId", task.getId())
                 .setOnInsert("serviceType", "志愿活动").setOnInsert("createTime", now)

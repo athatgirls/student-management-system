@@ -3,6 +3,14 @@ package org.example.service;
 import org.example.model.StudentModel;
 import java.util.List;
 
+/**
+ * 学生数据管理：账号 CRUD、名单导入、学号/姓名/专业/年级检索等。
+ *
+ * <p>职责边界（勿混淆）：本服务只管「学生数据怎么存取」。需要学生身份
+ * （当前登录者是谁、业务记录挂到谁名下）时一律走 {@link StudentRefService}，
+ * 禁止把本服务查出的 {@link StudentModel#getStudentId()}（学号）当业务关联键使用。
+ * 标识约定见 {@link org.example.dto.StudentRef}。
+ */
 public interface StudentService {
     // 登录
     StudentModel login(String account, String password);
@@ -13,7 +21,7 @@ public interface StudentService {
     // 获取所有学生
     List<StudentModel> findAllStudents();
     
-    // 根据ID查找学生
+    // 根据ID（账号主键）查找学生；账号主键即业务关联键 studentAccountId
     StudentModel findById(String id);
     
     // 创建学生
@@ -25,7 +33,7 @@ public interface StudentService {
     // 删除学生
     boolean deleteStudent(String id);
     
-    // 根据学号查找学生
+    // 根据学号查找学生（学号仅用于展示/导入匹配/管理端指定目标，不得用于业务关联查询）
     StudentModel findByStudentId(String studentId);
     
     // 根据姓名查找学生

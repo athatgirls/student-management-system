@@ -23,12 +23,13 @@ public class StudentOverviewService {
         this.mongo = mongo; this.students = students; this.access = access; this.mapper = mapper;
     }
 
-    public Map<String, Object> overview(String studentId, String keyword, String grade, String studentIdKeyword, String major, int page, int size, Map<String, Object> user) {
+    public Map<String, Object> overview(String studentAccountId, String keyword, String grade, String studentIdKeyword, String major, int page, int size, Map<String, Object> user) {
         List<StudentModel> selected;
         if (!access.isAdmin(user)) {
             selected = List.of(access.requireCurrentStudent(user));
-        } else if (studentId != null && !studentId.isBlank()) {
-            StudentModel student = students.findById(studentId).orElseGet(() -> students.findByStudentId(studentId));
+        } else if (studentAccountId != null && !studentAccountId.isBlank()) {
+            // 学生标识统一为账号主键（见 org.example.dto.StudentRef），不做主键/学号双猜测
+            StudentModel student = students.findById(studentAccountId).orElse(null);
             if (student == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "学生不存在");
             selected = List.of(student);
         } else {
@@ -62,32 +63,23 @@ public class StudentOverviewService {
         result.put("supervisor", student.getSupervisor());
         // Keep the existing profile summary alongside independently maintained appointments.
         result.put("workStatus", student.getWorkStatus());
-        result.put("grades", records(StudyRecordModel.class, student, "studentDbId", "studentId"));
-        result.put("papers", records(PaperModel.class, student, "studentId"));
-        result.put("competitions", records(CompetitionModel.class, student, "studentId"));
-        result.put("patents", records(PatentModel.class, student, "studentId"));
-        result.put("projects", records(ProjectModel.class, student, "studentId"));
-        result.put("academic", records(AcademicEventModel.class, student, "studentId"));
-        result.put("daily", records(DailyActivityModel.class, student, "studentId"));
-        result.put("volunteer", records(VolunteerServiceModel.class, student, "studentId"));
-        result.put("honors", records(HonorModel.class, student, "userId"));
-        result.put("appointments", records(AppointmentModel.class, student, "studentDbId"));
+        result.put("grades", records(StudyRecordModel.class, student));
+        result.put("papers", records(PaperModel.class, student));
+        result.put("competitions", records(CompetitionModel.class, student));
+        result.put("patents", records(PatentModel.class, student));
+        result.put("projects", records(ProjectModel.class, student));
+        result.put("academic", records(AcademicEventModel.class, student));
+        result.put("daily", records(DailyActivityModel.class, student));
+        result.put("volunteer", records(VolunteerServiceModel.class, student));
+        result.put("honors", records(HonorModel.class, student));
+        result.put("appointments", records(AppointmentModel.class, student));
         addTaskActivities(result, student);
         return result;
     }
-    private <T> List<Map<String, Object>> records(Class<T> type, StudentModel student, String... fields) {
-        List<Criteria> alternatives = new ArrayList<>();
-        List<String> identifiers = new ArrayList<>();
-        if (student.getId() != null && !student.getId().isBlank()) identifiers.add(student.getId());
-        if (student.getStudentId() != null && !student.getStudentId().isBlank()) identifiers.add(student.getStudentId());
-        for (String field : fields) {
-            if (field.equals("studentDbId")) alternatives.add(Criteria.where(field).is(student.getId()));
-            else if (type == StudyRecordModel.class) alternatives.add(new Criteria().andOperator(
-                    new Criteria().orOperator(Criteria.where("studentDbId").is(null), Criteria.where("studentDbId").is("")),
-                    Criteria.where(field).in(identifiers)));
-            else alternatives.add(Criteria.where(field).in(identifiers));
-        }
-        return mongo.find(Query.query(new Criteria().orOperator(alternatives.toArray(new Criteria[0]))), type).stream()
+
+    /** 按学生关联键（账号主键）统一查询业务记录，约定见 {@link org.example.dto.StudentRef}。 */
+    private <T> List<Map<String, Object>> records(Class<T> type, StudentModel student) {
+        return mongo.find(Query.query(Criteria.where("studentAccountId").is(student.getId())), type).stream()
                 .map(record -> {
                     Map<String, Object> entry = mapper.convertValue(record, new TypeReference<Map<String, Object>>() { });
                     entry.put("studentId", student.getStudentId()); entry.put("studentName", student.getName());
@@ -98,7 +90,7 @@ public class StudentOverviewService {
 
     @SuppressWarnings("unchecked")
     private void addTaskActivities(Map<String, Object> result, StudentModel student) {
-        List<DailyTaskSubmissionModel> submissions = mongo.find(Query.query(Criteria.where("studentId").is(student.getId())), DailyTaskSubmissionModel.class);
+        List<DailyTaskSubmissionModel> submissions = mongo.find(Query.query(Criteria.where("studentAccountId").is(student.getId())), DailyTaskSubmissionModel.class);
         if (submissions.isEmpty()) return;
         Map<String, DailyTaskModel> tasks = mongo.find(Query.query(Criteria.where("_id").in(submissions.stream()
                 .map(DailyTaskSubmissionModel::getTaskId).collect(Collectors.toSet()))), DailyTaskModel.class).stream()
@@ -108,7 +100,7 @@ public class StudentOverviewService {
                 .map(DailyTaskModel::getId).collect(Collectors.toSet());
         Set<String> attendedTaskIds = registrationTaskIds.isEmpty() ? Collections.emptySet() :
                 mongo.find(Query.query(Criteria.where("taskId").in(registrationTaskIds)
-                        .and("participantStudentIds").is(student.getId())), ActivityModel.class).stream()
+                        .and("participantStudentAccountIds").is(student.getId())), ActivityModel.class).stream()
                         .map(ActivityModel::getTaskId).collect(Collectors.toSet());
         for (DailyTaskSubmissionModel submission : submissions) {
             DailyTaskModel task = tasks.get(submission.getTaskId());

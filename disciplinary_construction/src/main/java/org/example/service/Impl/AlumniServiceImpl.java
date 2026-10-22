@@ -39,12 +39,12 @@ public class AlumniServiceImpl implements AlumniService {
 
     @Override
     public void insertAlumni(AlumniModel alumniModel) {
-        StudentModel studentModel = studentRepository.findById(alumniModel.getStudentId()).orElse(null);
+        StudentModel studentModel = studentRepository.findById(alumniModel.getStudentAccountId()).orElse(null);
         if (studentModel == null) {
             throw new BusinessException(ResponseCode.STUDENT_NOT_FOUND);
         }
         //3.是否已经存在该学生信息
-        AlumniModel data = alumniRepository.findAlumniByStudentId(alumniModel.getStudentId());
+        AlumniModel data = alumniRepository.findByStudentAccountId(alumniModel.getStudentAccountId());
         if (data != null) {
             throw new BusinessException(ResponseCode.ALUMNI_EXISTS_ERROR);
         }
@@ -65,25 +65,26 @@ public class AlumniServiceImpl implements AlumniService {
             throw new BusinessException(ResponseCode.STUDENT_ID_NAME_ERROR);
         }
         //是否已经存在该学生信息
-        AlumniModel data = alumniRepository.findAlumniByStudentId(studentModel.getId());
+        AlumniModel data = alumniRepository.findByStudentAccountId(studentModel.getId());
         if (data != null) {
             throw new BusinessException(ResponseCode.ALUMNI_EXISTS_ERROR);
         }
         //进入数据库
         alumniModel.setId(null);
         alumniModel.setStudent(null);
-        alumniModel.setStudentId(studentModel.getId());
+        alumniModel.setStudentAccountId(studentModel.getId());
+        alumniModel.setStudentId(studentModel.getStudentId());
         alumniRepository.insert(alumniModel);
     }
 
     @Override
     public void updateAlumni(AlumniModel alumniModel) {
-        StudentModel studentModel = studentRepository.findById(alumniModel.getStudentId()).orElse(null);
+        StudentModel studentModel = studentRepository.findById(alumniModel.getStudentAccountId()).orElse(null);
         if (studentModel == null) {
             throw new BusinessException(ResponseCode.STUDENT_NOT_FOUND);
         }
         //3.是否已经存在该学生信息
-        AlumniModel data = alumniRepository.findAlumniByStudentId(alumniModel.getStudentId());
+        AlumniModel data = alumniRepository.findByStudentAccountId(alumniModel.getStudentAccountId());
         if (data == null) {
             throw new BusinessException(ResponseCode.ALUMNI_NOT_FOUND_ERROR);
         }
@@ -100,32 +101,33 @@ public class AlumniServiceImpl implements AlumniService {
             throw new BusinessException(ResponseCode.STUDENT_NOT_FOUND);
         }
         //是否已经存在该学生信息
-        AlumniModel data = alumniRepository.findAlumniByStudentId(studentModel.getId());
+        AlumniModel data = alumniRepository.findByStudentAccountId(studentModel.getId());
         if (data == null) {
             throw new BusinessException(ResponseCode.ALUMNI_NOT_FOUND_ERROR);
         }
         //进入数据库
         alumniModel.setId(data.getId());
         alumniModel.setStudent(null);
-        alumniModel.setStudentId(studentModel.getId());
+        alumniModel.setStudentAccountId(studentModel.getId());
+        alumniModel.setStudentId(studentModel.getStudentId());
         alumniRepository.save(alumniModel);
     }
 
     @Override
-    public AlumniModel findAlumniByStudentId(String studentId) {
-        return alumniRepository.findAlumniByStudentId(studentId);
+    public AlumniModel findByStudentAccountId(String studentAccountId) {
+        return alumniRepository.findByStudentAccountId(studentAccountId);
     }
 
     @Override
     public List<AlumniModel> searchAlumniList(String searchValue, Date searchYear, Integer currentPage, Integer pageSize, boolean isAdmin) {
-        // 把 Alumni 的 studentId (String) 转成 ObjectId，存到一个临时字段 studentIdObj
+        // 把 Alumni 的 studentAccountId (String) 转成 ObjectId，存到一个临时字段 studentAccountIdObj
         AggregationOperation convertId = context -> new Document("$addFields",
-                new Document("studentIdObj", new Document("$toObjectId", "$studentId"))
+                new Document("studentAccountIdObj", new Document("$toObjectId", "$studentAccountId"))
         );
 
         LookupOperation lookup = LookupOperation.newLookup()
                 .from("students")
-                .localField("studentIdObj")
+                .localField("studentAccountIdObj")
                 .foreignField("_id")
                 .as("student");
 
@@ -160,7 +162,8 @@ public class AlumniServiceImpl implements AlumniService {
         SkipOperation skipOp = Aggregation.skip((currentPage - 1) * pageSize);
         LimitOperation limitOp = Aggregation.limit(pageSize);
         // Never join identity-card/contact/password fields into a directory response.
-        AggregationOperation publicFields = context -> new Document("$project", new Document("studentId", 1)
+        AggregationOperation publicFields = context -> new Document("$project", new Document("studentAccountId", 1)
+                .append("studentId", 1)
                 .append("enrollmentDate", 1).append("graduationDate", 1).append("workLocation", 1)
                 .append("workField", 1).append("workPlace", 1).append("jobType", 1).append("isPublic", 1)
                 .append("student", new Document("name", "$student.name").append("studentId", "$student.studentId")
@@ -174,12 +177,12 @@ public class AlumniServiceImpl implements AlumniService {
     @Override
     public Integer getTotalCount(String searchValue, Date searchYear, boolean isAdmin) {
         AggregationOperation convertId = context -> new Document("$addFields",
-                new Document("studentIdObj", new Document("$toObjectId", "$studentId"))
+                new Document("studentAccountIdObj", new Document("$toObjectId", "$studentAccountId"))
         );
 
         LookupOperation lookup = LookupOperation.newLookup()
                 .from("students")
-                .localField("studentIdObj")
+                .localField("studentAccountIdObj")
                 .foreignField("_id")
                 .as("student");
 

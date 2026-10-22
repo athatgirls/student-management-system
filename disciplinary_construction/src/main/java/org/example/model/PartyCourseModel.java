@@ -21,8 +21,12 @@ public class PartyCourseModel {
     private String participants; // 参与人员
     private String status; // 课程状态
     private String remark; // 备注
-    private String studentId; // 学生ID
-    private String studentName; // 学生姓名
+    /** 学生关联键：账号 Mongo 主键（见 {@link org.example.dto.StudentRef}）。禁止存学号。 */
+    private String studentAccountId;
+    /** 学号，仅用于展示和导入匹配，禁止用于关联查询。 */
+    private String studentId;
+    /** 学生姓名，仅用于展示。 */
+    private String studentName;
     private LocalDateTime createTime; // 创建时间
     private LocalDateTime updateTime; // 更新时间
     private String auditStatus; // 审核状态

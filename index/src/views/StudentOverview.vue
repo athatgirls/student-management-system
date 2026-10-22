@@ -53,7 +53,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(student, index) in students" :key="student.id || student.studentId">
+          <tr v-for="(student, index) in students" :key="student.id">
             <td>{{ isAdmin ? (page - 1) * pageSize + index + 1 : index + 1 }}</td>
             <td v-for="field in studentFields" :key="field.key">{{ studentField(student, field.key) }}</td>
             <template v-for="group in groups" :key="group.key">
@@ -168,7 +168,7 @@ const detail = ref(null)
 const detailTitle = ref('详情')
 const gradeStudent = ref(null)
 const showGrades = student => { gradeStudent.value = student }
-const detailEntries = computed(() => Object.entries(detail.value || {}).filter(([key]) => !['id', 'studentDbId', 'userId', 'auditorId', 'attachments', 'evidenceUrl', 'attachmentUrl', 'submissionFields', 'overviewType'].includes(key) && !(key === 'content' && detail.value?.submissionFields)))
+const detailEntries = computed(() => Object.entries(detail.value || {}).filter(([key]) => !['id', 'studentAccountId', 'auditorId', 'attachments', 'evidenceUrl', 'attachmentUrl', 'submissionFields', 'overviewType'].includes(key) && !(key === 'content' && detail.value?.submissionFields)))
 const attachmentValue = value => {
   try {
     const files = typeof value === 'string' ? JSON.parse(value) : value

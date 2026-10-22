@@ -9,7 +9,8 @@ public interface CompetitionService {
     CompetitionModel addCompetition(CompetitionModel competition);
     CompetitionModel updateCompetition(CompetitionModel competition);
     void deleteCompetition(String id);
-    List<CompetitionModel> getStudentCompetitions(String studentId);
+    /** 参数是学生关联键（账号主键），约定见 {@link org.example.dto.StudentRef}。 */
+    List<CompetitionModel> getStudentCompetitions(String studentAccountId);
 
     // 管理员操作
     List<CompetitionModel> getPendingCompetitions();
@@ -19,8 +20,8 @@ public interface CompetitionService {
     // 根据ID获取单个竞赛（Controller需要）
     CompetitionModel getCompetitionById(String id);
 
-    // 新增：Controller 兼容方法
-    List<CompetitionModel> getCompetitionsByStudentId(String studentId);
+    // 新增：Controller 兼容方法（参数是学生关联键：账号主键）
+    List<CompetitionModel> getCompetitionsByStudentAccountId(String studentAccountId);
     CompetitionModel saveCompetition(CompetitionModel competition);
     void deleteCompetition(Long id);
     CompetitionModel getCompetitionById(Long id);

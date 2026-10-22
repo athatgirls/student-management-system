@@ -3,6 +3,7 @@ package org.example.service;
 import org.example.model.DailyTaskModel;
 import org.example.model.PartyApplicationModel;
 import org.example.model.StudentModel;
+import org.example.repository.PartyApplicationRepository;
 import org.example.util.StudentGradePolicy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -25,7 +26,7 @@ public class DailyTaskAudienceService {
             "中共党员", "中共预备党员", "发展对象", "入党积极分子", "共青团员", "群众"));
 
     @Autowired
-    private PartyApplicationService partyApplicationService;
+    private PartyApplicationRepository partyApplicationRepository;
 
     public boolean matches(DailyTaskModel task, StudentModel student) {
         return matches(task, student, resolvePartyStage(student));
@@ -99,7 +100,9 @@ public class DailyTaskAudienceService {
         if (student == null || trim(student.getStudentId()) == null) {
             return null;
         }
-        PartyApplicationModel application = partyApplicationService.getByStudentId(student.getStudentId());
+        // 入党申请按学生关联键（账号主键）关联查询，禁止用学号关联（见 org.example.dto.StudentRef）
+        PartyApplicationModel application = partyApplicationRepository
+                .findByStudentAccountId(student.getId()).orElse(null);
         return application == null || !"通过".equals(application.getAuditStatus()) ? null : trim(application.getCurrentStage());
     }
 

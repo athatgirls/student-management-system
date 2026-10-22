@@ -21,14 +21,17 @@ class StudentIssue11RegressionTest {
         LeaveRequestService service = mock(LeaveRequestService.class);
         CurrentUserAccessService access = mock(CurrentUserAccessService.class);
         Map<String,Object> user = Map.of("userId", "student-a", "userType", "student");
-        when(access.requireStudentNumber(user)).thenReturn("2026001");
+        org.example.service.StudentRefService refs = mock(org.example.service.StudentRefService.class);
+        when(refs.current(user)).thenReturn(new org.example.dto.StudentRef("student-a", "2026001", "学生"));
         when(service.createLeaveRequest(any())).thenThrow(new IllegalArgumentException("请假开始日期不能早于今天"));
         ReflectionTestUtils.setField(controller, "leaveRequestService", service);
         ReflectionTestUtils.setField(controller, "currentUserAccessService", access);
-        LeaveRequestModel forged = new LeaveRequestModel(); forged.setStudentId("other-student");
+        ReflectionTestUtils.setField(controller, "studentRefService", refs);
+        LeaveRequestModel forged = new LeaveRequestModel(); forged.setStudentAccountId("victim"); forged.setStudentId("other-student");
         Map<String,Object> response = controller.createLeaveRequest(forged, user).getBody();
         assertEquals(400, response.get("code"));
         assertEquals("请假开始日期不能早于今天", response.get("msg"));
+        assertEquals("student-a", forged.getStudentAccountId());
         assertEquals("2026001", forged.getStudentId());
     }
 
@@ -57,9 +60,9 @@ class StudentIssue11RegressionTest {
         ReflectionTestUtils.setField(service, "studentService", students);
         StudentModel student = new StudentModel(); student.setName("学生"); student.setGrade("2026");
         student.setMajor("计算机"); student.setClassName("一班"); student.setPhone("13800000000");
-        when(students.findByStudentId("2026001")).thenReturn(student);
+        when(students.findById("student-a")).thenReturn(student);
         when(repository.save(any())).thenAnswer(i -> i.getArgument(0));
-        LeaveRequestModel leave = new LeaveRequestModel(); leave.setStudentId("2026001");
+        LeaveRequestModel leave = new LeaveRequestModel(); leave.setStudentAccountId("student-a"); leave.setStudentId("2026001");
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Shanghai"));
         leave.setStartDate(today); leave.setEndDate(today);
         assertEquals(1, service.createLeaveRequest(leave).getDays());
@@ -86,7 +89,7 @@ class StudentIssue11RegressionTest {
     }
     private DailyTaskSubmissionModel submission(String attachments) {
         DailyTaskSubmissionModel s = new DailyTaskSubmissionModel();
-        s.setTaskId("task"); s.setStudentId("student-a"); s.setContent("完成说明"); s.setAttachments(attachments);
+        s.setTaskId("task"); s.setStudentAccountId("student-a"); s.setStudentId("2026001"); s.setContent("完成说明"); s.setAttachments(attachments);
         return s;
     }
 
@@ -135,11 +138,11 @@ class StudentIssue11RegressionTest {
         when(tasks.findById("task")).thenReturn(Optional.of(task));
         when(students.findById("student-a")).thenReturn(Optional.of(student));
         when(audience.matches(task, student)).thenReturn(true);
-        when(submissions.findByTaskIdAndStudentId("task", "student-a")).thenReturn(Optional.empty());
+        when(submissions.findByTaskIdAndStudentAccountId("task", "student-a")).thenReturn(Optional.empty());
         when(submissions.save(any())).thenAnswer(i -> { DailyTaskSubmissionModel s = i.getArgument(0); s.setId("saved"); return s; });
         DailyTaskSubmissionModel saved = service.submitTask(submission(PROOF));
         assertEquals(PROOF, saved.getAttachments()); assertEquals("完成说明", saved.getContent());
-        when(submissions.findByTaskIdAndStudentId("task", "student-a")).thenReturn(Optional.of(saved));
+        when(submissions.findByTaskIdAndStudentAccountId("task", "student-a")).thenReturn(Optional.of(saved));
         assertEquals(PROOF, service.getSubmissionByTaskAndStudent("task", "student-a").getAttachments());
         DailyTaskSubmissionModel legacy = service.submitTask(submission(null));
         assertEquals("saved", legacy.getId()); assertEquals(PROOF, legacy.getAttachments());

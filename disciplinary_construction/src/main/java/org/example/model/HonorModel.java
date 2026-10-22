@@ -13,9 +13,12 @@ import java.util.List;
 public class HonorModel {
     @Id
     private String id;
-    private String userId; // 学生ID（关联StudentModel）
-    private String studentName; // 学生姓名（用于显示，不存储到数据库）
-    private String studentId; // 学号（用于显示，不存储到数据库）
+    /** 学生关联键：账号 Mongo 主键（见 {@link org.example.dto.StudentRef}）。禁止存学号。 */
+    private String studentAccountId;
+    /** 学号，仅用于展示和导入匹配，禁止用于关联查询。 */
+    private String studentId;
+    /** 学生姓名，仅用于展示。 */
+    private String studentName;
     private String title; // 荣誉名称
     private String category; // 类别（竞赛/论文/专利/奖学金/社会服务等）
     private String level; // 级别（国家/省级/校级/院级）

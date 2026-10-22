@@ -1,10 +1,11 @@
 package org.example.controller;
 
 import org.example.annotation.CurrentUser;
+import org.example.dto.StudentRef;
 import org.example.model.StudyRecordModel;
-import org.example.model.StudentModel;
 import org.example.repository.StudyRecordRepository;
 import org.example.service.CurrentUserAccessService;
+import org.example.service.StudentRefService;
 import org.example.util.SubmissionValidation;
 import org.example.util.StudyCourseType;
 import org.springframework.http.HttpStatus;
@@ -18,15 +19,18 @@ import java.util.Map;
 public class StudyRecordController {
     private final StudyRecordRepository repository;
     private final CurrentUserAccessService access;
-    public StudyRecordController(StudyRecordRepository repository, CurrentUserAccessService access) {
-        this.repository = repository; this.access = access;
+    private final StudentRefService studentRefService;
+    public StudyRecordController(StudyRecordRepository repository, CurrentUserAccessService access,
+                                 StudentRefService studentRefService) {
+        this.repository = repository; this.access = access; this.studentRefService = studentRefService;
     }
     @PostMapping
     public StudyRecordModel save(@RequestBody StudyRecordModel input, @CurrentUser Map<String, Object> user) {
-        StudentModel student = access.requireCurrentStudent(user);
+        StudentRef ref = studentRefService.current(user);
         if (input.getId() != null) {
             StudyRecordModel old = repository.findById(input.getId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-            if (!student.getId().equals(old.getStudentDbId()) || !"student".equals(old.getSource()))
+            access.requireStudentRecord(user, old.getStudentAccountId());
+            if (!"student".equals(old.getSource()))
                 throw new AccessDeniedException("只能编辑本人填写的学习记录，教务成绩请联系管理员更正");
         }
         try {
@@ -38,7 +42,7 @@ public class StudyRecordController {
                     || input.getCredit() == null || !Double.isFinite(input.getCredit()) || input.getCredit() <= 0)
                 throw new IllegalArgumentException("成绩应在 0 至 100 之间，学分必须大于 0");
         } catch (IllegalArgumentException e) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage()); }
-        input.setStudentDbId(student.getId()); input.setStudentId(student.getStudentId());
+        input.setStudentAccountId(ref.getAccountId()); input.setStudentId(ref.getStudentId());
         input.setSource("student"); input.setStatus("学生自填");
         return repository.save(input);
     }

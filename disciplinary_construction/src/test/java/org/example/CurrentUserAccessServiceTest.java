@@ -37,16 +37,17 @@ class CurrentUserAccessServiceTest {
     }
 
     @Test
-    void studentCanAccessOwnDatabaseIdAndStudentNumber() {
-        assertDoesNotThrow(() -> accessService.requireStudentAccess(studentUser, "database-id"));
-        assertDoesNotThrow(() -> accessService.requireStudentAccess(studentUser, "10240001"));
-        assertEquals("10240001", accessService.requireStudentNumber(studentUser));
+    void studentAccessesOwnRecordsByAccountIdAndStudentIdIsDisplayOnly() {
+        assertDoesNotThrow(() -> accessService.requireStudentRecord(studentUser, "database-id"));
+        // 学号仅展示/导入匹配，禁止作为关联键匹配（见 org.example.dto.StudentRef）
+        assertThrows(AccessDeniedException.class, () -> accessService.requireStudentRecord(studentUser, "10240001"));
+        assertEquals("10240001", accessService.requireCurrentStudentId(studentUser));
     }
 
     @Test
     void studentCannotAccessAnotherStudent() {
         assertThrows(AccessDeniedException.class,
-                () -> accessService.requireStudentAccess(studentUser, "10249999"));
+                () -> accessService.requireStudentRecord(studentUser, "10249999"));
     }
 
     @Test
@@ -54,6 +55,6 @@ class CurrentUserAccessServiceTest {
         Map<String, Object> adminUser = new HashMap<>();
         adminUser.put("userId", "admin-id");
         adminUser.put("userType", "admin");
-        assertDoesNotThrow(() -> accessService.requireStudentAccess(adminUser, "any-student"));
+        assertDoesNotThrow(() -> accessService.requireStudentRecord(adminUser, "any-student"));
     }
 }

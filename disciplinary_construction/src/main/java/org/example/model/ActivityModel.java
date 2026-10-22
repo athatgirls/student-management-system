@@ -23,8 +23,8 @@ public class ActivityModel {
     // 关联的任务ID（只匹配这个特定任务）
     private String taskId;
     
-    // 参与学生列表（存储学生的MongoDB _id）
-    private List<String> participantStudentIds;
+    /** 参与学生关联键列表（账号主键），见 {@link org.example.dto.StudentRef} */
+    private List<String> participantStudentAccountIds;
     
     // 是否已自动匹配到任务（用于标记是否已经处理过）
     private boolean matched = false;

@@ -8,7 +8,8 @@ public interface PartyApplicationService {
     PartyApplicationModel addPartyApplication(PartyApplicationModel application);
     PartyApplicationModel updatePartyApplication(PartyApplicationModel application);
     void deletePartyApplication(String id);
-    PartyApplicationModel getByStudentId(String studentId);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。 */
+    PartyApplicationModel getByStudentAccountId(String studentAccountId);
     PartyApplicationModel getById(String id);
     List<PartyApplicationModel> getAll();
     List<PartyApplicationModel> getByStage(String stage);

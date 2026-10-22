@@ -190,7 +190,7 @@ class PaperScoreControllerTest {
     private PaperModel paper() {
         PaperModel paper = new PaperModel();
         paper.setId("paper-1");
-        paper.setStudentId("1001");
+        paper.setStudentAccountId("db-1"); paper.setStudentId("1001");
         paper.setAttachments("[{\"url\":\"/proof.pdf\"}]");
         paper.setAuditStatus("待审核");
         return paper;
