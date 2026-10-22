@@ -7,6 +7,10 @@ import java.util.Map;
 /**
  * 学生身份解析的唯一入口。标识约定见 {@link StudentRef}。
  *
+ * <p>与 {@link StudentService} 的分工：学生数据的增删改查归 StudentService；
+ * 本接口只负责「当前是谁、记录挂到谁名下」，返回的 {@link StudentRef}
+ * 是业务记录三个标识字段（studentAccountId / studentId / studentName）的唯一写入来源。
+ *
  * <p>Controller/Service 需要学生身份时一律经由本接口取得，
  * 禁止在业务代码里直接把 JWT claim 或学号当关联键使用。
  */
