@@ -61,11 +61,13 @@ $overlay = $overlay.Replace('RELEASE_TAG', $release).Replace("`r`n", "`n") + "`n
 # Normalize the shipped shell script to LF even on a CRLF checkout.
 $deploySource = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'deploy-report-release.sh')).Replace("`r`n", "`n")
 [IO.File]::WriteAllText((Join-Path $bundlePath 'deploy.sh'), $deploySource, $utf8)
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'student-identity-migration.js') -Destination $bundlePath
 $pageHash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $distPath 'index.html')).Hash.ToLowerInvariant()
 [IO.File]::WriteAllText((Join-Path $bundlePath 'frontend-index.sha256'), "$pageHash`n", $utf8)
 $releaseInfo = "Release: $release`nCommit: $revision`nExpected previous release: $PreviousRelease`nServer command after extraction and version confirmation:`nsudo bash deploy.sh $release $revision $PreviousRelease`nNo production changes have been made by preparing this bundle.`n"
 [IO.File]::WriteAllText((Join-Path $bundlePath 'RELEASE.txt'), $releaseInfo, $utf8)
 Copy-Item -LiteralPath (Join-Path $repoPath 'TEST-REPORT-V2.md') -Destination $bundlePath
+Copy-Item -LiteralPath (Join-Path $repoPath 'STUDENT-IDENTITY-UPGRADE.md') -Destination $bundlePath
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'backup.sh') -Destination $bundlePath
 $checksumLines = Get-ChildItem -LiteralPath $bundlePath -File | Where-Object Name -ne 'SHA256SUMS' | Sort-Object Name | ForEach-Object {
     '{0}  {1}' -f (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant(), $_.Name

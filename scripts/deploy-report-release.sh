@@ -56,17 +56,31 @@ printf '\n' >> "$backup/compose-command.txt"
 cp compose.release.yaml "$deployment/releases/$release/compose.release.yaml"
 new=("${old[@]}" -f "$deployment/releases/$release/compose.release.yaml")
 "${new[@]}" config --quiet
+mongo_container=$("${old[@]}" ps -q mongo)
+[[ -n "$mongo_container" ]]
+migration_path="/tmp/student-identity-${release}.js"
+docker cp student-identity-migration.js "$mongo_container:$migration_path"
+identity() {
+  docker exec -e MIS_IDENTITY_MODE="$1" -e MIS_IDENTITY_RUN="$release" -e MIS_IDENTITY_SCRIPT="$migration_path" "$mongo_container" \
+    sh -c 'exec mongosh --quiet --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin disciplinary_construction --eval '\''require(process.env.MIS_IDENTITY_SCRIPT).runIdentityMigration(db, process.env.MIS_IDENTITY_MODE, process.env.MIS_IDENTITY_RUN, print).catch(error => { print(error.message); quit(1) })'\'''
+}
+# Read-only preflight BEFORE taking the old application offline.
+identity dry-run
 rollback() {
   code=$?
   trap - ERR
   echo "Upgrade failed; restoring previous application images. Backup: $backup"
+  "${new[@]}" stop frontend backend || { echo 'STOP_FAILED: manual recovery required'; exit "$code"; }
+  if [[ "${migration_attempted:-false}" == true ]]; then
+    identity rollback || { echo 'MIGRATION_ROLLBACK_FAILED: app remains stopped; manual recovery required'; exit "$code"; }
+  fi
   if [[ -n "${storage:-}" ]]; then docker start "$storage" >/dev/null || true; fi
   "${old[@]}" up -d --no-deps --pull never --wait --wait-timeout 240 backend frontend || true
   exit "$code"
 }
 trap rollback ERR
-"${old[@]}" stop backend
-# No database migrations; pause the app for a consistent backup before replacement.
+"${old[@]}" stop frontend backend
+# Pause all application writes before a consistent backup and identity conversion.
 "${old[@]}" exec -T mongo sh -c 'exec mongodump --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --db disciplinary_construction --archive --gzip' > "$backup/mongo.archive.gz" 2> "$backup/mongodump.log"
 test -s "$backup/mongo.archive.gz"
 gzip -t "$backup/mongo.archive.gz"
@@ -82,10 +96,19 @@ if [[ ${#storage_ids[@]} == 1 ]]; then
   gzip -t "$backup/rustfs.tar.gz"
 fi
 echo "BACKUP_OK $backup"
+migration_attempted=true
+identity apply
+identity verify
 "${new[@]}" up -d --no-deps --pull never --wait --wait-timeout 240 rustfs
-"${new[@]}" up -d --no-deps --pull never --wait --wait-timeout 240 backend frontend
-"${new[@]}" exec -T frontend nginx -t
+"${new[@]}" up -d --no-deps --pull never --wait --wait-timeout 240 backend
 "${new[@]}" exec -T backend curl --fail --silent http://127.0.0.1:1010/SCSE@hbut/actuator/health
+# Inspect the actual frontend image BEFORE opening the public listener again.
+image_page_hash=$(docker run --rm --pull never --network none --entrypoint sha256sum "mis-frontend:$release" /usr/share/nginx/html/index.html | cut -d' ' -f1)
+[[ "$image_page_hash" == "$expected_page_hash" ]]
+docker run --rm --pull never --network none --add-host backend:127.0.0.1 --entrypoint nginx "mis-frontend:$release" -t
+identity verify
+"${new[@]}" up -d --no-deps --pull never --wait --wait-timeout 240 frontend
+"${new[@]}" exec -T frontend nginx -t
 page_hash=$(curl --fail --silent --max-time 15 http://127.0.0.1:8080/ | sha256sum | cut -d' ' -f1)
 [[ "$page_hash" == "$expected_page_hash" ]]
 [[ $(curl --silent --max-time 15 -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/SCSE@hbut/uploads/nonexistent.pdf) == 401 ]]
@@ -96,4 +119,4 @@ printf '\n' >> "$deployment/releases/$release/compose-command.txt"
 trap - ERR
 echo "DEPLOYMENT_OK $release"
 echo "Backup: $backup"
-echo 'Existing database and uploads preserved; no production student records changed by verification.'
+echo 'Existing accounts, passwords, records and uploads preserved; only journaled student references normalized.'
