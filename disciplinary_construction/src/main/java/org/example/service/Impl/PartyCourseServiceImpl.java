@@ -38,8 +38,8 @@ public class PartyCourseServiceImpl implements PartyCourseService {
     }
 
     @Override
-    public List<PartyCourseModel> getStudentPartyCourses(String studentId) {
-        return partyCourseRepository.findByStudentId(studentId);
+    public List<PartyCourseModel> getStudentPartyCourses(String studentAccountId) {
+        return partyCourseRepository.findByStudentAccountId(studentAccountId);
     }
 
     @Override

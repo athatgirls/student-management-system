@@ -9,7 +9,7 @@ export function createLeaveRequest(data) {
   })
 }
 
-// 学生获取自己的请假记录
+// 学生获取自己的请假记录（学生端由登录态解析身份；studentId=学号，管理端按学号指定目标学生）
 export function getMyLeaveRequests(studentId) {
   return request({
     url: '/leave/my-leaves',

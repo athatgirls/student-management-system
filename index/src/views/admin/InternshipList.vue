@@ -817,7 +817,7 @@ const pagination = reactive({
 // 表单
 const form = reactive({
   id: '',
-  userId: '',
+  studentAccountId: '',
   studentId: '',
   studentName: '',
   studentClass: '',
@@ -974,7 +974,7 @@ const handleAdd = () => {
   dialogTitle.value = '添加实习就业记录'
   Object.assign(form, {
     id: '',
-    userId: '',
+    studentAccountId: '',
     studentId: '',
     studentName: '',
     studentClass: '',

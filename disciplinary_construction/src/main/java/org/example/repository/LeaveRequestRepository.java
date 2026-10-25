@@ -9,8 +9,8 @@ import java.util.List;
 
 @Repository
 public interface LeaveRequestRepository extends MongoRepository<LeaveRequestModel, String> {
-    // 根据学生ID查找请假记录
-    List<LeaveRequestModel> findByStudentId(String studentId);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。本接口不提供 findByStudentId 这类歧义命名。 */
+    List<LeaveRequestModel> findByStudentAccountId(String studentAccountId);
     
     // 根据审核状态查找
     List<LeaveRequestModel> findByAuditStatus(String auditStatus);

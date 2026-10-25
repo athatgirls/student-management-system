@@ -16,9 +16,12 @@ import java.time.LocalDateTime;
 public class AcademicEventModel {
     @Id
     private String id;
-    private String studentId;           // 学生ID（MongoDB的_id）
-    private String studentNumber;       // 学号（用于显示，不存储到数据库）
-    private String studentName;         // 学生姓名
+    /** 学生关联键：账号 Mongo 主键（见 {@link org.example.dto.StudentRef}）。禁止存学号。 */
+    private String studentAccountId;
+    /** 学号，仅用于展示和导入匹配，禁止用于关联查询。 */
+    private String studentId;
+    /** 学生姓名，仅用于展示。 */
+    private String studentName;
     private String title; // 活动标题
     private String type; // 学术活动类型（会议/讲座/研讨会等）
     private String organizer; // 主办方

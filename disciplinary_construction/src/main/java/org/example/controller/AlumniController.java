@@ -6,11 +6,13 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.example.annotation.CurrentUser;
+import org.example.dto.StudentRef;
 import org.example.exception.BusinessException;
 import org.example.model.AlumniModel;
 import org.example.response.ResponseCode;
 import org.example.response.ResponseResult;
 import org.example.service.AlumniService;
+import org.example.service.StudentRefService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,6 +29,9 @@ public class AlumniController {
     @Autowired
     private AlumniService alumniService;
 
+    @Autowired
+    private StudentRefService studentRefService;
+
     public AlumniController() {
         log.info("AlumniController已创建");
     }
@@ -34,9 +39,10 @@ public class AlumniController {
     @Operation(summary = "添加校友信息")
     @PostMapping("/insertAlumni")
     public ResponseResult<String> insertAlumni(@RequestBody AlumniModel alumniModel, @CurrentUser Map<String, Object> currentUser) {
-        String userId = (String) currentUser.get("userId");
+        StudentRef ref = studentRefService.current(currentUser);
         System.out.println(currentUser);
-        alumniModel.setStudentId(userId);
+        alumniModel.setStudentAccountId(ref.getAccountId());
+        alumniModel.setStudentId(ref.getStudentId());
         alumniService.insertAlumni(alumniModel);
         return ResponseResult.success();
     }
@@ -55,8 +61,9 @@ public class AlumniController {
     @Operation(summary = "更新校友信息")
     @PostMapping("/updateAlumni")
     public ResponseResult<String> updateAlumni(@RequestBody AlumniModel alumniModel, @CurrentUser Map<String, Object> currentUser) {
-        String userId = (String) currentUser.get("userId");
-        alumniModel.setStudentId(userId);
+        StudentRef ref = studentRefService.current(currentUser);
+        alumniModel.setStudentAccountId(ref.getAccountId());
+        alumniModel.setStudentId(ref.getStudentId());
         alumniService.updateAlumni(alumniModel);
         return ResponseResult.success();
     }
@@ -75,8 +82,9 @@ public class AlumniController {
     @Operation(summary = "获取当前用户的校友信息")
     @PostMapping("/getMyAlumniInfo")
     public ResponseResult<AlumniModel> getMyAlumniInfo(@CurrentUser Map<String, Object> currentUser) {
-        String userId = (String) currentUser.get("userId");
-        AlumniModel alumni = alumniService.findAlumniByStudentId(userId);
+        // 本人查自己，按 studentAccountId 查询即天然归属正确
+        StudentRef ref = studentRefService.current(currentUser);
+        AlumniModel alumni = alumniService.findByStudentAccountId(ref.getAccountId());
         return ResponseResult.success(alumni);
     }
 

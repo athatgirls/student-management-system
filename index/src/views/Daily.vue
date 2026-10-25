@@ -504,8 +504,8 @@
         <!-- 学术活动 -->
         <template v-if="moduleKey === 'academic'">
           <el-row :gutter="16">
-            <el-col :span="12"><el-form-item label="学生ID" prop="studentId"><el-input v-model="form.studentId" /></el-form-item></el-col>
-            <el-col :span="12"><el-form-item label="学生姓名" prop="studentName"><el-input v-model="form.studentName" /></el-form-item></el-col>
+            <el-col :span="12"><el-form-item label="学号"><el-input :model-value="userInfo.studentId" disabled /></el-form-item></el-col>
+            <el-col :span="12"><el-form-item label="学生姓名"><el-input :model-value="userInfo.name" disabled /></el-form-item></el-col>
           </el-row>
           <el-row :gutter="16">
             <el-col :span="12"><el-form-item label="活动标题" prop="title"><el-input v-model="form.title" /></el-form-item></el-col>
@@ -525,8 +525,8 @@
         <!-- 日常活动 -->
         <template v-else-if="moduleKey === 'daily'">
           <el-row :gutter="16">
-            <el-col :span="12"><el-form-item label="学生ID" prop="studentId"><el-input v-model="form.studentId" /></el-form-item></el-col>
-            <el-col :span="12"><el-form-item label="学生姓名" prop="studentName"><el-input v-model="form.studentName" /></el-form-item></el-col>
+            <el-col :span="12"><el-form-item label="学号"><el-input :model-value="userInfo.studentId" disabled /></el-form-item></el-col>
+            <el-col :span="12"><el-form-item label="学生姓名"><el-input :model-value="userInfo.name" disabled /></el-form-item></el-col>
           </el-row>
           <el-row :gutter="16">
             <el-col :span="12"><el-form-item label="活动标题" prop="title"><el-input v-model="form.title" /></el-form-item></el-col>
@@ -614,7 +614,7 @@
         <!-- 荣誉 -->
         <template v-else>
           <el-row :gutter="16">
-            <el-col :span="12"><el-form-item label="学生ID" prop="userId"><el-input v-model="form.userId" /></el-form-item></el-col>
+            <el-col :span="12"><el-form-item label="学号"><el-input :model-value="userInfo.studentId" disabled /></el-form-item></el-col>
             <el-col :span="12"><el-form-item label="荣誉名称" prop="title"><el-input v-model="form.title" /></el-form-item></el-col>
           </el-row>
           <el-row :gutter="16">
@@ -653,7 +653,7 @@
           <div class="sub">
             <el-tag size="small" effect="plain">{{ moduleTitle }}</el-tag>
             <span class="dot">·</span>
-            <span class="muted">发起人：</span><span>{{ detailEntity.studentName || detailEntity.userId || '-' }}</span>
+            <span class="muted">发起人：</span><span>{{ detailEntity.studentName || '-' }}</span>
             <span class="dot">·</span>
             <span class="muted">时间：</span>
             <span v-if="moduleKey === 'leave'">
@@ -1152,15 +1152,15 @@ const stat = computed(() => ({
 // 获取业务列表
 const loadBusinessData = async () => {
   if (moduleKey.value === 'volunteer') {
-    try { volunteerHistory.value = (await volunteerServiceApi.getStudentVolunteerServices(userInfo.value.studentId || userInfo.value.id)).data || [] } catch { /* shared interceptor */ }
+    try { volunteerHistory.value = (await volunteerServiceApi.getStudentVolunteerServices(userInfo.value.id)).data || [] } catch { /* shared interceptor */ }
   }
   if (['academic', 'daily', 'tasks', 'volunteer'].includes(moduleKey.value)) loadActiveTasks()
   if (['tasks', 'volunteer'].includes(moduleKey.value)) return
   try {
     if (moduleKey.value === 'leave') {
       // 请假，使用专门的API
-      // 从当前登录用户获取学号
-      const studentId = userInfo.value.studentId || (store.state.user && store.state.user.studentId)
+      // 查询参数走学号语义（管理端按学号指定目标学生），学生端由登录态解析身份
+      const studentId = userInfo.value.studentId
       if (!studentId) {
         ElMessage.warning('无法获取学号，请重新登录')
         return
@@ -1172,8 +1172,7 @@ const loadBusinessData = async () => {
         ElMessage.error(res.msg || '加载请假记录失败')
       }
     } else {
-      const userId = localStorage.getItem('userId')
-      const res = await listItems(moduleKey.value, { studentId: userId })
+      const res = await listItems(moduleKey.value, { studentAccountId: userInfo.value.id })
       if (res.code === 200) {
         allRows[moduleKey.value] = res.data
       }
@@ -1210,21 +1209,21 @@ const createVisible = ref(false)
 const createFormRef = ref()
 const editingHonor = ref(false)
 const initAcademic = {
-  id: '', studentId: '', studentName: '', title: '', type: '讲座',
+  id: '', studentAccountId: '', studentId: '', studentName: '', title: '', type: '讲座',
   organizer: '', speaker: '', attachmentUrl: '',
   startDate: '', endDate: '',
   auditStatus: 'pending', auditComment: '', auditorId: '', auditTime: '',
   createTime: '', updateTime: ''
 }
 const initDaily = {
-  id: '', studentId: '', studentName: '', activityType: 'lecture', title: '',
+  id: '', studentAccountId: '', studentId: '', studentName: '', activityType: 'lecture', title: '',
   organizer: '', level: '校级', attachmentUrl: '',
   startDate: '', endDate: '',
   auditStatus: 'pending', auditComment: '', auditorId: '', auditTime: '',
   createTime: '', updateTime: ''
 }
 const initLeave = {
-  id: '', studentId: '', // 只传学号，其他信息后端自动获取
+  id: '', studentAccountId: '', studentId: '', // 学生关联传账号主键，学号仅展示，其他信息后端自动获取
   reason: '', startDate: '', endDate: '', days: 0,
   evidenceUrls: [], status: 'pending',
   auditStatus: 'pending', auditComment: '', auditorId: '', auditorName: '', auditTime: '',
@@ -1232,7 +1231,7 @@ const initLeave = {
   createTime: '', updateTime: ''
 }
 const initHonor = {
-  id: '', userId: '', title: '', category: '竞赛', level: '校级',
+  id: '', studentAccountId: '', studentId: '', studentName: '', title: '', category: '竞赛', level: '校级',
   awardOrg: '', awardDate: '', description: '',
   evidenceUrl: '', tags: '', isPublic: false,
   auditStatus: 'pending', auditComment: '', auditorId: '', auditTime: '',
@@ -1273,18 +1272,24 @@ const openCreate = () => {
   editingHonor.value = false
   honorAttachments.value = ''
   createVisible.value = true
+  // 学生关联取当前登录用户的账号主键，学号/姓名仅作展示，均由登录态自动带入
+  const studentRef = {
+    studentAccountId: userInfo.value.id || '',
+    studentId: userInfo.value.studentId || '',
+    studentName: userInfo.value.name || ''
+  }
   if (moduleKey.value === 'leave') {
     // 请假表单，只初始化请假相关字段，学生信息从后端自动获取
     Object.assign(form, {
       ...initLeave,
-      studentId: userInfo.value.studentId || '' // 从当前登录用户获取学号
+      ...studentRef
     })
     leaveFileList.value = []
   } else {
     Object.assign(
       form,
-      moduleKey.value === 'academic' ? { ...initAcademic } :
-          moduleKey.value === 'daily' ? { ...initDaily } : { ...initHonor }
+      moduleKey.value === 'academic' ? { ...initAcademic, ...studentRef } :
+          moduleKey.value === 'daily' ? { ...initDaily, ...studentRef } : { ...initHonor, ...studentRef }
     )
   }
 }
@@ -1314,7 +1319,8 @@ const submitCreate = async () => {
       }
       
       const leaveData = {
-        studentId: form.studentId, // 只传学号
+        studentAccountId: form.studentAccountId, // 学生关联传账号主键
+        studentId: form.studentId, // 学号，仅用于展示
         reason: form.reason,
         startDate: form.startDate,
         endDate: form.endDate,
@@ -1669,7 +1675,7 @@ const detailPairs = computed(() => {
   const e = detailEntity
   if (moduleKey.value === 'academic') {
     return [
-      { label: '学生ID', value: e.studentId },
+      { label: '学号', value: e.studentId },
       { label: '学生姓名', value: e.studentName },
       { label: '活动类型', value: e.type },
       { label: '主办方', value: e.organizer },
@@ -1699,7 +1705,7 @@ const detailPairs = computed(() => {
     ]
   } else if (moduleKey.value === 'daily') {
     return [
-      { label: '学生ID', value: e.studentId },
+      { label: '学号', value: e.studentId },
       { label: '学生姓名', value: e.studentName },
       { label: '活动类型', value: dict.activityType.find(i=>i.value===e.activityType)?.label || e.activityType },
       { label: '主办/授予', value: e.organizer },
@@ -1709,7 +1715,7 @@ const detailPairs = computed(() => {
     ]
   } else {
     return [
-      { label: '学生ID', value: e.userId },
+      { label: '学号', value: e.studentId },
       { label: '荣誉类别', value: e.category },
       { label: '级别', value: e.level },
       { label: '授予单位', value: e.awardOrg },

@@ -38,8 +38,8 @@ public class PatentServiceImpl implements PatentService {
     }
 
     @Override
-    public List<PatentModel> getStudentPatents(String studentId) {
-        return patentRepository.findByStudentId(studentId);
+    public List<PatentModel> getStudentPatents(String studentAccountId) {
+        return patentRepository.findByStudentAccountId(studentAccountId);
     }
 
     @Override
@@ -66,8 +66,8 @@ public class PatentServiceImpl implements PatentService {
     }
 
     @Override
-    public List<PatentModel> getPatentsByStudentId(String studentId) {
-        return getStudentPatents(studentId);
+    public List<PatentModel> getPatentsByStudentAccountId(String studentAccountId) {
+        return getStudentPatents(studentAccountId);
    }
 
     @Override

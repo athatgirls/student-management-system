@@ -17,7 +17,7 @@ export const fieldLabels = {
   competitionName: '竞赛名称', competitionLevel: '竞赛级别', awardLevel: '获奖等级', ranking: '排名', awardDate: '获奖日期', teamMembers: '团队成员', instructorName: '指导老师',
   patentTitle: '专利名称', patentType: '专利类型', patentNumber: '专利号', inventorRank: '发明人排名', patentStatus: '专利状态', authorizationDate: '授权日期', applicationDate: '受理日期', coInventors: '合作发明人',
   projectName: '项目名称', projectLevel: '项目级别', startDate: '开始日期', endDate: '结束日期',
-  title: '名称', organizer: '主办单位', location: '地点', description: '说明', content: '内容', level: '级别', category: '类别', awardOrg: '授予单位', tags: '标签', type: '活动类型', activityType: '活动类型', speaker: '主讲人', isPublic: '公开展示', studentNumber: '学号',
+  title: '名称', organizer: '主办单位', location: '地点', description: '说明', content: '内容', level: '级别', category: '类别', awardOrg: '授予单位', tags: '标签', type: '活动类型', activityType: '活动类型', speaker: '主讲人', isPublic: '公开展示',
   position: '职务名称', organization: '任职/服务单位', serviceName: '服务名称', serviceType: '服务类型', serviceHours: '服务时长', serviceDate: '服务日期', serviceLocation: '服务地点', serviceDescription: '服务描述', contactPerson: '联系人', contactPhone: '联系电话',
   auditStatus: '审核状态', auditComment: '审核意见', auditorName: '审核人', auditTime: '审核时间', createTime: '创建时间', updateTime: '更新时间', remark: '备注', studentId: '学号', studentName: '姓名', submissionTime: '提交时间', deadline: '截止时间', taskCategory: '任务类型'
 }

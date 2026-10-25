@@ -9,7 +9,8 @@ public interface PatentService {
     PatentModel addPatent(PatentModel patent);
     PatentModel updatePatent(PatentModel patent);
     void deletePatent(String id);
-    List<PatentModel> getStudentPatents(String studentId);
+    /** 参数是学生关联键（账号主键），约定见 {@link org.example.dto.StudentRef}。 */
+    List<PatentModel> getStudentPatents(String studentAccountId);
 
     // 管理员操作
     List<PatentModel> getPendingPatents();
@@ -18,7 +19,8 @@ public interface PatentService {
     
     PatentModel getPatentById(String id); 
 
-    List<PatentModel> getPatentsByStudentId(String studentId);
+    // 兼容方法（参数是学生关联键：账号主键）
+    List<PatentModel> getPatentsByStudentAccountId(String studentAccountId);
     PatentModel savePatent(PatentModel patent);
     void deletePatent(Long id);
     PatentModel getPatentById(Long id);

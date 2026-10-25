@@ -24,7 +24,11 @@ import java.util.Map;
 public class AlumniModel {
     @Id
     private String id;//主键
-    private String studentId;//学号
+    /** 学生关联键：账号 Mongo 主键（见 {@link org.example.dto.StudentRef}）。禁止存学号。 */
+    private String studentAccountId;
+    /** 学号，仅用于展示和导入匹配，禁止用于关联查询。 */
+    private String studentId;
+    /** 学生档案快照，仅展示 */
     private StudentModel student;
     @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
     @JsonDeserialize(using = LocalDateDeserializer.class)

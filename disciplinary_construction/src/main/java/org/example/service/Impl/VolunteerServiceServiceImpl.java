@@ -36,8 +36,8 @@ public class VolunteerServiceServiceImpl implements VolunteerServiceService {
     }
 
     @Override
-    public List<VolunteerServiceModel> getStudentVolunteerServices(String studentId) {
-        return volunteerServiceRepository.findByStudentId(studentId);
+    public List<VolunteerServiceModel> getStudentVolunteerServices(String studentAccountId) {
+        return volunteerServiceRepository.findByStudentAccountId(studentAccountId);
     }
 
     @Override

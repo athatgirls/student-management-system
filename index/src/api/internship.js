@@ -22,18 +22,10 @@ export function getMyInternshipRecords() {
   })
 }
 
-// 根据用户ID获取实习就业记录（保留用于管理员功能）
-export function getInternshipByUserId(userId) {
+// 根据学生账号主键获取实习就业记录（路径变量传账号主键）
+export function getInternshipByStudentId(studentAccountId) {
   return request({
-    url: `/internship-employment/user/${userId}`,
-    method: 'get'
-  })
-}
-
-// 根据学生ID获取实习就业记录
-export function getInternshipByStudentId(studentId) {
-  return request({
-    url: `/internship-employment/student/${studentId}`,
+    url: `/internship-employment/student/${studentAccountId}`,
     method: 'get'
   })
 }
@@ -121,21 +113,21 @@ export function getInternshipByWorkType(workType) {
   })
 }
 
-// 根据学生ID和状态获取记录
-export function getInternshipByStudentIdAndStatus(studentId, status) {
+// 根据学生账号主键和状态获取记录
+export function getInternshipByStudentIdAndStatus(studentAccountId, status) {
   return request({
     url: '/internship-employment/student-status',
     method: 'get',
-    params: { studentId, status }
+    params: { studentAccountId, status }
   })
 }
 
-// 根据学生ID和审批状态获取记录
-export function getInternshipByStudentIdAndApprovalStatus(studentId, approvalStatus) {
+// 根据学生账号主键和审批状态获取记录
+export function getInternshipByStudentIdAndApprovalStatus(studentAccountId, approvalStatus) {
   return request({
     url: '/internship-employment/student-approval',
     method: 'get',
-    params: { studentId, approvalStatus }
+    params: { studentAccountId, approvalStatus }
   })
 }
 

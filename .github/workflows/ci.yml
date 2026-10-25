@@ -5,6 +5,23 @@ on:
   pull_request:
 
 jobs:
+  identity-migration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify legacy data migration and rollback in isolated MongoDB
+        run: |
+          set -euo pipefail
+          trap 'docker rm -fv mis-identity-ci >/dev/null 2>&1 || true' EXIT
+          docker run -d --name mis-identity-ci -v "$PWD/scripts:/migration:ro" mongo:7.0 --bind_ip 127.0.0.1
+          ready=false
+          for attempt in $(seq 1 30); do
+            if docker exec mis-identity-ci mongosh --quiet --eval 'db.runCommand({ping:1}).ok' >/dev/null 2>&1; then ready=true; break; fi
+            sleep 1
+          done
+          "$ready"
+          docker exec mis-identity-ci mongosh --quiet --file /migration/tests/student-identity-mongo.js
+
   backend:
     runs-on: ubuntu-latest
     container: maven:3.9.9-eclipse-temurin-11

@@ -31,8 +31,8 @@ public class HonorServiceImpl implements HonorService {
     }
 
     @Override
-    public List<HonorModel> findByUserId(String userId) {
-        return repository.findByUserId(userId);
+    public List<HonorModel> findByStudentAccountId(String studentAccountId) {
+        return repository.findByStudentAccountId(studentAccountId);
     }
 
     @Override

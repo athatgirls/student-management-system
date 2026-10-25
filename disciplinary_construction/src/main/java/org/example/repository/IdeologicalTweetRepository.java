@@ -8,9 +8,11 @@ import java.util.List;
 
 @Repository
 public interface IdeologicalTweetRepository extends MongoRepository<IdeologicalTweetModel, String> {
-    List<IdeologicalTweetModel> findByStudentId(String studentId);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。本接口不提供 findByStudentId 这类歧义命名。 */
+    List<IdeologicalTweetModel> findByStudentAccountId(String studentAccountId);
     List<IdeologicalTweetModel> findByAuditStatus(String auditStatus);
-    List<IdeologicalTweetModel> findByStudentIdAndAuditStatus(String studentId, String auditStatus);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。本接口不提供 findByStudentId 这类歧义命名。 */
+    List<IdeologicalTweetModel> findByStudentAccountIdAndAuditStatus(String studentAccountId, String auditStatus);
     List<IdeologicalTweetModel> findByTweetType(String tweetType);
     List<IdeologicalTweetModel> findByStatus(String status);
     List<IdeologicalTweetModel> findByTitleContaining(String title);

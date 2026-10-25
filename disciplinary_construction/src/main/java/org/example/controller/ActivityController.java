@@ -3,6 +3,7 @@ package org.example.controller;
 import org.example.annotation.CurrentUser;
 import org.example.model.ActivityModel;
 import org.example.service.ActivityService;
+import org.example.service.CurrentUserAccessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,13 +19,16 @@ public class ActivityController {
     @Autowired
     private ActivityService activityService;
 
+    @Autowired
+    private CurrentUserAccessService currentUserAccessService;
+
     // 创建活动
     @PostMapping("/create")
     public ResponseEntity<Map<String, Object>> createActivity(@RequestBody ActivityModel activity, @CurrentUser Map<String, Object> currentUser) {
         Map<String, Object> result = new HashMap<>();
         try {
-            String creatorId = (String) currentUser.get("userId");
-            activity.setCreatorId(creatorId);
+            // JWT userId 即账号主键（requireUserId），见 org.example.dto.StudentRef
+            activity.setCreatorId(currentUserAccessService.requireUserId(currentUser));
             ActivityModel savedActivity = activityService.createActivity(activity);
             result.put("code", 200);
             result.put("data", savedActivity);

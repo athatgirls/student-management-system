@@ -10,7 +10,10 @@ import java.time.LocalDateTime;
 public class PartyMemberModel {
     @Id
     private String id;
-    private String studentId; // 学号
+    /** 学生关联键：账号 Mongo 主键（见 {@link org.example.dto.StudentRef}）。禁止存学号。 */
+    private String studentAccountId;
+    /** 学号，仅用于展示和导入匹配，禁止用于关联查询。 */
+    private String studentId;
     private String name; // 姓名
     private String gender; // 性别
     private String nation; // 民族

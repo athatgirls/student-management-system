@@ -10,8 +10,8 @@ public interface LeaveRequestService {
     // 根据ID查找请假记录
     LeaveRequestModel findById(String id);
     
-    // 根据学生ID查找请假记录
-    List<LeaveRequestModel> findByStudentId(String studentId);
+    // 根据学生账号主键（studentAccountId）查找请假记录
+    List<LeaveRequestModel> findByStudentAccountId(String studentAccountId);
     
     // 获取所有待审核的请假记录
     List<LeaveRequestModel> getPendingLeaveRequests();

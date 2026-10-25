@@ -1,11 +1,11 @@
 package org.example.controller;
 
 import org.example.annotation.CurrentUser;
+import org.example.dto.StudentRef;
 import org.example.model.HonorModel;
-import org.example.model.StudentModel;
 import org.example.service.HonorService;
 import org.example.service.CurrentUserAccessService;
-import org.example.service.StudentService;
+import org.example.service.StudentRefService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,17 +23,19 @@ public class HonorController {
     private HonorService service;
     
     @Autowired
-    private StudentService studentService;
+    private StudentRefService studentRefService;
 
     @Autowired
     private CurrentUserAccessService currentUserAccessService;
 
     @PostMapping("/create")
     public ResponseEntity<Map<String, Object>> create(@RequestBody HonorModel model, @CurrentUser Map<String, Object> currentUser) {
-        String userId = currentUserAccessService.requireCurrentStudent(currentUser).getId();
+        StudentRef ref = studentRefService.current(currentUser);
         if (model.getEvidenceUrl() == null || model.getEvidenceUrl().isBlank())
             return ResponseEntity.badRequest().body(Map.of("code", 400, "msg", "请上传荣誉证明材料"));
-        model.setUserId(userId);
+        model.setStudentAccountId(ref.getAccountId());
+        model.setStudentId(ref.getStudentId());
+        model.setStudentName(ref.getName());
         Map<String, Object> result = new HashMap<>();
         result.put("code", 200);
         result.put("data", service.create(model));
@@ -41,16 +43,16 @@ public class HonorController {
     }
 
     @GetMapping("/list")
-    public ResponseEntity<Map<String, Object>> list(@RequestParam(required = false) String userId,
+    public ResponseEntity<Map<String, Object>> list(@RequestParam(required = false) String studentAccountId,
                                                       @CurrentUser Map<String, Object> currentUser) {
         if (!currentUserAccessService.isAdmin(currentUser)) {
-            userId = currentUserAccessService.requireUserId(currentUser);
+            studentAccountId = currentUserAccessService.requireUserId(currentUser);
         }
         Map<String, Object> result = new HashMap<>();
         result.put("code", 200);
         List<HonorModel> honors;
-        if (userId != null && !userId.isEmpty()) {
-            honors = service.findByUserId(userId);
+        if (studentAccountId != null && !studentAccountId.isEmpty()) {
+            honors = service.findByStudentAccountId(studentAccountId);
         } else {
             honors = service.findAll();
         }
@@ -71,7 +73,7 @@ public class HonorController {
         if (honor == null) {
             return ResponseEntity.notFound().build();
         }
-        currentUserAccessService.requireStudentAccess(currentUser, honor.getUserId());
+        currentUserAccessService.requireStudentRecord(currentUser, honor.getStudentAccountId());
         return ResponseEntity.ok(Map.of("code", 200, "data", withStudentInfo(honor)));
     }
 
@@ -83,12 +85,14 @@ public class HonorController {
         if (existing == null) {
             return ResponseEntity.notFound().build();
         }
-        currentUserAccessService.requireStudentAccess(currentUser, existing.getUserId());
+        currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
         if (model.getEvidenceUrl() == null || model.getEvidenceUrl().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("code", 400, "msg", "请上传荣誉证明材料"));
         }
         model.setId(id);
-        model.setUserId(existing.getUserId());
+        model.setStudentAccountId(existing.getStudentAccountId());
+        model.setStudentId(existing.getStudentId());
+        model.setStudentName(existing.getStudentName());
         model.setCreateTime(existing.getCreateTime());
         return ResponseEntity.ok(Map.of("code", 200, "data", service.update(model)));
     }
@@ -100,7 +104,7 @@ public class HonorController {
         if (existing == null) {
             return ResponseEntity.notFound().build();
         }
-        currentUserAccessService.requireStudentAccess(currentUser, existing.getUserId());
+        currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
         service.delete(id);
         return ResponseEntity.ok(Map.of("code", 200));
     }
@@ -110,7 +114,7 @@ public class HonorController {
         String id = (String) params.get("id");
         String status = (String) params.get("auditStatus");
         String comment = (String) params.get("auditComment");
-        String auditorId = (String) currentUser.get("userId");
+        String auditorId = currentUserAccessService.requireUserId(currentUser);
         Map<String, Object> result = new HashMap<>();
         result.put("code", 200);
         result.put("data", service.audit(id, status, comment, auditorId));
@@ -118,11 +122,11 @@ public class HonorController {
     }
 
     private HonorModel withStudentInfo(HonorModel honor) {
-        if (studentService == null || honor.getUserId() == null || honor.getUserId().isEmpty()) {
+        if (studentRefService == null || honor.getStudentAccountId() == null || honor.getStudentAccountId().isEmpty()) {
             return honor;
         }
         try {
-            StudentModel student = studentService.findById(honor.getUserId());
+            StudentRef student = studentRefService.resolveByAccountId(honor.getStudentAccountId());
             if (student != null) {
                 honor.setStudentName(student.getName());
                 honor.setStudentId(student.getStudentId());

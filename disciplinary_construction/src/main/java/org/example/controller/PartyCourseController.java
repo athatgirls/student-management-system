@@ -3,10 +3,12 @@ package org.example.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.annotation.CurrentUser;
+import org.example.dto.StudentRef;
 import org.example.model.PartyCourseModel;
 import org.example.response.ResponseResult;
 import org.example.service.CurrentUserAccessService;
 import org.example.service.PartyCourseService;
+import org.example.service.StudentRefService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,14 +24,20 @@ public class PartyCourseController {
     private PartyCourseService partyCourseService;
 
     @Autowired
+    private StudentRefService studentRefService;
+
+    @Autowired
     private CurrentUserAccessService currentUserAccessService;
 
     @Operation(summary = "添加党课记录")
     @PostMapping("/add")
     public ResponseResult<PartyCourseModel> addPartyCourse(@RequestBody PartyCourseModel partyCourse, @CurrentUser Map<String, Object> currentUser) {
-        if (!currentUserAccessService.isAdmin(currentUser)) {
-            partyCourse.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
-            partyCourse.setStudentName((String) currentUser.get("username"));
+        if (currentUserAccessService.isAdmin(currentUser)) {
+            // 管理端录入：按学号指定目标学生，姓名以学生档案为准，不信任请求体
+            fillStudentInfo(partyCourse, currentUserAccessService.requireAdminTarget(currentUser, partyCourse.getStudentId()));
+        } else {
+            // 学生本人提交：身份一律取本人档案
+            fillStudentInfo(partyCourse, studentRefService.current(currentUser));
             resetAudit(partyCourse);
         }
         PartyCourseModel result = partyCourseService.addPartyCourse(partyCourse);
@@ -41,11 +49,14 @@ public class PartyCourseController {
     public ResponseResult<PartyCourseModel> updatePartyCourse(@RequestBody PartyCourseModel partyCourse, @CurrentUser Map<String, Object> currentUser) {
         PartyCourseModel existing = partyCourseService.getPartyCourseById(partyCourse.getId());
         if (existing != null) {
-            currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+            currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
         }
-        if (!currentUserAccessService.isAdmin(currentUser)) {
-            partyCourse.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
-            partyCourse.setStudentName((String) currentUser.get("username"));
+        if (currentUserAccessService.isAdmin(currentUser)) {
+            // 管理端维护：按学号指定目标学生，姓名以学生档案为准，不信任请求体
+            fillStudentInfo(partyCourse, currentUserAccessService.requireAdminTarget(currentUser, partyCourse.getStudentId()));
+        } else {
+            // 学生本人维护：身份一律取本人档案
+            fillStudentInfo(partyCourse, studentRefService.current(currentUser));
             resetAudit(partyCourse);
         }
         PartyCourseModel result = partyCourseService.updatePartyCourse(partyCourse);
@@ -58,18 +69,18 @@ public class PartyCourseController {
                                                     @CurrentUser Map<String, Object> currentUser) {
         PartyCourseModel existing = partyCourseService.getPartyCourseById(id);
         if (existing != null) {
-            currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+            currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
         }
         partyCourseService.deletePartyCourse(id);
         return ResponseResult.success("删除成功");
     }
 
     @Operation(summary = "获取学生党课记录")
-    @GetMapping("/student/{studentId}")
-    public ResponseResult<List<PartyCourseModel>> getStudentPartyCourses(@PathVariable String studentId,
+    @GetMapping("/student/{studentAccountId}")
+    public ResponseResult<List<PartyCourseModel>> getStudentPartyCourses(@PathVariable String studentAccountId,
                                                                          @CurrentUser Map<String, Object> currentUser) {
-        currentUserAccessService.requireStudentAccess(currentUser, studentId);
-        List<PartyCourseModel> result = partyCourseService.getStudentPartyCourses(studentId);
+        currentUserAccessService.requireStudentRecord(currentUser, studentAccountId);
+        List<PartyCourseModel> result = partyCourseService.getStudentPartyCourses(studentAccountId);
         return ResponseResult.success(result);
     }
 
@@ -79,7 +90,7 @@ public class PartyCourseController {
                                                                @CurrentUser Map<String, Object> currentUser) {
         PartyCourseModel result = partyCourseService.getPartyCourseById(id);
         if (result != null) {
-            currentUserAccessService.requireStudentAccess(currentUser, result.getStudentId());
+            currentUserAccessService.requireStudentRecord(currentUser, result.getStudentAccountId());
         }
         return ResponseResult.success(result);
     }
@@ -97,7 +108,7 @@ public class PartyCourseController {
             @PathVariable String id,
             @RequestBody Map<String, String> auditData,
             @CurrentUser Map<String, Object> currentUser) {
-        String auditorId = (String) currentUser.get("userId");
+        String auditorId = currentUserAccessService.requireUserId(currentUser);
         String auditStatus = auditData.get("auditStatus");
         String auditComment = auditData.get("auditComment");
         
@@ -145,5 +156,12 @@ public class PartyCourseController {
         course.setAuditComment(null);
         course.setAuditorId(null);
         course.setAuditTime(null);
+    }
+
+    /** 写入学生标识：studentAccountId 是关联键，studentId（学号）与姓名仅展示。 */
+    private void fillStudentInfo(PartyCourseModel course, StudentRef ref) {
+        course.setStudentAccountId(ref.getAccountId());
+        course.setStudentId(ref.getStudentId());
+        course.setStudentName(ref.getName());
     }
 } 

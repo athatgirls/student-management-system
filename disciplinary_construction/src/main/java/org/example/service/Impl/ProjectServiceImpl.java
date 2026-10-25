@@ -38,8 +38,8 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
-    public List<ProjectModel> getStudentProjects(String studentId) {
-        return projectRepository.findByStudentId(studentId);
+    public List<ProjectModel> getStudentProjects(String studentAccountId) {
+        return projectRepository.findByStudentAccountId(studentAccountId);
     }
 
     @Override
@@ -66,8 +66,8 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
-    public List<ProjectModel> getProjectsByStudentId(String studentId) {
-        return getStudentProjects(studentId);
+    public List<ProjectModel> getProjectsByStudentAccountId(String studentAccountId) {
+        return getStudentProjects(studentAccountId);
     }
 
     @Override

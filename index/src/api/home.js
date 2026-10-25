@@ -32,10 +32,10 @@ export function getChartData() {
   })
 }
 
-// 获取学生个人统计数据
-export function getPersonalStats(studentId) {
+// 获取学生个人统计数据（studentAccountId=学生账号主键，路径变量传账号主键）
+export function getPersonalStats(studentAccountId) {
   return request({
-    url: `/student/personal-stats/${studentId}`,
+    url: `/student/personal-stats/${studentAccountId}`,
     method: 'get'
   })
 }

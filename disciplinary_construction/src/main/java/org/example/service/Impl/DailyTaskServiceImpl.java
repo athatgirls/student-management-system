@@ -2,6 +2,7 @@ package org.example.service.Impl;
 
 import cn.hutool.poi.excel.ExcelUtil;
 import cn.hutool.poi.excel.ExcelWriter;
+import org.example.dto.StudentRef;
 import org.example.model.DailyTaskModel;
 import org.example.model.DailyTaskSubmissionModel;
 import org.example.model.StudentModel;
@@ -45,6 +46,8 @@ public class DailyTaskServiceImpl implements DailyTaskService {
     private org.example.service.VolunteerCompletionService volunteerCompletionService;
     @Autowired
     private org.example.service.TaskAttachmentAccessService taskAttachmentAccessService;
+    @Autowired
+    private org.example.service.StudentRefService studentRefService;
 
     @Override
     public DailyTaskModel createTask(DailyTaskModel task) {
@@ -91,7 +94,7 @@ public class DailyTaskServiceImpl implements DailyTaskService {
             throw new RuntimeException("任务不存在");
         }
 
-        StudentModel student = studentRepository.findById(submission.getStudentId()).orElse(null);
+        StudentModel student = studentRepository.findById(submission.getStudentAccountId()).orElse(null);
         if (!dailyTaskAudienceService.matches(task, student)) {
             throw new AccessDeniedException("您不在该任务的接收范围内");
         }
@@ -99,8 +102,8 @@ public class DailyTaskServiceImpl implements DailyTaskService {
         taskAttachmentAccessService.validateSubmission(submission);
         
         // 检查是否已经提交过
-        Optional<DailyTaskSubmissionModel> existing = submissionRepository.findByTaskIdAndStudentId(
-                submission.getTaskId(), submission.getStudentId());
+        Optional<DailyTaskSubmissionModel> existing = submissionRepository.findByTaskIdAndStudentAccountId(
+                submission.getTaskId(), submission.getStudentAccountId());
         
         boolean isNewSubmission = !existing.isPresent();
         
@@ -159,8 +162,8 @@ public class DailyTaskServiceImpl implements DailyTaskService {
     }
 
     @Override
-    public DailyTaskSubmissionModel getSubmissionByTaskAndStudent(String taskId, String studentId) {
-        return submissionRepository.findByTaskIdAndStudentId(taskId, studentId).orElse(null);
+    public DailyTaskSubmissionModel getSubmissionByTaskAndStudent(String taskId, String studentAccountId) {
+        return submissionRepository.findByTaskIdAndStudentAccountId(taskId, studentAccountId).orElse(null);
     }
 
     @Override
@@ -168,7 +171,7 @@ public class DailyTaskServiceImpl implements DailyTaskService {
         DailyTaskModel task = taskRepository.findById(taskId).orElse(null);
         List<DailyTaskSubmissionModel> submissions = submissionRepository.findByTaskId(taskId);
         Map<String, DailyTaskSubmissionModel> submissionMap = submissions.stream()
-                .collect(Collectors.toMap(DailyTaskSubmissionModel::getStudentId, s -> s));
+                .collect(Collectors.toMap(DailyTaskSubmissionModel::getStudentAccountId, s -> s));
 
         List<Map<String, Object>> stats = new ArrayList<>();
         
@@ -176,7 +179,7 @@ public class DailyTaskServiceImpl implements DailyTaskService {
         if (task != null && "registration".equals(task.getTaskCategory())) {
             // 只处理已提交的学生
             for (DailyTaskSubmissionModel submission : submissions) {
-                StudentModel student = studentRepository.findById(submission.getStudentId()).orElse(null);
+                StudentModel student = studentRepository.findById(submission.getStudentAccountId()).orElse(null);
                 if (student == null) continue;
                 
                 Map<String, Object> row = new HashMap<>();
@@ -355,7 +358,7 @@ public class DailyTaskServiceImpl implements DailyTaskService {
         List<DailyTaskSubmissionModel> allSubmissions = submissionRepository.findAll();
         Map<String, Map<String, DailyTaskSubmissionModel>> studentSubmissionsMap = new HashMap<>();
         for (DailyTaskSubmissionModel submission : allSubmissions) {
-            studentSubmissionsMap.computeIfAbsent(submission.getStudentId(), k -> new HashMap<>())
+            studentSubmissionsMap.computeIfAbsent(submission.getStudentAccountId(), k -> new HashMap<>())
                     .put(submission.getTaskId(), submission);
         }
         
@@ -411,8 +414,8 @@ public class DailyTaskServiceImpl implements DailyTaskService {
     }
 
     @Override
-    public Map<String, Object> getStudentTaskCompletionAnalysis(String studentId) {
-        StudentModel student = studentRepository.findById(studentId).orElse(null);
+    public Map<String, Object> getStudentTaskCompletionAnalysis(String studentAccountId) {
+        StudentModel student = studentRepository.findById(studentAccountId).orElse(null);
         if (student == null) {
             throw new IllegalArgumentException("学生不存在");
         }
@@ -420,7 +423,7 @@ public class DailyTaskServiceImpl implements DailyTaskService {
                 .filter(task -> !"registration".equals(task.getTaskCategory()))
                 .collect(Collectors.toList());
         Map<String, DailyTaskSubmissionModel> submissions = new HashMap<>();
-        submissionRepository.findByStudentId(studentId).forEach(item -> submissions.put(item.getTaskId(), item));
+        submissionRepository.findByStudentAccountId(studentAccountId).forEach(item -> submissions.put(item.getTaskId(), item));
         return completionFor(student, tasks, submissions);
     }
     
@@ -456,27 +459,21 @@ public class DailyTaskServiceImpl implements DailyTaskService {
     
     @Override
     public List<Map<String, Object>> getStudentIncompleteTasks(String studentId) {
-        // studentId可能是MongoDB的_id，也可能是学号，先尝试按学号查找
-        StudentModel studentByStudentId = studentRepository.findByStudentId(studentId);
-        StudentModel student = studentByStudentId;
-        if (student == null) {
-            // 如果按学号找不到，尝试按ID查找
-            student = studentRepository.findById(studentId).orElse(null);
-        }
-        if (student == null) {
+        // 管理端按学号定位目标学生，内部完成学号 → 账号主键解析（见 org.example.dto.StudentRef），不做主键/学号双猜测
+        StudentRef ref = studentRefService.resolveByStudentId(studentId);
+        final String studentAccountId = ref.getAccountId();
+        final StudentModel finalStudent = studentRepository.findById(studentAccountId).orElse(null);
+        if (finalStudent == null) {
             return new ArrayList<>();
         }
-        
-        final StudentModel finalStudent = student;
-        final String finalStudentId = finalStudent.getId();
         
         // 获取所有普通任务
         List<DailyTaskModel> normalTasks = taskRepository.findAll().stream()
                 .filter(task -> task.isActive() && (!"registration".equals(task.getTaskCategory())))
                 .collect(Collectors.toList());
         
-        // 获取学生的提交记录（使用MongoDB的_id）
-        List<DailyTaskSubmissionModel> studentSubmissions = submissionRepository.findByStudentId(finalStudentId);
+        // 获取学生的提交记录（使用账号主键 studentAccountId）
+        List<DailyTaskSubmissionModel> studentSubmissions = submissionRepository.findByStudentAccountId(studentAccountId);
         Map<String, DailyTaskSubmissionModel> submissionMap = studentSubmissions.stream()
                 .collect(Collectors.toMap(DailyTaskSubmissionModel::getTaskId, s -> s));
         

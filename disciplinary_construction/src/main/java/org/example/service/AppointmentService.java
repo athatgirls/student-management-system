@@ -1,7 +1,7 @@
 package org.example.service;
 
+import org.example.dto.StudentRef;
 import org.example.model.AppointmentModel;
-import org.example.model.StudentModel;
 import org.example.repository.AppointmentRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -14,26 +14,27 @@ import java.util.Map;
 public class AppointmentService {
     private final AppointmentRepository repository;
     private final CurrentUserAccessService access;
+    private final StudentRefService studentRefService;
     private final org.example.repository.UploadedFileRepository files;
     @org.springframework.beans.factory.annotation.Value("${server.servlet.context-path:/SCSE@hbut}")
     private String contextPath = "/SCSE@hbut";
-    public AppointmentService(AppointmentRepository repository, CurrentUserAccessService access, org.example.repository.UploadedFileRepository files) {
-        this.repository = repository; this.access = access; this.files = files;
+    public AppointmentService(AppointmentRepository repository, CurrentUserAccessService access, StudentRefService studentRefService, org.example.repository.UploadedFileRepository files) {
+        this.repository = repository; this.access = access; this.studentRefService = studentRefService; this.files = files;
     }
     public List<AppointmentModel> list(Map<String, Object> user) {
-        return access.isAdmin(user) ? repository.findAll() : repository.findByStudentDbId(access.requireCurrentStudent(user).getId());
+        return access.isAdmin(user) ? repository.findAll() : repository.findByStudentAccountId(studentRefService.current(user).getAccountId());
     }
     private AppointmentModel owned(String id, Map<String, Object> user) {
         AppointmentModel record = repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "任职记录不存在"));
         // Only the owning student maintains records; administrators have read access.
-        StudentModel student = access.requireCurrentStudent(user);
-        access.requireStudentAccess(user, record.getStudentDbId());
-        if (!student.getId().equals(record.getStudentDbId())) throw new org.springframework.security.access.AccessDeniedException("无权修改此记录");
+        StudentRef ref = studentRefService.current(user);
+        access.requireStudentRecord(user, record.getStudentAccountId());
+        if (!ref.getAccountId().equals(record.getStudentAccountId())) throw new org.springframework.security.access.AccessDeniedException("无权修改此记录");
         return record;
     }
     public AppointmentModel save(String id, AppointmentModel input, Map<String, Object> user) {
-        StudentModel student = access.requireCurrentStudent(user);
+        StudentRef ref = studentRefService.current(user);
         AppointmentModel record = id == null ? new AppointmentModel() : owned(id, user);
         if (input.getPosition() == null || input.getPosition().trim().isEmpty() || input.getPosition().length() > 120
                 || input.getOrganization() == null || input.getOrganization().trim().isEmpty() || input.getOrganization().length() > 200
@@ -43,8 +44,9 @@ public class AppointmentService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "结束日期不能早于开始日期");
         if (input.getDescription() != null && input.getDescription().length() > 4000)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "职责说明不能超过4000字");
-        validateAttachments(input.getAttachments(), student.getId());
-        record.setStudentDbId(student.getId()); record.setStudentId(student.getStudentId()); record.setStudentName(student.getName());
+        validateAttachments(input.getAttachments(), ref.getAccountId());
+        // 关联键 + 展示字段（学号/姓名仅展示，不作关联）
+        record.setStudentAccountId(ref.getAccountId()); record.setStudentId(ref.getStudentId()); record.setStudentName(ref.getName());
         record.setPosition(input.getPosition().trim()); record.setOrganization(input.getOrganization().trim());
         record.setStartDate(input.getStartDate()); record.setEndDate(input.getEndDate());
         record.setDescription(input.getDescription()); record.setAttachments(input.getAttachments());

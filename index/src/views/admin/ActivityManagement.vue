@@ -32,7 +32,7 @@
           <el-table-column prop="location" label="活动地点" min-width="150" />
           <el-table-column label="参与人数" width="100" align="center">
             <template #default="scope">
-              {{ scope.row.participantStudentIds?.length || 0 }}
+              {{ scope.row.participantStudentAccountIds?.length || 0 }}
             </template>
           </el-table-column>
           <el-table-column label="关联任务" min-width="200">
@@ -69,7 +69,7 @@
                 type="success"
                 link
                 size="small"
-                :disabled="!(scope.row.participantStudentIds || []).length"
+                :disabled="!(scope.row.participantStudentAccountIds || []).length"
                 @click="handleSyncVolunteer(scope.row)"
               >
                 同步志愿到场
@@ -767,7 +767,7 @@ const taskCategoryLabel = (taskId) => {
 
 const volunteerSyncMeta = (activity) => {
   if (activity.activityCategory !== 'volunteer') return { text: '不适用', type: 'info' }
-  return (activity.participantStudentIds || []).length
+  return (activity.participantStudentAccountIds || []).length
     ? { text: '已同步，可重试', type: 'success' }
     : { text: '待导入到场', type: 'warning' }
 }

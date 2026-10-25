@@ -624,7 +624,7 @@ watch(() => [route.path, route.query.tab], () => {
 // 表单
 const form = reactive({
   id: '',
-  userId: '',
+  studentAccountId: '',
   studentId: '',
   studentName: '',
   studentClass: '',
@@ -740,7 +740,7 @@ const handleAdd = () => {
   dialogTitle.value = '添加实习就业记录'
   Object.assign(form, {
     id: '',
-    userId: currentUser.value.id,
+    studentAccountId: currentUser.value.id,
     studentId: currentUser.value.studentId,
     studentName: currentUser.value.name,
     studentClass: currentUser.value.studentClass || '',

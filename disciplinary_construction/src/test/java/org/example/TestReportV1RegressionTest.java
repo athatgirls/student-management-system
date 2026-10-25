@@ -1,6 +1,7 @@
 package org.example;
 
 import org.example.controller.*;
+import org.example.dto.StudentRef;
 import org.example.model.*;
 import org.example.repository.*;
 import org.example.service.*;
@@ -8,6 +9,8 @@ import org.example.service.Impl.ActivityServiceImpl;
 import org.example.util.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
+import org.mockito.ArgumentCaptor;
 import org.springframework.data.mongodb.core.query.*;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -26,6 +29,12 @@ class TestReportV1RegressionTest {
         StudentRepository students = mock(StudentRepository.class);
         when(students.findById("student-a")).thenReturn(Optional.of(student()));
         return new CurrentUserAccessService(students);
+    }
+    private StudentRefService refs() {
+        // 标识约定见 org.example.dto.StudentRef：accountId=账号主键（关联），studentId=学号（展示）
+        StudentRefService refs = mock(StudentRefService.class);
+        when(refs.current(user)).thenReturn(new StudentRef("student-a", "2026001", "测试学生"));
+        return refs;
     }
     @Test void attachmentsMustBeNonEmptyFilesAndNotExecutableUrls() {
         for (String value : Arrays.asList(null, "", "[]", "null", "{}", "[{\"name\":\"fake\"}]", "[{\"url\":\"javascript:alert(1)\"}]"))
@@ -85,13 +94,13 @@ class TestReportV1RegressionTest {
     }
     @Test void studentStudyRecordUsesAuthenticatedOwnerAndCannotForgeOfficialStatus() {
         StudyRecordRepository repository = mock(StudyRecordRepository.class); when(repository.save(any())).thenAnswer(i -> i.getArgument(0));
-        StudyRecordController c = new StudyRecordController(repository, access()); StudyRecordModel r = study();
-        r.setStudentDbId("victim"); r.setStudentId("victim"); r.setSource("official"); r.setStatus("已通过");
-        StudyRecordModel saved = c.save(r,user); assertEquals("student-a", saved.getStudentDbId()); assertEquals("2026001", saved.getStudentId()); assertEquals("student",saved.getSource()); assertEquals("学生自填",saved.getStatus());
+        StudyRecordController c = new StudyRecordController(repository, access(), refs()); StudyRecordModel r = study();
+        r.setStudentAccountId("victim"); r.setStudentId("victim"); r.setSource("official"); r.setStatus("已通过");
+        StudyRecordModel saved = c.save(r,user); assertEquals("student-a", saved.getStudentAccountId()); assertEquals("2026001", saved.getStudentId()); assertEquals("student",saved.getSource()); assertEquals("学生自填",saved.getStatus());
     }
     @Test void studyRecordRequiresCourseTypeAndPositiveCredits() {
         StudyRecordRepository repository = mock(StudyRecordRepository.class);
-        StudyRecordController controller = new StudyRecordController(repository, access());
+        StudyRecordController controller = new StudyRecordController(repository, access(), refs());
         StudyRecordModel record = study(); record.setCourseType(null);
         assertThrows(ResponseStatusException.class, () -> controller.save(record, user));
         record.setCourseType("degree"); record.setCredit(0.0);
@@ -99,20 +108,32 @@ class TestReportV1RegressionTest {
         verify(repository, never()).save(any());
     }
     @Test void cannotEditOtherStudentsOrImportedGrades() {
-        StudyRecordRepository repository = mock(StudyRecordRepository.class); StudyRecordController c = new StudyRecordController(repository, access());
-        StudyRecordModel input = study(); input.setId("record"); StudyRecordModel old = study(); old.setStudentDbId("victim"); old.setSource("student");
+        StudyRecordRepository repository = mock(StudyRecordRepository.class); StudyRecordController c = new StudyRecordController(repository, access(), refs());
+        StudyRecordModel input = study(); input.setId("record"); StudyRecordModel old = study(); old.setStudentAccountId("victim"); old.setSource("student");
         when(repository.findById("record")).thenReturn(Optional.of(old));
         assertThrows(AccessDeniedException.class, () -> c.save(input,user));
-        old.setStudentDbId("student-a"); old.setSource(null);
+        old.setStudentAccountId("student-a"); old.setSource(null);
         assertThrows(AccessDeniedException.class, () -> c.save(input,user)); verify(repository, never()).save(any());
         old.setSource("student"); input.setAttachments("[]"); assertThrows(ResponseStatusException.class, () -> c.save(input,user));
     }
-    @Test void employmentIntentIsPersistedUnderCurrentStudentNotClientId() {
-        EmploymentIntentionRepository repository = mock(EmploymentIntentionRepository.class); when(repository.save(any())).thenAnswer(i -> i.getArgument(0));
-        EmploymentIntentionController c = new EmploymentIntentionController(repository, access()); EmploymentIntentionModel input = new EmploymentIntentionModel();
-        input.setId("victim"); input.setStudentName("伪造"); input.setIntentionType("就业"); input.setTargetCity("武汉");
-        EmploymentIntentionModel saved = c.save(input,user); assertEquals("student-a",saved.getId()); assertEquals("2026001",saved.getStudentId()); assertEquals("测试学生",saved.getStudentName());
-        verify(repository).save(input);
+    @Test void employmentIntentIsUpsertedUnderStudentAccountIdNotClientPayload() {
+        EmploymentIntentionRepository repository = mock(EmploymentIntentionRepository.class);
+        MongoTemplate mongo = mock(MongoTemplate.class);
+        when(mongo.findAndModify(any(), any(), any(), eq(EmploymentIntentionModel.class))).thenReturn(new EmploymentIntentionModel());
+        EmploymentIntentionController c = new EmploymentIntentionController(repository, mongo, refs());
+        EmploymentIntentionModel input = new EmploymentIntentionModel();
+        input.setId("forged"); input.setStudentAccountId("forged-db"); input.setStudentName("伪造"); input.setIntentionType("就业"); input.setTargetCity("武汉");
+        c.save(input, user);
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Update> update = ArgumentCaptor.forClass(Update.class);
+        verify(mongo).findAndModify(query.capture(), update.capture(), any(FindAndModifyOptions.class), eq(EmploymentIntentionModel.class));
+        org.bson.Document filter = query.getValue().getQueryObject();
+        org.bson.Document set = (org.bson.Document) update.getValue().getUpdateObject().get("$set");
+        assertEquals("student-a", filter.get("studentAccountId"));
+        assertEquals("student-a", set.get("studentAccountId"));
+        assertEquals("2026001", set.get("studentId"));
+        assertEquals("测试学生", set.get("studentName"));
+        verify(repository, never()).save(any());
     }
     @Test void leaveAuditUsesAuthenticatedAdministratorIdentity() {
         LeaveRequestService service = mock(LeaveRequestService.class);
@@ -156,7 +177,7 @@ class TestReportV1RegressionTest {
         ReflectionTestUtils.setField(service, "studentRepository", students);
         ReflectionTestUtils.setField(service, "dailyTaskAudienceService", audience);
         ReflectionTestUtils.setField(service, "volunteerCompletionService", volunteer);
-        ActivityModel activity = new ActivityModel(); activity.setId("activity-a"); activity.setTitle("志愿活动"); activity.setTaskId("task-a"); activity.setParticipantStudentIds(Arrays.asList("student-a", "student-b", "student-missing"));
+        ActivityModel activity = new ActivityModel(); activity.setId("activity-a"); activity.setTitle("志愿活动"); activity.setTaskId("task-a"); activity.setParticipantStudentAccountIds(Arrays.asList("student-a", "student-b", "student-missing"));
         DailyTaskModel task = new DailyTaskModel(); task.setId("task-a"); task.setActivityCategory("volunteer");
         StudentModel other = new StudentModel(); other.setId("student-b"); other.setStudentId("2026002"); other.setName("范围外学生");
         when(activities.findById("activity-a")).thenReturn(Optional.of(activity));

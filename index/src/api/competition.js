@@ -1,35 +1,36 @@
 import request from './request'
 
 // ==================== 学生端 API ====================
+// 注意：/student/{xxx} 路径变量传学生账号主键（studentAccountId），URL 结构不变
 
 // 获取学生的竞赛数据
-export const getStudentCompetitions = (studentId) => {
+export const getStudentCompetitions = (studentAccountId) => {
   return request({
-    url: `/competitions/student/${studentId}`,
+    url: `/competitions/student/${studentAccountId}`,
     method: 'get'
   })
 }
 
 // 获取学生的论文数据
-export const getStudentPapers = (studentId) => {
+export const getStudentPapers = (studentAccountId) => {
   return request({
-    url: `/papers/student/${studentId}`,
+    url: `/papers/student/${studentAccountId}`,
     method: 'get'
   })
 }
 
 // 获取学生的专利数据
-export const getStudentPatents = (studentId) => {
+export const getStudentPatents = (studentAccountId) => {
   return request({
-    url: `/patents/student/${studentId}`,
+    url: `/patents/student/${studentAccountId}`,
     method: 'get'
   })
 }
 
 // 获取学生的项目数据
-export const getStudentProjects = (studentId) => {
+export const getStudentProjects = (studentAccountId) => {
   return request({
-    url: `/projects/student/${studentId}`,
+    url: `/projects/student/${studentAccountId}`,
     method: 'get'
   })
 }

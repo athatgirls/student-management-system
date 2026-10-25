@@ -9,8 +9,10 @@ import org.springframework.data.mongodb.core.mapping.Document;
 public class StudyRecordModel {
     @Id
     private String id;
-    private String studentId;   // 学号
-    private String studentDbId; // 数据库ID
+    /** 学生关联键：账号 Mongo 主键（见 {@link org.example.dto.StudentRef}）。禁止存学号。 */
+    private String studentAccountId;
+    /** 学号，仅用于展示和导入匹配，禁止用于关联查询。 */
+    private String studentId;
     private String semester;    // 学期
     private String course;      // 课程名称
     private Integer score;      // 成绩

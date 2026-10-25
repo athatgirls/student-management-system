@@ -35,8 +35,8 @@ public class IdeologicalTweetServiceImpl implements IdeologicalTweetService {
     }
 
     @Override
-    public List<IdeologicalTweetModel> getStudentIdeologicalTweets(String studentId) {
-        return ideologicalTweetRepository.findByStudentId(studentId);
+    public List<IdeologicalTweetModel> getStudentIdeologicalTweets(String studentAccountId) {
+        return ideologicalTweetRepository.findByStudentAccountId(studentAccountId);
     }
 
     @Override

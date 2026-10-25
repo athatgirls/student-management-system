@@ -16,8 +16,12 @@ public class VolunteerServiceModel {
     private String serviceHours; // 服务时长
     private String serviceLocation; // 服务地点
     private String serviceDescription; // 服务描述
-    private String studentId; // 学生ID
-    private String studentName; // 学生姓名
+    /** 学生关联键：账号 Mongo 主键（见 {@link org.example.dto.StudentRef}）。禁止存学号。 */
+    private String studentAccountId;
+    /** 学号，仅用于展示和导入匹配，禁止用于关联查询。 */
+    private String studentId;
+    /** 学生姓名，仅用于展示。 */
+    private String studentName;
     private String organization; // 服务组织
     private String contactPerson; // 联系人
     private String contactPhone; // 联系电话

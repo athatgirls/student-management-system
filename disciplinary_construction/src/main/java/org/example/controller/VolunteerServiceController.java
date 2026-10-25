@@ -3,9 +3,11 @@ package org.example.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.annotation.CurrentUser;
+import org.example.dto.StudentRef;
 import org.example.model.VolunteerServiceModel;
 import org.example.response.ResponseResult;
 import org.example.service.CurrentUserAccessService;
+import org.example.service.StudentRefService;
 import org.example.service.VolunteerServiceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -22,14 +24,20 @@ public class VolunteerServiceController {
     private VolunteerServiceService volunteerServiceService;
 
     @Autowired
+    private StudentRefService studentRefService;
+
+    @Autowired
     private CurrentUserAccessService currentUserAccessService;
 
     @Operation(summary = "添加志愿服务记录")
     @PostMapping("/add")
     public ResponseResult<VolunteerServiceModel> addVolunteerService(@RequestBody VolunteerServiceModel volunteerService, @CurrentUser Map<String, Object> currentUser) {
-        if (!currentUserAccessService.isAdmin(currentUser)) {
-            volunteerService.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
-            volunteerService.setStudentName((String) currentUser.get("username"));
+        if (currentUserAccessService.isAdmin(currentUser)) {
+            // 管理端录入：按学号指定目标学生，姓名以学生档案为准，不信任请求体
+            fillStudentInfo(volunteerService, currentUserAccessService.requireAdminTarget(currentUser, volunteerService.getStudentId()));
+        } else {
+            // 学生本人提交：身份一律取本人档案
+            fillStudentInfo(volunteerService, studentRefService.current(currentUser));
             resetAudit(volunteerService);
         }
         VolunteerServiceModel result = volunteerServiceService.addVolunteerService(volunteerService);
@@ -41,11 +49,14 @@ public class VolunteerServiceController {
     public ResponseResult<VolunteerServiceModel> updateVolunteerService(@RequestBody VolunteerServiceModel volunteerService, @CurrentUser Map<String, Object> currentUser) {
         VolunteerServiceModel existing = volunteerServiceService.getVolunteerServiceById(volunteerService.getId());
         if (existing != null) {
-            currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+            currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
         }
-        if (!currentUserAccessService.isAdmin(currentUser)) {
-            volunteerService.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
-            volunteerService.setStudentName((String) currentUser.get("username"));
+        if (currentUserAccessService.isAdmin(currentUser)) {
+            // 管理端维护：按学号指定目标学生，姓名以学生档案为准，不信任请求体
+            fillStudentInfo(volunteerService, currentUserAccessService.requireAdminTarget(currentUser, volunteerService.getStudentId()));
+        } else {
+            // 学生本人维护：身份一律取本人档案
+            fillStudentInfo(volunteerService, studentRefService.current(currentUser));
             resetAudit(volunteerService);
         }
         VolunteerServiceModel result = volunteerServiceService.updateVolunteerService(volunteerService);
@@ -58,18 +69,18 @@ public class VolunteerServiceController {
                                                          @CurrentUser Map<String, Object> currentUser) {
         VolunteerServiceModel existing = volunteerServiceService.getVolunteerServiceById(id);
         if (existing != null) {
-            currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+            currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
         }
         volunteerServiceService.deleteVolunteerService(id);
         return ResponseResult.success("删除成功");
     }
 
     @Operation(summary = "获取学生志愿服务记录")
-    @GetMapping("/student/{studentId}")
-    public ResponseResult<List<VolunteerServiceModel>> getStudentVolunteerServices(@PathVariable String studentId,
+    @GetMapping("/student/{studentAccountId}")
+    public ResponseResult<List<VolunteerServiceModel>> getStudentVolunteerServices(@PathVariable String studentAccountId,
                                                                                     @CurrentUser Map<String, Object> currentUser) {
-        currentUserAccessService.requireStudentAccess(currentUser, studentId);
-        List<VolunteerServiceModel> result = volunteerServiceService.getStudentVolunteerServices(studentId);
+        currentUserAccessService.requireStudentRecord(currentUser, studentAccountId);
+        List<VolunteerServiceModel> result = volunteerServiceService.getStudentVolunteerServices(studentAccountId);
         return ResponseResult.success(result);
     }
 
@@ -79,7 +90,7 @@ public class VolunteerServiceController {
                                                                          @CurrentUser Map<String, Object> currentUser) {
         VolunteerServiceModel result = volunteerServiceService.getVolunteerServiceById(id);
         if (result != null) {
-            currentUserAccessService.requireStudentAccess(currentUser, result.getStudentId());
+            currentUserAccessService.requireStudentRecord(currentUser, result.getStudentAccountId());
         }
         return ResponseResult.success(result);
     }
@@ -97,7 +108,7 @@ public class VolunteerServiceController {
             @PathVariable String id,
             @RequestBody Map<String, String> auditData,
             @CurrentUser Map<String, Object> currentUser) {
-        String auditorId = (String) currentUser.get("userId");
+        String auditorId = currentUserAccessService.requireUserId(currentUser);
         String auditStatus = auditData.get("auditStatus");
         String auditComment = auditData.get("auditComment");
         
@@ -145,5 +156,12 @@ public class VolunteerServiceController {
         service.setAuditComment(null);
         service.setAuditorId(null);
         service.setAuditTime(null);
+    }
+
+    /** 写入学生标识：studentAccountId 是关联键，studentId（学号）与姓名仅展示。 */
+    private void fillStudentInfo(VolunteerServiceModel service, StudentRef ref) {
+        service.setStudentAccountId(ref.getAccountId());
+        service.setStudentId(ref.getStudentId());
+        service.setStudentName(ref.getName());
     }
 } 

@@ -22,6 +22,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -34,6 +35,7 @@ class GradeManagementTest {
     @Mock private StudyRecordRepository studyRecordRepository;
     @Mock private StudentRepository studentRepository;
     @Mock private MongoTemplate mongoTemplate;
+    @Mock private org.example.service.StudentRefService studentRefService;
     @InjectMocks private GradeController controller;
 
     @Test
@@ -60,6 +62,9 @@ class GradeManagementTest {
         StudentModel student = new StudentModel();
         student.setId("db-1"); student.setStudentId("10240001");
         when(studentRepository.findByGradeIn(any())).thenReturn(Collections.singletonList(student));
+        // 管理端按学号定位学生：学号仅作匹配用，解析为关联键后过滤（见 org.example.dto.StudentRef）
+        when(studentRefService.resolveByStudentId("10240001"))
+                .thenReturn(new org.example.dto.StudentRef("db-1", "10240001", "学生甲"));
         when(mongoTemplate.count(any(Query.class), eq(StudyRecordModel.class))).thenReturn(1L);
         StudyRecordModel record = new StudyRecordModel();
         when(mongoTemplate.find(any(Query.class), eq(StudyRecordModel.class)))
@@ -76,8 +81,9 @@ class GradeManagementTest {
         assertEquals(10, query.getValue().getSkip());
         assertEquals(10, query.getValue().getLimit());
         String criteria = query.getValue().getQueryObject().toJson();
-        assertTrue(criteria.contains("10240001"));
+        // 查询条件统一为 studentAccountId，学号不出现在查询里
         assertTrue(criteria.contains("db-1"));
+        assertFalse(criteria.contains("10240001"));
         assertTrue(criteria.contains("2025-2026-1"));
         assertTrue(criteria.contains("Web"));
     }
@@ -93,9 +99,9 @@ class GradeManagementTest {
     @Test
     void savesValidatedEditWithoutChangingStudentOrSource() {
         StudyRecordModel record = new StudyRecordModel();
-        record.setId("record-1"); record.setStudentId("10240001"); record.setSource("official");
+        record.setId("record-1"); record.setStudentAccountId("account-1"); record.setStudentId("10240001"); record.setSource("official");
         when(studyRecordRepository.findById("record-1")).thenReturn(Optional.of(record));
-        when(studyRecordRepository.findByStudentIdAndSemesterAndCourse("10240001", "2026秋", "数学"))
+        when(studyRecordRepository.findByStudentAccountIdAndSemesterAndCourse("account-1", "2026秋", "数学"))
                 .thenReturn(Optional.empty());
         when(studyRecordRepository.save(record)).thenReturn(record);
 
@@ -104,6 +110,7 @@ class GradeManagementTest {
         assertEquals(59, record.getScore());
         assertEquals("failed", record.getStatus());
         assertEquals("official", record.getSource());
+        assertEquals("account-1", record.getStudentAccountId());
         assertEquals("10240001", record.getStudentId());
         verify(studyRecordRepository).save(record);
     }
@@ -111,7 +118,7 @@ class GradeManagementTest {
     @Test
     void rejectsInvalidScoreAndDuplicateCourse() {
         StudyRecordModel record = new StudyRecordModel();
-        record.setId("record-1"); record.setStudentId("10240001");
+        record.setId("record-1"); record.setStudentAccountId("account-1"); record.setStudentId("10240001");
         when(studyRecordRepository.findById("record-1")).thenReturn(Optional.of(record));
         Map<String, Object> input = Map.of("semester", "2026秋", "course", "数学", "score", 90,
                 "credit", 2.0, "courseType", "degree");
@@ -119,7 +126,7 @@ class GradeManagementTest {
                 Map.of("semester", "2026秋", "course", "数学", "score", 101, "credit", 2,
                         "courseType", "degree"), Map.of("userType", "admin")));
         StudyRecordModel duplicate = new StudyRecordModel(); duplicate.setId("record-2");
-        when(studyRecordRepository.findByStudentIdAndSemesterAndCourse("10240001", "2026秋", "数学"))
+        when(studyRecordRepository.findByStudentAccountIdAndSemesterAndCourse("account-1", "2026秋", "数学"))
                 .thenReturn(Optional.of(duplicate));
         assertThrows(ResponseStatusException.class, () -> controller.updateManagedRecord("record-1", input,
                 Map.of("userType", "admin")));

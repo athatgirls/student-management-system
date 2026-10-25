@@ -8,11 +8,14 @@ import java.util.List;
 
 @Repository
 public interface PartyMemberRepository extends MongoRepository<PartyMemberModel, String> {
-    List<PartyMemberModel> findByStudentId(String studentId);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。本接口不提供 findByStudentId 这类歧义命名。 */
+    List<PartyMemberModel> findByStudentAccountId(String studentAccountId);
     List<PartyMemberModel> findByAuditStatus(String auditStatus);
-    List<PartyMemberModel> findByStudentIdAndAuditStatus(String studentId, String auditStatus);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。本接口不提供 findByStudentId 这类歧义命名。 */
+    List<PartyMemberModel> findByStudentAccountIdAndAuditStatus(String studentAccountId, String auditStatus);
     List<PartyMemberModel> findByBranch(String branch);
     List<PartyMemberModel> findByIsRegular(String isRegular);
     List<PartyMemberModel> findByNameContaining(String name);
-    List<PartyMemberModel> findByStudentIdContaining(String studentId);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。本接口不提供 findByStudentId 这类歧义命名。 */
+    List<PartyMemberModel> findByStudentAccountIdContaining(String studentAccountId);
 } 

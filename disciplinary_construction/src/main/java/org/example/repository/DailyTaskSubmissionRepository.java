@@ -7,7 +7,9 @@ import java.util.Optional;
 
 public interface DailyTaskSubmissionRepository extends MongoRepository<DailyTaskSubmissionModel, String> {
     List<DailyTaskSubmissionModel> findByTaskId(String taskId);
-    List<DailyTaskSubmissionModel> findByStudentId(String studentId);
-    Optional<DailyTaskSubmissionModel> findByTaskIdAndStudentId(String taskId, String studentId);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。本接口不提供 findByStudentId 这类歧义命名。 */
+    List<DailyTaskSubmissionModel> findByStudentAccountId(String studentAccountId);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。本接口不提供 findByStudentId 这类歧义命名。 */
+    Optional<DailyTaskSubmissionModel> findByTaskIdAndStudentAccountId(String taskId, String studentAccountId);
 }
 

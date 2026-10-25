@@ -1,9 +1,11 @@
 package org.example.controller;
 
 import org.example.annotation.CurrentUser;
+import org.example.dto.StudentRef;
 import org.example.model.ProjectModel;
 import org.example.service.CurrentUserAccessService;
 import org.example.service.ProjectService;
+import org.example.service.StudentRefService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,14 +25,17 @@ public class ProjectController {
     @Autowired
     private CurrentUserAccessService currentUserAccessService;
 
+    @Autowired
+    private StudentRefService studentRefService;
+
     // ==================== 学生端接口 ====================
 
-    @GetMapping("/student/{studentId}")
-    public ResponseEntity<?> getStudentProjects(@PathVariable String studentId,
+    @GetMapping("/student/{studentAccountId}")
+    public ResponseEntity<?> getStudentProjects(@PathVariable String studentAccountId,
                                                 @CurrentUser Map<String, Object> currentUser) {
-        currentUserAccessService.requireStudentAccess(currentUser, studentId);
+        currentUserAccessService.requireStudentRecord(currentUser, studentAccountId);
         try {
-            List<ProjectModel> projects = projectService.getProjectsByStudentId(studentId);
+            List<ProjectModel> projects = projectService.getProjectsByStudentAccountId(studentAccountId);
             return ResponseEntity.ok(projects);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("获取项目数据失败: " + e.getMessage());
@@ -40,8 +45,12 @@ public class ProjectController {
     @PostMapping
     public ResponseEntity<?> addProject(@RequestBody ProjectModel project,
                                         @CurrentUser Map<String, Object> currentUser) {
-        project.setStudentId(currentUserAccessService.requireStudentNumber(currentUser));
-        project.setStudentName((String) currentUser.get("username"));
+        StudentRef ref = studentRefService.current(currentUser);
+        if (ref.getStudentId() == null || ref.getStudentId().isBlank())
+            throw new AccessDeniedException("当前学生账号缺少学号");
+        project.setStudentAccountId(ref.getAccountId());
+        project.setStudentId(ref.getStudentId());
+        project.setStudentName(ref.getName());
         project.setScore(null);
         project.setScorePending(false);
         project.setPreviousScore(null);
@@ -63,9 +72,10 @@ public class ProjectController {
         if (existing == null) {
             return ResponseEntity.notFound().build();
         }
-        currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+        currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
         try {
             project.setId(id);
+            project.setStudentAccountId(existing.getStudentAccountId());
             project.setStudentId(existing.getStudentId());
             project.setStudentName(existing.getStudentName());
             org.example.util.SubmissionValidation.validate(project);
@@ -95,7 +105,7 @@ public class ProjectController {
         if (existing == null) {
             return ResponseEntity.notFound().build();
         }
-        currentUserAccessService.requireStudentAccess(currentUser, existing.getStudentId());
+        currentUserAccessService.requireStudentRecord(currentUser, existing.getStudentAccountId());
         try {
             projectService.deleteProject(id);
             return ResponseEntity.ok("删除成功");
@@ -113,7 +123,7 @@ public class ProjectController {
             if (project == null) {
                 return ResponseEntity.badRequest().body("项目不存在");
             }
-            currentUserAccessService.requireStudentAccess(currentUser, project.getStudentId());
+            currentUserAccessService.requireStudentRecord(currentUser, project.getStudentAccountId());
             return ResponseEntity.ok(project);
         } catch (org.springframework.security.access.AccessDeniedException e) {
             throw e;

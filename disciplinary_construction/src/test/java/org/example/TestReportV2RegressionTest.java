@@ -43,7 +43,7 @@ class TestReportV2RegressionTest {
         StudentModel student = new StudentModel(); student.setId("s1"); student.setGrade("2026");
         when(students.findById("s1")).thenReturn(Optional.of(student));
         DailyTaskAudienceService audience = new DailyTaskAudienceService();
-        ReflectionTestUtils.setField(audience, "partyApplicationService", mock(PartyApplicationService.class));
+        ReflectionTestUtils.setField(audience, "partyApplicationRepository", mock(org.example.repository.PartyApplicationRepository.class));
         TaskAttachmentAccessService service = new TaskAttachmentAccessService(tasks, files, new CurrentUserAccessService(students), audience);
         UploadedFileModel file = new UploadedFileModel(); file.setOwnerId("admin-a");
         when(files.findById("handout.pdf")).thenReturn(Optional.of(file));
@@ -82,7 +82,7 @@ class TestReportV2RegressionTest {
         when(tasks.findByActive(true)).thenReturn(List.of(normal, restricted, signup));
         DailyTaskSubmissionRepository submissions = mock(DailyTaskSubmissionRepository.class);
         DailyTaskSubmissionModel submitted = new DailyTaskSubmissionModel(); submitted.setTaskId("normal");
-        when(submissions.findByStudentId("s1")).thenReturn(List.of(submitted));
+        when(submissions.findByStudentAccountId("s1")).thenReturn(List.of(submitted));
         DailyTaskAudienceService audience = mock(DailyTaskAudienceService.class);
         when(audience.matches(eq(normal), eq(student), any())).thenReturn(true);
         DailyTaskServiceImpl service = new DailyTaskServiceImpl();

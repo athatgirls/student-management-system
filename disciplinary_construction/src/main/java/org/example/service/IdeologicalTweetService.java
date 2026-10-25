@@ -8,7 +8,8 @@ public interface IdeologicalTweetService {
     IdeologicalTweetModel addIdeologicalTweet(IdeologicalTweetModel ideologicalTweet);
     IdeologicalTweetModel updateIdeologicalTweet(IdeologicalTweetModel ideologicalTweet);
     void deleteIdeologicalTweet(String id);
-    List<IdeologicalTweetModel> getStudentIdeologicalTweets(String studentId);
+    /** 按学生关联键（账号主键）查询，约定见 {@link org.example.dto.StudentRef}。 */
+    List<IdeologicalTweetModel> getStudentIdeologicalTweets(String studentAccountId);
     IdeologicalTweetModel getIdeologicalTweetById(String id);
 
     // 管理员操作

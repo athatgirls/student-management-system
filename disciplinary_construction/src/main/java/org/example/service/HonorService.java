@@ -6,7 +6,7 @@ import java.util.List;
 public interface HonorService {
     HonorModel create(HonorModel model);
     List<HonorModel> findAll();
-    List<HonorModel> findByUserId(String userId);
+    List<HonorModel> findByStudentAccountId(String studentAccountId);
     HonorModel findById(String id);
     HonorModel update(HonorModel model);
     HonorModel audit(String id, String status, String comment, String auditorId);
