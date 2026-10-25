@@ -51,22 +51,12 @@ await assert.rejects(async () => runIdentityMigration(database, 'rollback', 'bbb
 await database.paper.updateOne({}, { $set: { studentId: '10001' } })
 await runIdentityMigration(database, 'rollback', 'bbbbbbb', print)
 assert.equal(await snapshot(), before)
-// Simulate an interruption after journal creation and record updates, before index creation.
-const failingDatabase = new Proxy(database, { get(target, key) {
-  if (key === 'getCollection') return name => {
-    const collection = target.getCollection(name)
-    return name !== 'employment_intentions' ? collection : new Proxy(collection, { get(inner, property) {
-      if (property === 'createIndex') return async () => { throw new Error('simulated-index-failure') }
-      const value = inner[property]
-      return typeof value === 'function' ? value.bind(inner) : value
-    } })
-  }
-  const value = target[key]
-  return typeof value === 'function' ? value.bind(target) : value
-} })
-await assert.rejects(async () => runIdentityMigration(failingDatabase, 'apply', 'ddddddd', print), /simulated-index-failure/)
+// A conflicting index name forces a real Mongo failure after journal/record writes.
+await database.employment_intentions.createIndex({ fixtureConflict: 1 }, { name: 'employment_student_account_unique' })
+await assert.rejects(async () => runIdentityMigration(database, 'apply', 'ddddddd', print), error => [85, 86].includes(error.code))
 await runIdentityMigration(database, 'rollback', 'ddddddd', print)
 assert.equal(await snapshot(), before, 'Interrupted apply must also be reversible')
+await database.employment_intentions.dropIndex('employment_student_account_unique')
 await database.study_records.updateOne({}, { $set: { studentDbId: 'dirty-value' } })
 await assert.rejects(async () => runIdentityMigration(database, 'apply', 'ccccccc', print), /Unresolved/)
 assert.equal(await database.getCollection('identity_migration_ccccccc').countDocuments({}), 0)
