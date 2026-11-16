@@ -16,7 +16,13 @@ public interface StudentService {
     StudentModel login(String account, String password);
     
     // 检查密码是否为初始密码
-    boolean isDefaultPassword(String studentId, String password);
+    boolean isDefaultPassword(StudentModel student, String password);
+
+    // Use only with a student whose supplied login password was verified.
+    boolean requiresInitialPasswordChange(StudentModel student, String password);
+
+    // Replace the verified credential only while its stored version is still current.
+    boolean replaceInitialPassword(StudentModel student, String newPassword, java.util.Date grantExpiresAt);
     
     // 获取所有学生
     List<StudentModel> findAllStudents();

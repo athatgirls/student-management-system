@@ -32,7 +32,7 @@ request.interceptors.request.use(
         return config
     },
     error => {
-        console.error('请求错误:', error)
+        console.error('请求配置失败:', error.code)
         return Promise.reject(error)
     }
 )
@@ -44,7 +44,7 @@ request.interceptors.response.use(
         return response.data
     },
     error => {
-        console.error('响应错误:', error)
+        console.error('请求失败:', error.response?.status || error.code)
         if (error.response) {
             const { status, data } = error.response
             switch (status) {

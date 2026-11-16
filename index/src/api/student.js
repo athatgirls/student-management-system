@@ -168,11 +168,11 @@ export function changePassword(oldPassword, newPassword) {
   })
 }
 
-// 修改初始密码（不需要登录；studentId=学号，与登录使用的学号一致）
-export function changeInitialPassword(studentId, initialPassword, newPassword) {
+// 修改初始密码，账号由后端从改密凭证中识别。
+export function changeInitialPassword(passwordChangeToken, newPassword) {
   return request({
     url: '/student/change-initial-password',
     method: 'post',
-    data: { studentId, initialPassword, newPassword }
+    data: { passwordChangeToken, newPassword }
   })
 }

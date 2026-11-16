@@ -141,13 +141,13 @@ class SecurityRegressionTest {
         student.setPassword(new BCryptPasswordEncoder().encode("Hbut_123456"));
         when(students.findByStudentId(student.getStudentId())).thenReturn(student);
         assertSame(student, service.login(student.getStudentId(), "Hbut_123456"));
-        assertTrue(service.isDefaultPassword(student.getStudentId(), "Hbut_123456"));
+        assertTrue(service.isDefaultPassword(student, "Hbut_123456"));
         assertFalse(service.changePassword(student.getStudentId(), null, "NewFixture123!"));
         assertFalse(service.changePassword(student.getStudentId(), "WrongPassword123!", "NewFixture123!"));
         verify(students, never()).save(any());
         assertTrue(service.changePassword(student.getStudentId(), "Hbut_123456", "NewFixture123!"));
         assertFalse(student.getPasswordChangeRequired());
-        assertFalse(service.isDefaultPassword(student.getStudentId(), "Hbut_123456"));
+        assertFalse(service.isDefaultPassword(student, "Hbut_123456"));
         assertFalse(service.changePassword(student.getStudentId(), "Hbut_123456", "AnotherFixture123!"));
         assertFalse(service.changePassword(student.getStudentId(), "NewFixture123!", "Hbut_123456"));
     }
@@ -161,7 +161,7 @@ class SecurityRegressionTest {
         assertTrue(student.getPasswordChangeRequired()); assertNull(student.getInitialPasswordExpiresAt());
         when(students.findByStudentId(student.getStudentId())).thenReturn(student);
         assertTrue(service.resetStudentPassword(student.getStudentId(), null));
-        assertTrue(service.isDefaultPassword(student.getStudentId(), "Hbut_123456"));
+        assertTrue(service.isDefaultPassword(student, "Hbut_123456"));
         assertSame(student, service.login(student.getStudentId(), "Hbut_123456"));
     }
     @Test void initialLoginDoesNotIssueBusinessTokenEvenForLegacyAccount() {
@@ -172,13 +172,16 @@ class SecurityRegressionTest {
         when(students.findByStudentId(student.getStudentId())).thenReturn(student);
         StudentController controller = new StudentController();
         JwtUtil jwt = mock(JwtUtil.class);
+        student.setId("legacy-account");
+        when(jwt.generateInitialPasswordToken(student.getId(), student.getPassword(), null)).thenReturn("grant");
         ReflectionTestUtils.setField(controller, "studentService", service);
         ReflectionTestUtils.setField(controller, "jwtUtil", jwt);
         ReflectionTestUtils.setField(controller, "loginAttemptLimiter", new LoginAttemptLimiter());
         Map<String,Object> response = controller.login(Map.of("account", student.getStudentId(), "password", "Hbut_123456")).getBody();
         assertEquals(true, response.get("requirePasswordChange"));
+        assertEquals("grant", response.get("passwordChangeToken"));
         assertNull(response.get("data"));
-        verifyNoInteractions(jwt);
+        verify(jwt, never()).generateToken(anyString(), anyString(), anyString());
     }
     @Test void temporaryPasswordExpiresAndMustBeChanged() {
         StudentRepository students = mock(StudentRepository.class);
@@ -187,8 +190,8 @@ class SecurityRegressionTest {
         String temporary = PasswordPolicy.temporaryPassword(); s.setPassword(new BCryptPasswordEncoder().encode(temporary));
         s.setPasswordChangeRequired(true); s.setInitialPasswordExpiresAt(new Date(System.currentTimeMillis() + 60000));
         when(students.findByStudentId("fixture")).thenReturn(s);
-        assertTrue(service.isDefaultPassword("fixture", temporary));
-        s.setInitialPasswordExpiresAt(new Date(0)); assertFalse(service.isDefaultPassword("fixture", temporary));
+        assertTrue(service.isDefaultPassword(s, temporary));
+        s.setInitialPasswordExpiresAt(new Date(0)); assertFalse(service.isDefaultPassword(s, temporary));
         assertNull(service.login("fixture", temporary));
     }
     @Test void accountRateLimitIsEnforced() {

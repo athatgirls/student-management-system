@@ -21,6 +21,7 @@
       </el-alert>
       
       <el-form
+        v-if="studentInfo"
         ref="passwordFormRef"
         :model="passwordForm"
         :rules="passwordRules"
@@ -28,20 +29,10 @@
         class="password-form"
       >
         <el-form-item label="学号">
-          <el-input v-model="studentInfo.studentId" disabled />
+          <el-input :model-value="studentInfo.studentId" disabled />
         </el-form-item>
         <el-form-item label="姓名">
-          <el-input v-model="studentInfo.studentName" disabled />
-        </el-form-item>
-        <el-form-item label="初始密码" prop="initialPassword">
-          <el-input
-            v-model="passwordForm.initialPassword"
-            type="password"
-            placeholder="请再次输入当前初始密码"
-            show-password
-            size="large"
-            autocomplete="current-password"
-          />
+          <el-input :model-value="studentInfo.studentName" disabled />
         </el-form-item>
         <el-form-item label="新密码" prop="newPassword">
           <el-input
@@ -50,6 +41,7 @@
             placeholder="请输入新密码（至少8位，包含数字和字母）"
             show-password
             size="large"
+            autocomplete="new-password"
           />
           <div class="password-tip">
             <p style="margin: 5px 0 0 0; color: #909399; font-size: 12px;">
@@ -64,6 +56,7 @@
             placeholder="请再次输入新密码"
             show-password
             size="large"
+            autocomplete="new-password"
           />
         </el-form-item>
         <el-form-item>
@@ -92,25 +85,20 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { changeInitialPassword } from '@/api/student'
+import { getPendingPasswordChange, clearPendingPasswordChange } from '@/utils/initialPasswordChange'
 
 const router = useRouter()
-const route = useRoute()
 const passwordFormRef = ref()
 const loading = ref(false)
 
-// 从路由参数获取学生信息
-const studentInfo = reactive({
-  studentId: '',
-  studentName: ''
-})
+const studentInfo = getPendingPasswordChange()
 
 // 密码表单
 const passwordForm = reactive({
-  initialPassword: '',
   newPassword: '',
   confirmPassword: ''
 })
@@ -151,9 +139,6 @@ const validateConfirmPassword = (rule, value, callback) => {
 }
 
 const passwordRules = {
-  initialPassword: [
-    { required: true, message: '请输入当前初始密码', trigger: 'blur' }
-  ],
   newPassword: [
     { required: true, message: '请输入新密码', trigger: 'blur' },
     { validator: validatePassword, trigger: 'blur' }
@@ -164,72 +149,40 @@ const passwordRules = {
   ]
 }
 
-// 修改密码
 const handleChangePassword = async () => {
+  if (loading.value || !studentInfo?.token) return
+  loading.value = true
   try {
-    await passwordFormRef.value.validate()
-    
-    if (!studentInfo.studentId) {
-      ElMessage.error('学号信息缺失，请返回登录页面重新操作')
-      return
-    }
-    
-    loading.value = true
-    
-    // 调用修改初始密码接口
-    const res = await changeInitialPassword(
-      studentInfo.studentId,
-      passwordForm.initialPassword,
-      passwordForm.newPassword
-    )
-    
+    const valid = await passwordFormRef.value.validate().catch(() => false)
+    if (!valid) return
+    const res = await changeInitialPassword(studentInfo.token, passwordForm.newPassword)
     if (res.code === 200) {
-      ElMessage.success({
-        message: '密码修改成功！请返回登录页面使用新密码登录',
-        duration: 3000
-      })
-      // 延迟跳转到登录页
-      setTimeout(() => {
-        router.push('/login')
-      }, 2000)
+      ElMessage.success('密码修改成功，请使用新密码登录')
+      await router.replace('/login')
+    } else if (res.code === 410) {
+      ElMessage.warning(res.msg)
+      await router.replace('/login')
     } else {
       ElMessage.error(res.msg || '密码修改失败')
     }
-    
-    loading.value = false
   } catch (error) {
-    if (error !== false) {
-      console.error('修改密码失败:', error)
-      // 如果error有response，显示后端返回的错误信息
-      if (error.response && error.response.data && error.response.data.msg) {
-        ElMessage.error(error.response.data.msg || '密码修改失败')
-      } else if (error.msg) {
-        ElMessage.error(error.msg || '密码修改失败')
-      } else {
-        ElMessage.error('修改密码失败，请检查网络连接')
-      }
-    }
+    ElMessage.error(error.response?.data?.msg || '修改密码失败，请检查网络连接')
+  } finally {
     loading.value = false
   }
 }
 
-// 返回登录
 const handleBackToLogin = () => {
-  router.push('/login')
+  router.replace('/login')
 }
 
-// 页面加载时从路由参数获取学生信息
 onMounted(() => {
-  if (route.query.studentId) {
-    studentInfo.studentId = route.query.studentId
-    studentInfo.studentName = route.query.studentName || ''
-  } else {
-    ElMessage.warning('缺少学生信息，正在返回登录页面')
-    setTimeout(() => {
-      router.push('/login')
-    }, 1500)
+  if (!studentInfo?.token) {
+    ElMessage.warning('请先登录后再设置新密码')
+    router.replace('/login')
   }
 })
+onUnmounted(clearPendingPasswordChange)
 </script>
 
 <style scoped>

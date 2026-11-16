@@ -17,12 +17,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
@@ -67,15 +69,13 @@ public class StudentServiceImpl implements StudentService {
         }
 
         // Fixed-format initial passwords remain supported; they only allow the mandatory password-change flow.
+        boolean initialPassword = requiresInitialPasswordChange(student, password);
         if (student.getPassword() == null || student.getPassword().isEmpty()
-                || (Boolean.TRUE.equals(student.getPasswordChangeRequired())
-                    && student.getInitialPasswordExpiresAt() != null
-                    && !student.getInitialPasswordExpiresAt().after(new java.util.Date()))) return null;
+                || (initialPassword && !isInitialPasswordCurrent(student))) return null;
 
         if (passwordEncoder.matches(password, student.getPassword())) {
             // Do not perform business actions before initial password replacement.
-            if (Boolean.TRUE.equals(student.getPasswordChangeRequired())
-                    || PasswordPolicy.legacyPassword(student.getStudentId()).equals(password)) return student;
+            if (initialPassword) return student;
             // 登录成功，检查并发布个人信息完善任务
             checkAndTriggerProfileTask(student);
             return student;
@@ -695,7 +695,7 @@ public class StudentServiceImpl implements StudentService {
             if (student.getPassword() == null || student.getPassword().isEmpty()
                     || oldPassword == null || oldPassword.isEmpty()
                     || !passwordEncoder.matches(oldPassword, student.getPassword())) return false;
-            if (Boolean.TRUE.equals(student.getPasswordChangeRequired()) && !isDefaultPassword(studentId, oldPassword)) return false;
+            if (Boolean.TRUE.equals(student.getPasswordChangeRequired()) && !isInitialPasswordCurrent(student)) return false;
             if (passwordEncoder.matches(newPassword, student.getPassword()))
                 throw new IllegalArgumentException("新密码不能与当前密码相同");
             student.setPassword(passwordEncoder.encode(newPassword));
@@ -714,22 +714,45 @@ public class StudentServiceImpl implements StudentService {
     }
 
     @Override
-    public boolean isDefaultPassword(String studentId, String password) {
-        try {
-            StudentModel student = studentRepository.findByStudentId(studentId);
-            if (student == null || student.getPassword() == null || student.getPassword().isEmpty()
-                    || password == null || password.isEmpty()) {
-                return false;
-            }
-            return (Boolean.TRUE.equals(student.getPasswordChangeRequired())
-                        || PasswordPolicy.legacyPassword(studentId).equals(password))
-                    && (student.getInitialPasswordExpiresAt() == null
-                        || student.getInitialPasswordExpiresAt().after(new java.util.Date()))
-                    && passwordEncoder.matches(password, student.getPassword());
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
+    public boolean isDefaultPassword(StudentModel student, String password) {
+        return student != null && student.getPassword() != null && !student.getPassword().isEmpty()
+                && password != null && !password.isEmpty()
+                && requiresInitialPasswordChange(student, password)
+                && isInitialPasswordCurrent(student)
+                && passwordEncoder.matches(password, student.getPassword());
+    }
+
+    @Override
+    public boolean requiresInitialPasswordChange(StudentModel student, String password) {
+        return Boolean.TRUE.equals(student.getPasswordChangeRequired())
+                || PasswordPolicy.legacyPassword(student.getStudentId()).equals(password);
+    }
+
+    private boolean isInitialPasswordCurrent(StudentModel student) {
+        Date expiresAt = student.getInitialPasswordExpiresAt();
+        return expiresAt == null || expiresAt.after(new Date());
+    }
+
+    @Override
+    public boolean replaceInitialPassword(StudentModel student, String newPassword, Date grantExpiresAt) {
+        PasswordPolicy.validate(newPassword);
+        if (PasswordPolicy.legacyPassword(student.getStudentId()).equals(newPassword)
+                || passwordEncoder.matches(newPassword, student.getPassword())) {
+            throw new IllegalArgumentException("新密码不能与初始密码相同");
         }
+        String newHash = passwordEncoder.encode(newPassword);
+        Date now = new Date();
+        if (grantExpiresAt != null && !grantExpiresAt.after(now)) return false;
+        Query current = Query.query(Criteria.where("_id").is(student.getId())
+                .and("password").is(student.getPassword())
+                .and("passwordChangeRequired").is(student.getPasswordChangeRequired())
+                .orOperator(Criteria.where("initialPasswordExpiresAt").is(null),
+                        Criteria.where("initialPasswordExpiresAt").gt(now)));
+        Update replacement = new Update().set("password", newHash)
+                .set("passwordChangeRequired", false)
+                .unset("initialPasswordExpiresAt")
+                .set("updateTime", now);
+        return mongoTemplate.updateFirst(current, replacement, StudentModel.class).getModifiedCount() == 1;
     }
 
 }

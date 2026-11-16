@@ -12,10 +12,15 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.security.MessageDigest;
+import java.util.Base64;
 
 @Slf4j
 @Component
 public class JwtUtil {
+    private static final String INITIAL_PASSWORD_AUDIENCE = "initial-password-change";
+    private static final long INITIAL_PASSWORD_TOKEN_MS = 10 * 60 * 1000L;
+
     @org.springframework.beans.factory.annotation.Autowired
     private org.example.service.AccountTokenStateService accountTokenStateService;
 
@@ -25,11 +30,51 @@ public class JwtUtil {
     private String credentialStamp(String id, String type) {
         String state = accountTokenStateService.state(id, type);
         if (state == null) throw new IllegalArgumentException("Account unavailable");
+        return signCredentialState(state);
+    }
+
+    private String signCredentialState(String state) {
         try {
             javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
             mac.init(getKey());
-            return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(mac.doFinal(state.getBytes(StandardCharsets.UTF_8)));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(mac.doFinal(state.getBytes(StandardCharsets.UTF_8)));
         } catch (java.security.GeneralSecurityException e) { throw new IllegalStateException(e); }
+    }
+
+    public String generateInitialPasswordToken(String accountId, String passwordHash, Date passwordExpiresAt) {
+        long now = System.currentTimeMillis();
+        long expires = now + INITIAL_PASSWORD_TOKEN_MS;
+        if (passwordExpiresAt != null) expires = Math.min(expires, passwordExpiresAt.getTime());
+        return Jwts.builder()
+                .setSubject(accountId)
+                .setAudience(INITIAL_PASSWORD_AUDIENCE)
+                .setIssuedAt(new Date(now))
+                .setExpiration(new Date(expires))
+                .claim("passwordVersion", signCredentialState(INITIAL_PASSWORD_AUDIENCE + ":" + passwordHash))
+                .signWith(getKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public Claims readInitialPasswordToken(String token) {
+        if (token == null || token.length() > 2048) return null;
+        try {
+            Claims claims = Jwts.parserBuilder()
+                    .setSigningKey(getKey())
+                    .requireAudience(INITIAL_PASSWORD_AUDIENCE)
+                    .build()
+                    .parseClaimsJws(token).getBody();
+            return claims.getSubject() != null && claims.getExpiration() != null
+                    && claims.get("passwordVersion", String.class) != null ? claims : null;
+        } catch (JwtException | IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    public boolean matchesInitialPasswordVersion(Claims claims, String passwordHash) {
+        if (passwordHash == null || passwordHash.isEmpty()) return false;
+        String expected = signCredentialState(INITIAL_PASSWORD_AUDIENCE + ":" + passwordHash);
+        return MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8),
+                claims.get("passwordVersion", String.class).getBytes(StandardCharsets.UTF_8));
     }
     
     @Value("${jwt.secret}")

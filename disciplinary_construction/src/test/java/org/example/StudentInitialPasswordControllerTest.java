@@ -1,8 +1,10 @@
 package org.example;
 
+import io.jsonwebtoken.Claims;
 import org.example.controller.StudentController;
 import org.example.model.StudentModel;
 import org.example.service.StudentService;
+import org.example.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import java.util.Date;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -23,10 +26,12 @@ class StudentInitialPasswordControllerTest {
     private static final String URL = "/msi/student/change-initial-password";
     private static final String BODY = "{\"studentId\":\"test-student\",\"initialPassword\":\"OldTest123\",\"newPassword\":\"NewTest456\"}";
     @Mock private StudentService studentService;
+    @Mock private JwtUtil jwtUtil;
     @Mock private org.example.service.CurrentUserAccessService currentUserAccessService;
     @Mock private org.example.service.LoginAttemptLimiter loginAttemptLimiter;
     @InjectMocks private StudentController controller;
     private MockMvc mvc;
+    private final StudentModel student = new StudentModel();
 
     @BeforeEach
     void setup() {
@@ -66,8 +71,8 @@ class StudentInitialPasswordControllerTest {
 
     @Test
     void wrongInitialPasswordCannotChangePassword() throws Exception {
-        when(studentService.findByStudentId("test-student")).thenReturn(new StudentModel());
-        when(studentService.isDefaultPassword("test-student", "OldTest123")).thenReturn(false);
+        when(studentService.findByStudentId("test-student")).thenReturn(student);
+        when(studentService.isDefaultPassword(student, "OldTest123")).thenReturn(false);
         mvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(jsonPath("$.code").value(400));
         verify(studentService, never()).changePassword(anyString(), anyString(), anyString());
@@ -76,24 +81,55 @@ class StudentInitialPasswordControllerTest {
     @Test
     void passwordPolicyFailureIsStillReturned() throws Exception {
         allowInitialPassword();
-        when(studentService.changePassword("test-student", "OldTest123", "NewTest456"))
-                .thenThrow(new RuntimeException("password policy rejected"));
+        when(studentService.replaceInitialPassword(student, "NewTest456", null))
+                .thenThrow(new IllegalArgumentException("password policy rejected"));
         mvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.msg").value("password policy rejected"));
     }
 
     @Test
-    void postPassesOriginalCredentialsToPasswordService() throws Exception {
+    void legacyPostStillAcceptsOriginalCredentials() throws Exception {
         allowInitialPassword();
-        when(studentService.changePassword("test-student", "OldTest123", "NewTest456")).thenReturn(true);
+        when(studentService.replaceInitialPassword(student, "NewTest456", null)).thenReturn(true);
         mvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(200));
-        verify(studentService).changePassword("test-student", "OldTest123", "NewTest456");
+        verify(studentService).replaceInitialPassword(student, "NewTest456", null);
     }
 
     private void allowInitialPassword() {
-        when(studentService.findByStudentId("test-student")).thenReturn(new StudentModel());
-        when(studentService.isDefaultPassword("test-student", "OldTest123")).thenReturn(true);
+        when(studentService.findByStudentId("test-student")).thenReturn(student);
+        when(studentService.isDefaultPassword(student, "OldTest123")).thenReturn(true);
+    }
+
+    @Test
+    void grantIsBoundToTheAuthenticatedAccountAndCannotBeReplayed() throws Exception {
+        Claims grant = mock(Claims.class);
+        Date expiry = new Date(System.currentTimeMillis() + 60_000);
+        when(grant.getSubject()).thenReturn("account-id");
+        when(grant.getExpiration()).thenReturn(expiry);
+        student.setPassword("original-hash");
+        when(jwtUtil.readInitialPasswordToken("grant")).thenReturn(grant);
+        when(studentService.findById("account-id")).thenReturn(student);
+        when(jwtUtil.matchesInitialPasswordVersion(grant, "original-hash")).thenReturn(true);
+        when(studentService.replaceInitialPassword(student, "NewTest456", expiry)).thenAnswer(invocation -> {
+            student.setPassword("replacement-hash");
+            return true;
+        });
+        String body = "{\"passwordChangeToken\":\"grant\",\"studentId\":\"untrusted-id\",\"newPassword\":\"NewTest456\"}";
+        mvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(jsonPath("$.code").value(200));
+        mvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(jsonPath("$.code").value(410));
+        verify(studentService, never()).findByStudentId(anyString());
+        verify(studentService, times(1)).replaceInitialPassword(any(), anyString(), any());
+    }
+
+    @Test
+    void invalidGrantCannotFallBackToAnUntrustedStudentId() throws Exception {
+        mvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"passwordChangeToken\":\"invalid\",\"studentId\":\"test-student\",\"newPassword\":\"NewTest456\"}"))
+                .andExpect(jsonPath("$.code").value(410));
+        verifyNoInteractions(studentService);
     }
 }

@@ -1,10 +1,13 @@
 package org.example.controller;
 
+import io.jsonwebtoken.Claims;
+import lombok.extern.slf4j.Slf4j;
 import org.example.annotation.CurrentUser;
 import org.example.model.StudentModel;
 import org.example.service.*;
 import org.example.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -14,6 +17,7 @@ import java.util.Map;
 import java.util.HashMap;
 
 @RestController
+@Slf4j
 @RequestMapping("/msi/student")
 public class StudentController {
     @Autowired
@@ -46,10 +50,7 @@ public class StudentController {
         StudentModel student = studentService.login(account, password);
         
         if (student != null) {
-            // 检查密码是否为初始密码
-            boolean isDefaultPassword = studentService.isDefaultPassword(student.getStudentId(), password);
-            
-            if (isDefaultPassword) {
+            if (studentService.requiresInitialPasswordChange(student, password)) {
                 // 密码是初始密码，需要强制修改
                 result.put("code", 403);
                 result.put("data", null);
@@ -57,7 +58,9 @@ public class StudentController {
                 result.put("requirePasswordChange", true);
                 result.put("studentId", student.getStudentId());
                 result.put("studentName", student.getName());
-                return ResponseEntity.ok(result);
+                result.put("passwordChangeToken", jwtUtil.generateInitialPasswordToken(
+                        student.getId(), student.getPassword(), student.getInitialPasswordExpiresAt()));
+                return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(result);
             }
             
             // 生成JWT token
@@ -690,72 +693,54 @@ public class StudentController {
         return ResponseEntity.ok(result);
     }
 
-    // 修改初始密码（不需要登录，用于首次登录时强制修改密码）
-    // POST is the primary method; retain PUT for older clients during rollout.
+    // 新页面使用登录后签发的短时凭证，旧页面仍可提交学号和初始密码。
     @PostMapping("/change-initial-password")
     public ResponseEntity<Map<String, Object>> changeInitialPassword(@RequestBody Map<String, String> requestBody) {
-        loginAttemptLimiter.check("student", requestBody.get("studentId"));
-        Map<String, Object> result = new HashMap<>();
-        try {
-            String studentId = requestBody.get("studentId");
-            String initialPassword = requestBody.get("initialPassword");
-            String newPassword = requestBody.get("newPassword");
-            
-            if (studentId == null || studentId.isEmpty()) {
-                result.put("code", 400);
-                result.put("msg", "学号不能为空");
-                return ResponseEntity.ok(result);
-            }
-            
-            if (newPassword == null || newPassword.isEmpty()) {
-                result.put("code", 400);
-                result.put("msg", "新密码不能为空");
-                return ResponseEntity.ok(result);
-            }
+        boolean tokenRequest = requestBody.containsKey("passwordChangeToken");
+        Claims grant = tokenRequest ? jwtUtil.readInitialPasswordToken(requestBody.get("passwordChangeToken")) : null;
+        if (tokenRequest && grant == null) return initialPasswordResult(410, "改密凭证已失效，请重新登录");
 
-            if (initialPassword == null || initialPassword.isEmpty()) {
-                result.put("code", 400);
-                result.put("msg", "请输入当前初始密码");
-                return ResponseEntity.ok(result);
-            }
-            
-            // 验证学号是否存在
-            StudentModel student = studentService.findByStudentId(studentId);
-            if (student == null) {
-                result.put("code", 400);
-                result.put("msg", "账号或临时密码无效，请联系管理员");
-                return ResponseEntity.ok(result);
-            }
-            
-            // 校验临时凭证、强制改密标记及有效期。
-            boolean isDefaultPassword = studentService.isDefaultPassword(studentId, initialPassword);
-            if (!isDefaultPassword) {
-                result.put("code", 400);
-                result.put("msg", "账号或临时密码无效，请联系管理员");
-                return ResponseEntity.ok(result);
-            }
-            
-            // 传入用户提供的初始密码，由服务层再次校验旧密码及新密码强度。
-            try {
-                boolean success = studentService.changePassword(studentId, initialPassword, newPassword);
-                if (success) {
-                    result.put("code", 200);
-                    result.put("msg", "密码修改成功，请重新登录");
-                } else {
-                    result.put("code", 500);
-                    result.put("msg", "密码修改失败，请检查密码是否符合要求");
-                }
-            } catch (RuntimeException e) {
-                // 捕获密码规则验证异常
-                result.put("code", 400);
-                result.put("msg", e.getMessage());
-            }
-        } catch (Exception e) {
-            e.printStackTrace(); // 打印异常堆栈，便于调试
-            result.put("code", 500);
-            result.put("msg", "密码修改失败: " + e.getMessage());
+        String studentId = requestBody.get("studentId");
+        if (tokenRequest) {
+            loginAttemptLimiter.check("student-initial-password", grant.getSubject());
+        } else {
+            loginAttemptLimiter.check("student", studentId);
         }
-        return ResponseEntity.ok(result);
+        String newPassword = requestBody.get("newPassword");
+        if (newPassword == null || newPassword.isEmpty()) return initialPasswordResult(400, "新密码不能为空");
+
+        try {
+            StudentModel student;
+            if (tokenRequest) {
+                student = studentService.findById(grant.getSubject());
+                if (student == null || !jwtUtil.matchesInitialPasswordVersion(grant, student.getPassword())) {
+                    return initialPasswordResult(410, "改密凭证已失效，请重新登录");
+                }
+            } else {
+                if (studentId == null || studentId.isEmpty()) return initialPasswordResult(400, "学号不能为空");
+                String initialPassword = requestBody.get("initialPassword");
+                if (initialPassword == null || initialPassword.isEmpty()) {
+                    return initialPasswordResult(400, "请输入当前初始密码");
+                }
+                student = studentService.findByStudentId(studentId);
+                if (student == null || !studentService.isDefaultPassword(student, initialPassword)) {
+                    return initialPasswordResult(400, "账号或临时密码无效，请联系管理员");
+                }
+            }
+            if (!studentService.replaceInitialPassword(student, newPassword, grant == null ? null : grant.getExpiration())) {
+                return initialPasswordResult(410, "改密凭证已失效，请重新登录");
+            }
+            return initialPasswordResult(200, "密码修改成功，请重新登录");
+        } catch (IllegalArgumentException e) {
+            return initialPasswordResult(400, e.getMessage());
+        } catch (Exception e) {
+            log.error("首次改密失败，异常类型: {}", e.getClass().getSimpleName());
+            return initialPasswordResult(500, "暂时无法修改密码，请稍后重试");
+        }
+    }
+
+    private ResponseEntity<Map<String, Object>> initialPasswordResult(int code, String message) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of("code", code, "msg", message));
     }
 
     // 学生修改自己的密码

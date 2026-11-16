@@ -3,6 +3,7 @@ package org.example;
 import org.example.util.JwtUtil;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+import java.util.Date;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -26,6 +27,24 @@ class JwtUtilTest {
         assertEquals("user-1", jwtUtil.getUserIdFromToken(token));
         assertEquals("student", jwtUtil.getUserTypeFromToken(token));
         assertEquals("张同学", jwtUtil.getUsernameFromToken(token));
+        assertNull(jwtUtil.readInitialPasswordToken(token));
+    }
+
+    @Test
+    void initialPasswordTokenHasSeparatePurposeAndCredentialVersion() {
+        JwtUtil jwt = new JwtUtil();
+        ReflectionTestUtils.setField(jwt, "secretKey", "test-only-secret-key-that-is-longer-than-thirty-two-bytes");
+        Date passwordExpiry = new Date(System.currentTimeMillis() + 60_000);
+        String token = jwt.generateInitialPasswordToken("student-account", "old-hash", passwordExpiry);
+        var grant = jwt.readInitialPasswordToken(token);
+        assertNotNull(grant);
+        assertEquals("student-account", grant.getSubject());
+        assertTrue(grant.getExpiration().getTime() <= passwordExpiry.getTime());
+        assertTrue(jwt.matchesInitialPasswordVersion(grant, "old-hash"));
+        assertFalse(jwt.matchesInitialPasswordVersion(grant, "reset-hash"));
+        assertFalse(jwt.validateToken(token));
+        assertNull(jwt.readInitialPasswordToken(token + "tampered"));
+        assertNull(jwt.readInitialPasswordToken(jwt.generateInitialPasswordToken("student-account", "old-hash", new Date(0))));
     }
 
     @Test

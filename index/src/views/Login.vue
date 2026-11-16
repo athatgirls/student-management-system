@@ -67,6 +67,7 @@ import { useStore } from 'vuex'
 import { ElMessage } from 'element-plus'
 import { adminLogin } from '@/api/admin'
 import { studentLogin } from '@/api/student'
+import { clearPendingPasswordChange, setPendingPasswordChange } from '@/utils/initialPasswordChange'
 
 const router = useRouter()
 const store = useStore()
@@ -89,9 +90,11 @@ const loginRules = {
 }
 
 const handleLogin = async () => {
+  if (loading.value) return
+  loading.value = true
+  clearPendingPasswordChange()
   try {
     await loginFormRef.value.validate()
-    loading.value = true
     
     let res
     if (isAdminLogin.value) {
@@ -124,22 +127,24 @@ const handleLogin = async () => {
         router.push('/home') // 学生页面
       }
     } else if (res.code === 403 && res.requirePasswordChange) {
-      // 需要强制修改密码，跳转到修改密码页面
-      router.push({
-        path: '/change-password',
-        query: {
-          studentId: res.studentId,
-          studentName: res.studentName || ''
-        }
+      if (!res.passwordChangeToken) {
+        ElMessage.warning('暂时无法进入改密页面，请刷新后重新登录')
+        return
+      }
+      setPendingPasswordChange({
+        token: res.passwordChangeToken,
+        studentId: res.studentId,
+        studentName: res.studentName
       })
+      loginForm.password = ''
+      router.push('/change-password')
       ElMessage.warning(res.msg || '请先修改初始密码')
     } else {
       // 处理后端返回的业务错误（如 401 账号密码错误）
       ElMessage.error(res.msg || '登录失败')
     }
     loading.value = false
-  } catch (error) {
-    console.error('登录失败:', error)
+  } catch {
     ElMessage.error('登录失败，请检查网络连接')
   } finally {
     loading.value = false

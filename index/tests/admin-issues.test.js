@@ -2,12 +2,12 @@ const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const { readSource: read, loadBindings: handlers } = require('./helpers/sourceHarness')
 
-test('first-login password change sends credentials via the supported POST endpoint', () => {
+test('first-login password change sends the grant and new password via POST', () => {
   const { changeInitialPassword } = handlers('api/student.js', ['changeInitialPassword'], { request: config => config })
-  const config = changeInitialPassword('1001', 'old-password', 'new-password')
+  const config = changeInitialPassword('short-lived-grant', 'new-password')
   assert.equal(config.url, '/student/change-initial-password')
   assert.equal(config.method, 'post')
-  assert.deepEqual({ ...config.data }, { studentId: '1001', initialPassword: 'old-password', newPassword: 'new-password' })
+  assert.deepEqual({ ...config.data }, { passwordChangeToken: 'short-lived-grant', newPassword: 'new-password' })
 })
 
 test('dashboard approval submits the business ID, decision and rejection reason', async () => {
